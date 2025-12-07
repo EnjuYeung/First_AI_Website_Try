@@ -100,3 +100,29 @@ export interface AppSettings {
     lastPasswordChange: string;
   };
 }
+
+// --- Notification History Types ---
+
+export type NotificationType = 'renewal_reminder' | 'renewal_success' | 'renewal_failed' | 'subscription_change';
+export type NotificationStatus = 'success' | 'failed';
+export type NotificationChannel = 'telegram' | 'email';
+
+export interface NotificationRecord {
+  id: string;
+  subscriptionName: string;
+  type: NotificationType;
+  status: NotificationStatus;
+  channel: NotificationChannel;
+  timestamp: number;
+  // Dynamic fields for the template
+  details: {
+    amount?: number;
+    currency?: string;
+    date?: string;
+    paymentMethod?: string;
+    message?: string;
+    receiver?: string;
+    daysUntil?: number;
+    errorReason?: string;
+  };
+}

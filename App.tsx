@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, LayoutDashboard, List, CreditCard, Settings as SettingsIcon, BarChart2 } from 'lucide-react';
+import { Plus, LayoutDashboard, List, Settings as SettingsIcon, BarChart2, BellRing, Globe, Moon, Sun, LogOut, Home, CreditCard } from 'lucide-react';
 import { Subscription, AppSettings } from './types';
 import { loadSubscriptions, saveSubscriptions, loadSettings, saveSettings } from './services/storageService';
 import { translations } from './services/i18n';
@@ -9,9 +9,10 @@ import SubscriptionList from './components/SubscriptionList';
 import SubscriptionForm from './components/SubscriptionForm';
 import Settings from './components/Settings';
 import Statistics from './components/Statistics';
+import NotificationHistory from './components/NotificationHistory';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>('dashboard');
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [settings, setSettings] = useState<AppSettings>(loadSettings());
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -108,88 +109,88 @@ const App: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Toggle Language Helper
+  const toggleLanguage = () => {
+      handleUpdateSettings({ ...settings, language: settings.language === 'en' ? 'zh' : 'en' });
+  };
+
+  // Toggle Theme Helper
+  const toggleTheme = () => {
+      const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
+      handleUpdateSettings({ ...settings, theme: newTheme });
+  };
+
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex transition-colors duration-200">
-      {/* Sidebar Navigation */}
-      <aside className="w-20 lg:w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-gray-700 fixed h-full z-10 transition-all">
-        <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-gray-100 dark:border-gray-700">
-          <div className="bg-primary-600 text-white p-2 rounded-lg">
-            <CreditCard size={20} />
-          </div>
-          <span className="ml-3 font-bold text-xl text-gray-800 dark:text-white hidden lg:block">{t('app_name')}</span>
-        </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors duration-200">
+      
+      {/* Top Navigation Bar */}
+      <header className="bg-black text-white px-6 h-16 flex items-center justify-between sticky top-0 z-20 shadow-md">
+         {/* Left: Branding & Nav Links */}
+         <div className="flex items-center gap-8">
+            <h1 className="text-xl font-bold tracking-tight">SubManager</h1>
+            
+            {/* Nav Links */}
+            <nav className="hidden md:flex items-center gap-1 ml-4">
+                <button 
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                   <Home size={18} />
+                   <span>{t('dashboard')}</span>
+                </button>
+                 <button 
+                  onClick={() => setActiveTab('list')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'list' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                   <CreditCard size={18} />
+                   <span>{t('subscriptions')}</span>
+                </button>
+                 <button 
+                  onClick={() => setActiveTab('analytics')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                   <BarChart2 size={18} />
+                   <span>{t('analytics')}</span>
+                </button>
+                 <button 
+                  onClick={() => setActiveTab('notifications')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'notifications' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                   <BellRing size={18} />
+                   <span>{t('notifications_history')}</span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('settings')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                   <SettingsIcon size={18} />
+                   <span>{t('settings')}</span>
+                </button>
+            </nav>
+         </div>
 
-        <nav className="p-4 space-y-2">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center p-3 rounded-xl transition-all ${
-              activeTab === 'dashboard' 
-                ? 'bg-primary-50 dark:bg-slate-700 text-primary-600 dark:text-white font-medium' 
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <LayoutDashboard size={20} />
-            <span className="ml-3 hidden lg:block">{t('dashboard')}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('list')}
-            className={`w-full flex items-center p-3 rounded-xl transition-all ${
-              activeTab === 'list' 
-                ? 'bg-primary-50 dark:bg-slate-700 text-primary-600 dark:text-white font-medium' 
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <List size={20} />
-            <span className="ml-3 hidden lg:block">{t('subscriptions')}</span>
-          </button>
-          
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`w-full flex items-center p-3 rounded-xl transition-all ${
-              activeTab === 'analytics' 
-                ? 'bg-primary-50 dark:bg-slate-700 text-primary-600 dark:text-white font-medium' 
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <BarChart2 size={20} />
-            <span className="ml-3 hidden lg:block">{t('analytics')}</span>
-          </button>
-
-          <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
-            <button
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center p-3 rounded-xl transition-all ${
-                activeTab === 'settings' 
-                    ? 'bg-primary-50 dark:bg-slate-700 text-primary-600 dark:text-white font-medium' 
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
-                }`}
-            >
-                <SettingsIcon size={20} />
-                <span className="ml-3 hidden lg:block">{t('settings')}</span>
+         {/* Right: Controls */}
+         <div className="flex items-center gap-4 text-gray-300">
+            <button onClick={toggleLanguage} className="hover:text-white transition-colors" title={t('language')}><Globe size={18} /></button>
+            <button onClick={toggleTheme} className="hover:text-white transition-colors" title={t('appearance')}>
+                {settings.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-          </div>
-        </nav>
-      </aside>
+            <button className="hover:text-white transition-colors" title={t('logout')}><LogOut size={18} /></button>
+         </div>
+      </header>
+
 
       {/* Main Content */}
-      <main className="flex-1 ml-20 lg:ml-64 p-6 lg:p-10 overflow-x-hidden">
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
-                {activeTab === 'list' ? t('subscriptions') : 
-                 activeTab === 'analytics' ? t('analytics') :
-                 activeTab === 'settings' ? t('settings') : t('dashboard')}
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-              {activeTab === 'dashboard' && t('overview_text')}
-              {activeTab === 'list' && t('manage_text')}
-              {activeTab === 'analytics' && t('analytics_text')}
-              {activeTab === 'settings' && t('settings_text')}
-            </p>
-          </div>
+      <main className="flex-1 p-6 lg:p-10 overflow-x-hidden max-w-7xl mx-auto w-full">
+        {/* Header Section for Page Content */}
+        <div className="flex justify-between items-center mb-8">
+            {/* Optional Breadcrumb or Page Title if strictly needed, otherwise implied by tabs */}
+             <div>
+                 {/* Empty div to keep layout if add button is on right */}
+             </div>
           
-          {activeTab !== 'settings' && (
+          {activeTab !== 'settings' && activeTab !== 'notifications' && (
             <button
                 onClick={openAddModal}
                 className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl shadow-md transition-transform active:scale-95"
@@ -198,9 +199,9 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline">{t('add_new')}</span>
             </button>
           )}
-        </header>
+        </div>
 
-        <div className="max-w-6xl mx-auto">
+        <div className="animate-fade-in">
           {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={settings.language} />}
           
           {activeTab === 'list' && (
@@ -216,6 +217,10 @@ const App: React.FC = () => {
 
           {activeTab === 'analytics' && (
             <Statistics subscriptions={subscriptions} lang={settings.language} />
+          )}
+
+          {activeTab === 'notifications' && (
+            <NotificationHistory lang={settings.language} />
           )}
           
           {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={handleUpdateSettings} />}

@@ -1,8 +1,9 @@
 
-import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS } from '../types';
+import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, NotificationRecord } from '../types';
 
 const STORAGE_KEY = 'subscrybe_data_v1';
 const SETTINGS_KEY = 'subscrybe_settings_v1';
+const NOTIFICATIONS_KEY = 'subscrybe_notifications_v1';
 
 export const saveSubscriptions = (subs: Subscription[]): void => {
   try {
@@ -101,5 +102,98 @@ export const loadSettings = (): AppSettings => {
     };
   } catch (error) {
     return DEFAULT_SETTINGS;
+  }
+};
+
+// --- Notification Storage ---
+
+const generateMockNotifications = (): NotificationRecord[] => {
+  const records: NotificationRecord[] = [
+    {
+      id: '1',
+      subscriptionName: 'Netflix',
+      type: 'renewal_success',
+      status: 'success',
+      channel: 'telegram',
+      timestamp: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
+      details: {
+        amount: 15.99,
+        currency: 'USD',
+        date: new Date().toISOString().split('T')[0],
+        paymentMethod: 'Credit Card',
+        receiver: '123456789',
+        message: 'Payment processed successfully.'
+      }
+    },
+    {
+      id: '2',
+      subscriptionName: 'Spotify',
+      type: 'renewal_reminder',
+      status: 'success',
+      channel: 'email',
+      timestamp: Date.now() - 1000 * 60 * 60 * 25, // Yesterday
+      details: {
+        amount: 9.99,
+        currency: 'USD',
+        date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString().split('T')[0], // 2 days from now
+        daysUntil: 2,
+        receiver: 'user@example.com',
+        message: 'Please ensure sufficient funds.'
+      }
+    },
+    {
+      id: '3',
+      subscriptionName: 'Adobe Creative Cloud',
+      type: 'renewal_failed',
+      status: 'failed',
+      channel: 'telegram',
+      timestamp: Date.now() - 1000 * 60 * 60 * 48, // 2 days ago
+      details: {
+        amount: 54.99,
+        currency: 'USD',
+        date: new Date().toISOString().split('T')[0],
+        errorReason: 'Insufficient funds',
+        receiver: '123456789'
+      }
+    },
+    {
+      id: '4',
+      subscriptionName: 'GitHub Copilot',
+      type: 'renewal_reminder',
+      status: 'success',
+      channel: 'telegram',
+      timestamp: Date.now() - 1000 * 60 * 60 * 72, // 3 days ago
+      details: {
+        amount: 10.00,
+        currency: 'USD',
+        daysUntil: 3,
+        date: new Date().toISOString().split('T')[0],
+        receiver: '123456789'
+      }
+    }
+  ];
+  return records;
+};
+
+export const loadNotificationHistory = (): NotificationRecord[] => {
+  try {
+    const data = localStorage.getItem(NOTIFICATIONS_KEY);
+    if (!data) {
+        // Return Mock Data for demonstration if empty
+        const mocks = generateMockNotifications();
+        saveNotificationHistory(mocks);
+        return mocks;
+    }
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+};
+
+export const saveNotificationHistory = (records: NotificationRecord[]): void => {
+  try {
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(records));
+  } catch (error) {
+    console.error('Failed to save notifications', error);
   }
 };
