@@ -1,4 +1,5 @@
 
+
 export const translations = {
   en: {
     app_name: "Sub_Management",
@@ -75,6 +76,9 @@ export const translations = {
     new_password: "New Password",
     confirm_new_password: "Confirm New Password",
     update_password: "Update Password",
+    password_success: "Password updated successfully!",
+    password_error_mismatch: "New passwords do not match.",
+    password_error_empty: "Please fill in all password fields.",
     scan_qr: "Scan this with Google Authenticator",
     verify: "Verify",
     enable_notifications: "Enable Notifications",
@@ -149,6 +153,7 @@ export const translations = {
     full_screen: "Full Screen",
     exit_full_screen: "Exit Full Screen",
     logout: "Logout",
+    confirm_logout: "Are you sure you want to logout?",
     // Notification History
     notif_total: "Total",
     notif_sent: "Sent",
@@ -177,7 +182,16 @@ export const translations = {
     notif_records_count: "{count} records",
     notif_tips: "Tips",
     notif_tip_ensure_funds: "Please ensure funds to avoid service interruption",
-    notif_tip_payment_ok: "Payment processed successfully"
+    notif_tip_payment_ok: "Payment processed successfully",
+    // Login
+    login_title: "Sign in to SubManager",
+    username: "Username",
+    password: "Password",
+    login_button: "Sign In",
+    logging_in: "Signing in...",
+    invalid_credentials: "Invalid username or password",
+    welcome_back: "Welcome back!",
+    login_subtitle: "Manage your subscriptions intelligently"
   },
   zh: {
     app_name: "Sub_Management",
@@ -254,6 +268,9 @@ export const translations = {
     new_password: "新密码",
     confirm_new_password: "确认新密码",
     update_password: "更新密码",
+    password_success: "密码更新成功！",
+    password_error_mismatch: "新密码不匹配。",
+    password_error_empty: "请填写所有密码字段。",
     scan_qr: "使用 Google Authenticator 扫描",
     verify: "验证",
     enable_notifications: "开启通知",
@@ -328,6 +345,7 @@ export const translations = {
     full_screen: "全屏查看",
     exit_full_screen: "退出全屏",
     logout: "登出",
+    confirm_logout: "您确定要退出登录吗？",
     // Notification History
     notif_total: "总数",
     notif_sent: "已发送",
@@ -356,6 +374,15 @@ export const translations = {
     notif_records_count: "共 {count} 条记录",
     notif_tips: "提示",
     notif_tip_ensure_funds: "请及时续订以避免服务中断",
-    notif_tip_payment_ok: "支付已成功处理"
+    notif_tip_payment_ok: "支付已成功处理",
+    // Login
+    login_title: "登录 SubManager",
+    username: "用户名",
+    password: "密码",
+    login_button: "登录",
+    logging_in: "登录中...",
+    invalid_credentials: "用户名或密码错误",
+    welcome_back: "欢迎回来！",
+    login_subtitle: "智能管理您的订阅服务"
   }
 };

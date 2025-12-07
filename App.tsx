@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, LayoutDashboard, List, Settings as SettingsIcon, BarChart2, BellRing, Globe, Moon, Sun, LogOut, Home, CreditCard } from 'lucide-react';
 import { Subscription, AppSettings } from './types';
@@ -10,8 +9,14 @@ import SubscriptionForm from './components/SubscriptionForm';
 import Settings from './components/Settings';
 import Statistics from './components/Statistics';
 import NotificationHistory from './components/NotificationHistory';
+import LoginPage from './components/LoginPage';
 
 const App: React.FC = () => {
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  // App State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>('dashboard');
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [settings, setSettings] = useState<AppSettings>(loadSettings());
@@ -25,6 +30,13 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Check for existing session
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        setIsAuthenticated(true);
+    }
+    setIsLoadingAuth(false);
+
     const loadedSubs = loadSubscriptions();
     setSubscriptions(loadedSubs);
 
@@ -120,6 +132,32 @@ const App: React.FC = () => {
       handleUpdateSettings({ ...settings, theme: newTheme });
   };
 
+  const handleLogin = (token: string) => {
+      localStorage.setItem('auth_token', token);
+      setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+      if (window.confirm(t('confirm_logout'))) {
+          localStorage.removeItem('auth_token');
+          setIsAuthenticated(false);
+          setActiveTab('dashboard'); // Reset tab
+      }
+  };
+
+  if (isLoadingAuth) {
+      return null; // Or a loading spinner
+  }
+
+  if (!isAuthenticated) {
+      return (
+          <LoginPage 
+            onLogin={handleLogin} 
+            lang={settings.language}
+            toggleLanguage={toggleLanguage}
+          />
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors duration-200">
@@ -176,7 +214,7 @@ const App: React.FC = () => {
             <button onClick={toggleTheme} className="hover:text-white transition-colors" title={t('appearance')}>
                 {settings.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button className="hover:text-white transition-colors" title={t('logout')}><LogOut size={18} /></button>
+            <button onClick={handleLogout} className="hover:text-white transition-colors" title={t('logout')}><LogOut size={18} /></button>
          </div>
       </header>
 

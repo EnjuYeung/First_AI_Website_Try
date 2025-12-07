@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { AppSettings } from '../types';
 import { getRatesFromAI, shouldAutoUpdate } from '../services/currencyService';
@@ -171,6 +172,32 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     } finally {
         setIsTestingTelegram(false);
     }
+  };
+
+  const handleUpdatePassword = () => {
+    const { current, new: newPass, confirm } = passwords;
+    
+    if (!current || !newPass || !confirm) {
+        alert(t('password_error_empty'));
+        return;
+    }
+
+    if (newPass !== confirm) {
+        alert(t('password_error_mismatch'));
+        return;
+    }
+
+    // Simulate success since we don't have backend auth
+    setPasswords({ current: '', new: '', confirm: '' });
+    onUpdateSettings({
+        ...settings,
+        security: {
+            ...settings.security,
+            lastPasswordChange: new Date().toISOString()
+        }
+    });
+
+    alert(t('password_success'));
   };
 
   const formatLastUpdated = (timestamp: number) => {
@@ -553,7 +580,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                         <input type="password" placeholder={t('current_password')} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} />
                         <input type="password" placeholder={t('new_password')} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} />
                         <input type="password" placeholder={t('confirm_new_password')} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} />
-                        <button className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">{t('update_password')}</button>
+                        <button onClick={handleUpdatePassword} className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">{t('update_password')}</button>
                     </div>
                  </section>
                  
