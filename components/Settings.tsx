@@ -1,11 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { AppSettings, ExchangeRates } from '../types';
-import { loadSettings, saveSettings } from '../services/storageService';
-import { fetchExchangeRates } from '../services/currencyService';
-import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2 } from 'lucide-react';
 
-const Settings: React.FC = () => {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings());
+import React, { useState } from 'react';
+import { AppSettings, ExchangeRates } from '../types';
+import { fetchExchangeRates } from '../services/currencyService';
+import { translations } from '../services/i18n';
+import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock } from 'lucide-react';
+
+interface Props {
+    settings: AppSettings;
+    onUpdateSettings: (settings: AppSettings) => void;
+}
+
+const COMMON_TIMEZONES = [
+  'UTC',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Singapore',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Australia/Sydney'
+];
+
+const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'currency' | 'notifications' | 'security'>('general');
   const [newCategory, setNewCategory] = useState('');
   const [newPayment, setNewPayment] = useState('');
@@ -22,27 +41,22 @@ const Settings: React.FC = () => {
   // Notification State
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
 
-  useEffect(() => {
-    saveSettings(settings);
-    // Apply theme immediately
-    if (settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [settings]);
+  const t = (key: keyof typeof translations['en']) => {
+    const value = translations[settings.language][key];
+    return value !== undefined ? value : key;
+  };
 
   // General Handlers
   const handleAddCategory = () => {
     if (newCategory && !settings.customCategories.includes(newCategory)) {
-      setSettings(prev => ({ ...prev, customCategories: [...prev.customCategories, newCategory] }));
+      onUpdateSettings({ ...settings, customCategories: [...settings.customCategories, newCategory] });
       setNewCategory('');
     }
   };
 
   const handleAddPayment = () => {
     if (newPayment && !settings.customPaymentMethods.includes(newPayment)) {
-        setSettings(prev => ({...prev, customPaymentMethods: [...prev.customPaymentMethods, newPayment]}));
+        onUpdateSettings({...settings, customPaymentMethods: [...settings.customPaymentMethods, newPayment]});
         setNewPayment('');
     }
   }
@@ -104,7 +118,7 @@ const Settings: React.FC = () => {
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
             >
-                {tab}
+                {t(tab as any)}
             </button>
         ))}
       </div>
@@ -114,14 +128,64 @@ const Settings: React.FC = () => {
         {/* GENERAL TAB */}
         {activeTab === 'general' && (
             <div className="space-y-8 max-w-2xl">
+                {/* Language */}
+                 <section>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('language')}</h3>
+                    <div className="flex space-x-4">
+                        <button
+                            onClick={() => onUpdateSettings({ ...settings, language: 'zh' })}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
+                                settings.language === 'zh'
+                                ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white' 
+                                : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
+                            }`}
+                        >
+                            <Globe size={16} />
+                            <span>简体中文</span>
+                        </button>
+                        <button
+                            onClick={() => onUpdateSettings({ ...settings, language: 'en' })}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
+                                settings.language === 'en'
+                                ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white' 
+                                : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
+                            }`}
+                        >
+                            <Globe size={16} />
+                            <span>English</span>
+                        </button>
+                    </div>
+                </section>
+
+                {/* Timezone */}
+                <section>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('timezone')}</h3>
+                    <div className="flex items-center space-x-2 max-w-xs">
+                         <Clock className="text-gray-500" size={20} />
+                         <select 
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none"
+                            value={settings.timezone}
+                            onChange={(e) => onUpdateSettings({ ...settings, timezone: e.target.value })}
+                        >
+                            {COMMON_TIMEZONES.map(tz => (
+                                <option key={tz} value={tz}>{tz}</option>
+                            ))}
+                            {!COMMON_TIMEZONES.includes(settings.timezone) && (
+                                <option value={settings.timezone}>{settings.timezone}</option>
+                            )}
+                        </select>
+                    </div>
+                </section>
+
+
                 {/* Theme */}
                 <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Appearance</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('appearance')}</h3>
                     <div className="flex space-x-4">
                         {(['light', 'dark', 'system'] as const).map(mode => (
                             <button
                                 key={mode}
-                                onClick={() => setSettings(s => ({ ...s, theme: mode }))}
+                                onClick={() => onUpdateSettings({ ...settings, theme: mode })}
                                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
                                     settings.theme === mode 
                                     ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white' 
@@ -139,7 +203,7 @@ const Settings: React.FC = () => {
 
                 {/* Categories */}
                 <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Categories</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('categories')}</h3>
                     <div className="flex gap-2 mb-3">
                         <input 
                             type="text" 
@@ -154,7 +218,7 @@ const Settings: React.FC = () => {
                         {settings.customCategories.map(cat => (
                             <span key={cat} className="px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2">
                                 {cat}
-                                <button onClick={() => setSettings(s => ({...s, customCategories: s.customCategories.filter(c => c !== cat)}))} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
+                                <button onClick={() => onUpdateSettings({...settings, customCategories: settings.customCategories.filter(c => c !== cat)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
                     </div>
@@ -162,7 +226,7 @@ const Settings: React.FC = () => {
 
                 {/* Payment Methods */}
                 <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Payment Methods</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('payment_methods')}</h3>
                     <div className="flex gap-2 mb-3">
                         <input 
                             type="text" 
@@ -177,7 +241,7 @@ const Settings: React.FC = () => {
                         {settings.customPaymentMethods.map(pm => (
                             <span key={pm} className="px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2">
                                 {pm}
-                                <button onClick={() => setSettings(s => ({...s, customPaymentMethods: s.customPaymentMethods.filter(p => p !== pm)}))} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
+                                <button onClick={() => onUpdateSettings({...settings, customPaymentMethods: settings.customPaymentMethods.filter(p => p !== pm)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
                     </div>
@@ -189,7 +253,7 @@ const Settings: React.FC = () => {
         {activeTab === 'currency' && (
             <div className="space-y-8 max-w-2xl">
                 <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Supported Currencies</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('supported_currencies')}</h3>
                     <div className="flex gap-2 mb-3">
                         <input 
                             type="text" placeholder="Code (e.g. TWD)" 
@@ -204,7 +268,7 @@ const Settings: React.FC = () => {
                         <button 
                             onClick={() => {
                                 if(newCurrency.code && newCurrency.name) {
-                                    setSettings(s => ({...s, customCurrencies: [...s.customCurrencies, newCurrency]}));
+                                    onUpdateSettings({...settings, customCurrencies: [...settings.customCurrencies, newCurrency]});
                                     setNewCurrency({code: '', name: ''});
                                 }
                             }} 
@@ -215,21 +279,21 @@ const Settings: React.FC = () => {
                          {settings.customCurrencies.map(c => (
                             <span key={c.code} className="px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2">
                                 <b>{c.code}</b> - {c.name}
-                                <button onClick={() => setSettings(s => ({...s, customCurrencies: s.customCurrencies.filter(cur => cur.code !== c.code)}))} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
+                                <button onClick={() => onUpdateSettings({...settings, customCurrencies: settings.customCurrencies.filter(cur => cur.code !== c.code)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
                     </div>
                 </section>
 
                 <section>
-                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Exchange Rate API</h3>
+                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('exchange_rate_api')}</h3>
                      <div className="grid gap-4">
                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Provider</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('provider')}</label>
                             <select 
                                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none"
                                 value={settings.currencyApi.provider}
-                                onChange={e => setSettings(s => ({...s, currencyApi: {...s.currencyApi, provider: e.target.value as any}}))}
+                                onChange={e => onUpdateSettings({...settings, currencyApi: {...settings.currencyApi, provider: e.target.value as any}})}
                             >
                                 <option value="none">None (Use Mock Data)</option>
                                 <option value="tianapi">TianAPI</option>
@@ -237,12 +301,12 @@ const Settings: React.FC = () => {
                             </select>
                          </div>
                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('api_key')}</label>
                             <input 
                                 type="password"
                                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none"
                                 value={settings.currencyApi.apiKey}
-                                onChange={e => setSettings(s => ({...s, currencyApi: {...s.currencyApi, apiKey: e.target.value}}))}
+                                onChange={e => onUpdateSettings({...settings, currencyApi: {...settings.currencyApi, apiKey: e.target.value}})}
                             />
                          </div>
                      </div>
@@ -250,7 +314,7 @@ const Settings: React.FC = () => {
 
                 <section>
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-white">Real-time Rates (Base: USD)</h3>
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('realtime_rates')} ({t('base_usd')})</h3>
                         <button onClick={fetchRates} disabled={isLoadingRates} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg">
                             <RefreshCw size={20} className={isLoadingRates ? "animate-spin" : ""} />
                         </button>
@@ -276,24 +340,24 @@ const Settings: React.FC = () => {
             <div className="space-y-8 max-w-2xl">
                  {/* Channels */}
                  <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Channels</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('channels')}</h3>
                     
                     <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl mb-4">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <Send size={20} className="text-blue-500"/>
-                                <span className="font-semibold dark:text-white">Telegram Bot</span>
+                                <span className="font-semibold dark:text-white">{t('telegram_bot')}</span>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={settings.notifications.telegram.enabled} onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, telegram: {...s.notifications.telegram, enabled: e.target.checked}}}))} className="sr-only peer" />
+                                <input type="checkbox" checked={settings.notifications.telegram.enabled} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, enabled: e.target.checked}}})} className="sr-only peer" />
                                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
                         {settings.notifications.telegram.enabled && (
                             <div className="space-y-3">
-                                <input placeholder="Bot Token" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.botToken} onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, telegram: {...s.notifications.telegram, botToken: e.target.value}}}))} />
+                                <input placeholder="Bot Token" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.botToken} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, botToken: e.target.value}}})} />
                                 <div className="flex gap-2">
-                                     <input placeholder="Chat ID" className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.chatId} onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, telegram: {...s.notifications.telegram, chatId: e.target.value}}}))} />
+                                     <input placeholder="Chat ID" className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.chatId} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, chatId: e.target.value}}})} />
                                      <button 
                                         onClick={handleTestTelegram}
                                         disabled={isTestingTelegram || !settings.notifications.telegram.botToken || !settings.notifications.telegram.chatId}
@@ -310,50 +374,55 @@ const Settings: React.FC = () => {
                     <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <span className="font-semibold dark:text-white">Email</span>
+                                <span className="font-semibold dark:text-white">{t('email')}</span>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={settings.notifications.email.enabled} onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, email: {...s.notifications.email, enabled: e.target.checked}}}))} className="sr-only peer" />
+                                <input type="checkbox" checked={settings.notifications.email.enabled} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, email: {...settings.notifications.email, enabled: e.target.checked}}})} className="sr-only peer" />
                                 <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                             </label>
                         </div>
                         {settings.notifications.email.enabled && (
-                             <input placeholder="Email Address" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.email.emailAddress} onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, email: {...s.notifications.email, emailAddress: e.target.value}}}))} />
+                             <input placeholder="Email Address" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.email.emailAddress} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, email: {...settings.notifications.email, emailAddress: e.target.value}}})} />
                         )}
                     </div>
                  </section>
 
                  {/* Rules */}
                  <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Notification Rules</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('rules')}</h3>
                     <div className="space-y-3">
                         {[
-                            { key: 'expiryWarning', label: 'Expiry Warning' },
-                            { key: 'renewalFailed', label: 'Renewal Failed' },
-                            { key: 'renewalReminder', label: 'Renewal Reminder' },
-                            { key: 'renewalSuccess', label: 'Renewal Success' },
-                            { key: 'subscriptionChange', label: 'Subscription Changes' },
+                            { key: 'renewalReminder', label: t('renewal_reminder') },
+                            { key: 'renewalFailed', label: t('renewal_failed') },
+                            { key: 'renewalSuccess', label: t('renewal_success') },
+                            { key: 'subscriptionChange', label: t('subscription_changes') },
                         ].map((rule) => (
-                             <div key={rule.key} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                                <span className="text-gray-700 dark:text-gray-200">{rule.label}</span>
-                                <input 
-                                    type="checkbox" 
-                                    checked={(settings.notifications.rules as any)[rule.key]} 
-                                    onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, rules: {...s.notifications.rules, [rule.key]: e.target.checked}}}))}
-                                    className="w-5 h-5 text-primary-600 rounded"
-                                />
+                             <div key={rule.key} className="flex flex-col p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-700 dark:text-gray-200">{rule.label}</span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={(settings.notifications.rules as any)[rule.key]} 
+                                        onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, [rule.key]: e.target.checked}}})}
+                                        className="w-5 h-5 text-primary-600 rounded"
+                                    />
+                                </div>
+                                
+                                {/* Reminder Days Input - Only show for Renewal Reminder when enabled */}
+                                {rule.key === 'renewalReminder' && settings.notifications.rules.renewalReminder && (
+                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex items-center gap-2 animate-fade-in">
+                                        <label className="text-sm text-gray-600 dark:text-gray-400">{t('remind_me')}</label>
+                                        <input 
+                                            type="number" min="1" max="30" 
+                                            className="w-16 px-2 py-1 border rounded dark:bg-slate-800 dark:border-gray-600 dark:text-white text-center"
+                                            value={settings.notifications.rules.reminderDays}
+                                            onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, reminderDays: parseInt(e.target.value)}}}) }
+                                        />
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">{t('days_before')}</span>
+                                    </div>
+                                )}
                              </div>
                         ))}
-                    </div>
-                    <div className="mt-4 flex items-center gap-4">
-                        <label className="text-sm text-gray-700 dark:text-gray-300">Remind me</label>
-                        <input 
-                            type="number" min="1" max="30" 
-                            className="w-16 px-2 py-1 border rounded dark:bg-slate-700 dark:border-gray-600 dark:text-white"
-                            value={settings.notifications.rules.reminderDays}
-                            onChange={e => setSettings(s => ({...s, notifications: {...s.notifications, rules: {...s.notifications.rules, reminderDays: parseInt(e.target.value)}}}) )}
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">days before renewal</span>
                     </div>
                  </section>
             </div>
@@ -363,21 +432,21 @@ const Settings: React.FC = () => {
         {activeTab === 'security' && (
             <div className="space-y-8 max-w-2xl">
                  <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Change Password</h3>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('change_password')}</h3>
                     <div className="space-y-4">
-                        <input type="password" placeholder="Current Password" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} />
-                        <input type="password" placeholder="New Password" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} />
-                        <input type="password" placeholder="Confirm New Password" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} />
-                        <button className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">Update Password</button>
+                        <input type="password" placeholder={t('current_password')} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} />
+                        <input type="password" placeholder={t('new_password')} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} />
+                        <input type="password" placeholder={t('confirm_new_password')} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} />
+                        <button className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">{t('update_password')}</button>
                     </div>
                  </section>
                  
                  <section>
                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-white">Two-Factor Authentication (2FA)</h3>
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('two_factor')}</h3>
                          <label className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" checked={settings.security.twoFactorEnabled} onChange={e => {
-                                setSettings(s => ({...s, security: {...s.security, twoFactorEnabled: e.target.checked}}));
+                                onUpdateSettings({...settings, security: {...settings.security, twoFactorEnabled: e.target.checked}});
                                 if(e.target.checked) setShowQr(true);
                                 else setShowQr(false);
                             }} className="sr-only peer" />
@@ -390,10 +459,10 @@ const Settings: React.FC = () => {
                                  {/* Mock QR Code */}
                                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/Subscrybe:User?secret=JBSWY3DPEHPK3PXP&issuer=Subscrybe" alt="2FA QR" />
                              </div>
-                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 text-center">Scan this with Google Authenticator</p>
+                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 text-center">{t('scan_qr')}</p>
                              <div className="flex gap-2">
                                  <input type="text" placeholder="Enter 6-digit code" className="px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white" />
-                                 <button className="px-4 py-2 bg-green-600 text-white rounded-lg">Verify</button>
+                                 <button className="px-4 py-2 bg-green-600 text-white rounded-lg">{t('verify')}</button>
                              </div>
                          </div>
                      )}

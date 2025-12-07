@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -5,14 +6,20 @@ import {
 } from 'recharts';
 import { Subscription, Frequency } from '../types';
 import { TrendingUp, Calendar, CreditCard, PieChart } from 'lucide-react';
+import { translations } from '../services/i18n';
 
 interface Props {
   subscriptions: Subscription[];
+  lang: 'en' | 'zh';
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16'];
 
-const Statistics: React.FC<Props> = ({ subscriptions }) => {
+const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
+    const t = (key: keyof typeof translations['en']) => {
+        const value = translations[lang][key];
+        return value !== undefined ? value : key;
+    };
 
   // --- Helper Functions ---
 
@@ -158,8 +165,8 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
         <div className="flex items-center justify-center h-96 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-gray-700">
              <div className="text-center text-gray-500 dark:text-gray-400">
                  <PieChart size={48} className="mx-auto mb-4 opacity-50"/>
-                 <p className="text-lg font-medium">Not enough data for analysis</p>
-                 <p className="text-sm">Add subscriptions to see trends and insights.</p>
+                 <p className="text-lg font-medium">{t('analytics_text')}</p>
+                 <p className="text-sm">{t('manage_text')}</p>
              </div>
         </div>
       )
@@ -173,16 +180,15 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="flex items-center space-x-3 mb-2">
                 <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><TrendingUp size={20}/></div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Lifetime Spend</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t('lifetime_spend')}</span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white">${overview.lifetimeSpend.toLocaleString()}</h3>
-            <p className="text-xs text-gray-400 mt-1">Total calculated from start dates</p>
         </div>
 
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="flex items-center space-x-3 mb-2">
                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Calendar size={20}/></div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Avg. Monthly</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t('avg_monthly')}</span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white">${overview.avgMonthly.toFixed(2)}</h3>
         </div>
@@ -190,7 +196,7 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="flex items-center space-x-3 mb-2">
                 <div className="p-2 bg-pink-100 text-pink-600 rounded-lg"><CreditCard size={20}/></div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Highest Sub</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t('highest_sub')}</span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate" title={overview.highestSub.name}>{overview.highestSub.name}</h3>
             <p className="text-xs text-gray-400 mt-1">${overview.highestSub.price.toFixed(2)} / cycle</p>
@@ -199,7 +205,7 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="flex items-center space-x-3 mb-2">
                 <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><PieChart size={20}/></div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Top Category</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t('top_category')}</span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{overview.topCategory.name}</h3>
             <p className="text-xs text-gray-400 mt-1">${overview.topCategory.value.toFixed(2)} / mo</p>
@@ -208,7 +214,7 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
 
       {/* Row 2: Trend History */}
       <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
-        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">Spending Trend (Last 12 Months)</h3>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">{t('spending_trend')}</h3>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={historyData.data} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
             <defs>
@@ -245,7 +251,7 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
           
           {/* Calendar Distribution */}
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-80">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Payment Distribution (Day of Month)</h3>
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('payment_distribution')}</h3>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={billingCycleData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB"/>
@@ -261,7 +267,7 @@ const Statistics: React.FC<Props> = ({ subscriptions }) => {
 
           {/* Category Radar */}
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-80">
-             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Category Balance</h3>
+             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('category_balance')}</h3>
              <ResponsiveContainer width="100%" height="100%">
                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={categoryRadarData}>
                     <PolarGrid stroke="#e5e7eb" />

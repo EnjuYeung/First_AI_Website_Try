@@ -1,3 +1,4 @@
+
 export enum Frequency {
   MONTHLY = 'Monthly',
   QUARTERLY = 'Quarterly',
@@ -32,11 +33,13 @@ export interface Subscription {
   frequency: Frequency;
   category: string; // Changed from Enum to string
   paymentMethod: string; // Changed from Enum to string
+  status: 'active' | 'cancelled'; // New status field
   startDate: string;
   nextBillingDate: string;
   iconUrl?: string;
   url?: string;
   notes?: string;
+  notificationsEnabled: boolean;
 }
 
 export interface SpendingData {
@@ -59,7 +62,6 @@ export interface CurrencyConfig {
 }
 
 export interface NotificationRule {
-  expiryWarning: boolean;
   renewalFailed: boolean;
   renewalReminder: boolean;
   renewalSuccess: boolean;
@@ -68,6 +70,8 @@ export interface NotificationRule {
 }
 
 export interface AppSettings {
+  language: 'zh' | 'en';
+  timezone: string;
   theme: 'light' | 'dark' | 'system';
   customCategories: string[];
   customPaymentMethods: string[];

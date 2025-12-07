@@ -1,3 +1,4 @@
+
 import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS } from '../types';
 
 const STORAGE_KEY = 'subscrybe_data_v1';
@@ -14,7 +15,14 @@ export const saveSubscriptions = (subs: Subscription[]): void => {
 export const loadSubscriptions = (): Subscription[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    
+    const parsed = JSON.parse(data);
+    // Migration: Ensure all subscriptions have a status
+    return parsed.map((sub: any) => ({
+      ...sub,
+      status: sub.status || 'active'
+    }));
   } catch (error) {
     console.error('Failed to load from local storage', error);
     return [];
@@ -22,6 +30,8 @@ export const loadSubscriptions = (): Subscription[] => {
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
+  language: 'zh',
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
   theme: 'system',
   customCategories: DEFAULT_CATEGORIES,
   customPaymentMethods: DEFAULT_PAYMENT_METHODS,
@@ -42,7 +52,6 @@ const DEFAULT_SETTINGS: AppSettings = {
     telegram: { enabled: false, botToken: '', chatId: '' },
     email: { enabled: false, emailAddress: '' },
     rules: {
-      expiryWarning: true,
       renewalFailed: true,
       renewalReminder: true,
       renewalSuccess: false,

@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Plus, LayoutDashboard, List, CreditCard, Settings as SettingsIcon, BarChart2 } from 'lucide-react';
-import { Subscription } from './types';
-import { loadSubscriptions, saveSubscriptions, loadSettings } from './services/storageService';
+import { Subscription, AppSettings } from './types';
+import { loadSubscriptions, saveSubscriptions, loadSettings, saveSettings } from './services/storageService';
+import { translations } from './services/i18n';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
 import SubscriptionForm from './components/SubscriptionForm';
@@ -11,19 +13,39 @@ import Statistics from './components/Statistics';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'settings'>('dashboard');
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(loadSettings());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
 
+  // Helper for translations
+  const t = (key: keyof typeof translations['en']) => {
+    const value = translations[settings.language][key];
+    return value !== undefined ? value : key;
+  };
+
   useEffect(() => {
-    const loaded = loadSubscriptions();
-    setSubscriptions(loaded);
+    const loadedSubs = loadSubscriptions();
+    setSubscriptions(loadedSubs);
 
     // Initial Theme Load
-    const settings = loadSettings();
     if (settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
     }
   }, []);
+
+  // Update settings handler
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    saveSettings(newSettings);
+    // Apply theme
+    if (newSettings.theme === 'dark' || (newSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+  };
 
   const handleSaveSubscription = (sub: Subscription) => {
     let updated: Subscription[];
@@ -38,11 +60,42 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSubscription = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this subscription?')) {
+    if (window.confirm(t('confirm_delete'))) {
       const updated = subscriptions.filter(s => s.id !== id);
       setSubscriptions(updated);
       saveSubscriptions(updated);
     }
+  };
+
+  const handleBatchDelete = (ids: string[]) => {
+    const message = t('confirm_batch_delete').replace('{count}', ids.length.toString());
+    if (window.confirm(message)) {
+      const updated = subscriptions.filter(s => !ids.includes(s.id));
+      setSubscriptions(updated);
+      saveSubscriptions(updated);
+    }
+  };
+
+  const handleDuplicateSubscription = (sub: Subscription) => {
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? crypto.randomUUID() 
+      : Date.now().toString(36) + Math.random().toString(36).substring(2);
+    
+    const prefix = t('copy_prefix');
+    const suffix = t('copy_suffix');
+
+    const newName = `${prefix}${sub.name}${suffix}`;
+
+    const newSub: Subscription = {
+      ...sub,
+      id: newId,
+      name: newName,
+      // Keep other fields same
+    };
+
+    const updated = [...subscriptions, newSub];
+    setSubscriptions(updated);
+    saveSubscriptions(updated);
   };
 
   const handleEditSubscription = (sub: Subscription) => {
@@ -63,7 +116,7 @@ const App: React.FC = () => {
           <div className="bg-primary-600 text-white p-2 rounded-lg">
             <CreditCard size={20} />
           </div>
-          <span className="ml-3 font-bold text-xl text-gray-800 dark:text-white hidden lg:block">Subscrybe</span>
+          <span className="ml-3 font-bold text-xl text-gray-800 dark:text-white hidden lg:block">{t('app_name')}</span>
         </div>
 
         <nav className="p-4 space-y-2">
@@ -76,7 +129,7 @@ const App: React.FC = () => {
             }`}
           >
             <LayoutDashboard size={20} />
-            <span className="ml-3 hidden lg:block">Dashboard</span>
+            <span className="ml-3 hidden lg:block">{t('dashboard')}</span>
           </button>
 
           <button
@@ -88,7 +141,7 @@ const App: React.FC = () => {
             }`}
           >
             <List size={20} />
-            <span className="ml-3 hidden lg:block">Subscriptions</span>
+            <span className="ml-3 hidden lg:block">{t('subscriptions')}</span>
           </button>
           
           <button
@@ -100,7 +153,7 @@ const App: React.FC = () => {
             }`}
           >
             <BarChart2 size={20} />
-            <span className="ml-3 hidden lg:block">Analytics</span>
+            <span className="ml-3 hidden lg:block">{t('analytics')}</span>
           </button>
 
           <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
@@ -113,7 +166,7 @@ const App: React.FC = () => {
                 }`}
             >
                 <SettingsIcon size={20} />
-                <span className="ml-3 hidden lg:block">Settings</span>
+                <span className="ml-3 hidden lg:block">{t('settings')}</span>
             </button>
           </div>
         </nav>
@@ -124,15 +177,15 @@ const App: React.FC = () => {
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
-                {activeTab === 'list' ? 'My Subscriptions' : 
-                 activeTab === 'analytics' ? 'Analytics & Trends' :
-                 activeTab === 'settings' ? 'Settings' : 'Dashboard'}
+                {activeTab === 'list' ? t('subscriptions') : 
+                 activeTab === 'analytics' ? t('analytics') :
+                 activeTab === 'settings' ? t('settings') : t('dashboard')}
             </h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-              {activeTab === 'dashboard' && `Overview of your ${subscriptions.length} active subscriptions.`}
-              {activeTab === 'list' && 'Manage your recurring expenses.'}
-              {activeTab === 'analytics' && 'Deep dive into your spending habits.'}
-              {activeTab === 'settings' && 'Configure app preferences and integrations.'}
+              {activeTab === 'dashboard' && t('overview_text')}
+              {activeTab === 'list' && t('manage_text')}
+              {activeTab === 'analytics' && t('analytics_text')}
+              {activeTab === 'settings' && t('settings_text')}
             </p>
           </div>
           
@@ -142,27 +195,30 @@ const App: React.FC = () => {
                 className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl shadow-md transition-transform active:scale-95"
             >
                 <Plus size={20} />
-                <span className="hidden sm:inline">Add New</span>
+                <span className="hidden sm:inline">{t('add_new')}</span>
             </button>
           )}
         </header>
 
         <div className="max-w-6xl mx-auto">
-          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} />}
+          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={settings.language} />}
           
           {activeTab === 'list' && (
             <SubscriptionList 
               subscriptions={subscriptions} 
               onEdit={handleEditSubscription}
               onDelete={handleDeleteSubscription}
+              onDuplicate={handleDuplicateSubscription}
+              onBatchDelete={handleBatchDelete}
+              lang={settings.language}
             />
           )}
 
           {activeTab === 'analytics' && (
-            <Statistics subscriptions={subscriptions} />
+            <Statistics subscriptions={subscriptions} lang={settings.language} />
           )}
           
-          {activeTab === 'settings' && <Settings />}
+          {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={handleUpdateSettings} />}
         </div>
       </main>
 
@@ -172,6 +228,8 @@ const App: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveSubscription}
         initialData={editingSub}
+        settings={settings}
+        lang={settings.language}
       />
     </div>
   );
