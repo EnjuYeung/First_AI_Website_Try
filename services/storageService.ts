@@ -39,15 +39,15 @@ const DEFAULT_SETTINGS: AppSettings = {
     { code: 'USD', name: 'US Dollar' },
     { code: 'CNY', name: 'Chinese Yuan' },
     { code: 'EUR', name: 'Euro' },
-    { code: 'GBP', name: 'British Pound' },
-    { code: 'JPY', name: 'Japanese Yen' },
-    { code: 'KRW', name: 'South Korean Won' },
     { code: 'SGD', name: 'Singapore Dollar' },
   ],
-  currencyApi: {
-    provider: 'none',
-    apiKey: '',
+  exchangeRates: {
+    'USD': 1,
+    'CNY': 7.2,
+    'EUR': 0.92,
+    'SGD': 1.34
   },
+  lastRatesUpdate: 0,
   notifications: {
     telegram: { enabled: false, botToken: '', chatId: '' },
     email: { enabled: false, emailAddress: '' },
@@ -81,7 +81,24 @@ export const loadSettings = (): AppSettings => {
     
     // Merge with default to handle new fields in future updates
     const parsed = JSON.parse(data);
-    return { ...DEFAULT_SETTINGS, ...parsed, notifications: { ...DEFAULT_SETTINGS.notifications, ...parsed.notifications, rules: {...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules} } };
+    
+    // Clean up legacy fields if they exist in local storage
+    if ('currencyApi' in parsed) {
+        delete parsed.currencyApi;
+    }
+
+    return { 
+        ...DEFAULT_SETTINGS, 
+        ...parsed, 
+        notifications: { 
+            ...DEFAULT_SETTINGS.notifications, 
+            ...parsed.notifications, 
+            rules: {...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules} 
+        },
+        // Ensure exchangeRates structure exists if loading old data
+        exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
+        customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies
+    };
   } catch (error) {
     return DEFAULT_SETTINGS;
   }

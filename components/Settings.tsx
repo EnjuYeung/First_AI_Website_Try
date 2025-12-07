@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
-import { AppSettings, ExchangeRates } from '../types';
-import { fetchExchangeRates } from '../services/currencyService';
+import React, { useState, useEffect } from 'react';
+import { AppSettings } from '../types';
+import { getRatesFromAI, shouldAutoUpdate } from '../services/currencyService';
 import { translations } from '../services/i18n';
-import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock } from 'lucide-react';
+import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon } from 'lucide-react';
 
 interface Props {
     settings: AppSettings;
@@ -24,15 +24,59 @@ const COMMON_TIMEZONES = [
   'Australia/Sydney'
 ];
 
+const ISO_CURRENCIES = [
+    { code: 'USD', name: 'United States Dollar' },
+    { code: 'EUR', name: 'Euro' },
+    { code: 'CNY', name: 'Chinese Yuan' },
+    { code: 'GBP', name: 'British Pound' },
+    { code: 'JPY', name: 'Japanese Yen' },
+    { code: 'KRW', name: 'South Korean Won' },
+    { code: 'TWD', name: 'New Taiwan Dollar' },
+    { code: 'HKD', name: 'Hong Kong Dollar' },
+    { code: 'SGD', name: 'Singapore Dollar' },
+    { code: 'AUD', name: 'Australian Dollar' },
+    { code: 'CAD', name: 'Canadian Dollar' },
+    { code: 'CHF', name: 'Swiss Franc' },
+    { code: 'INR', name: 'Indian Rupee' },
+    { code: 'RUB', name: 'Russian Ruble' },
+    { code: 'BRL', name: 'Brazilian Real' },
+    { code: 'THB', name: 'Thai Baht' },
+    { code: 'VND', name: 'Vietnamese Dong' },
+    { code: 'IDR', name: 'Indonesian Rupiah' },
+    { code: 'MYR', name: 'Malaysian Ringgit' },
+    { code: 'PHP', name: 'Philippine Peso' },
+    { code: 'NZD', name: 'New Zealand Dollar' },
+    { code: 'ZAR', name: 'South African Rand' },
+    { code: 'MXN', name: 'Mexican Peso' },
+    { code: 'SEK', name: 'Swedish Krona' },
+    { code: 'NOK', name: 'Norwegian Krone' },
+    { code: 'DKK', name: 'Danish Krone' },
+    { code: 'TRY', name: 'Turkish Lira' },
+    { code: 'SAR', name: 'Saudi Riyal' },
+    { code: 'AED', name: 'United Arab Emirates Dirham' },
+    { code: 'PLN', name: 'Polish Zloty' },
+    { code: 'ILS', name: 'Israeli New Shekel' },
+    { code: 'ARS', name: 'Argentine Peso' },
+    { code: 'CLP', name: 'Chilean Peso' },
+    { code: 'COP', name: 'Colombian Peso' },
+    { code: 'EGP', name: 'Egyptian Pound' },
+    { code: 'HUF', name: 'Hungarian Forint' },
+    { code: 'CZK', name: 'Czech Koruna' },
+    { code: 'RON', name: 'Romanian Leu' },
+    { code: 'NGN', name: 'Nigerian Naira' },
+    { code: 'PKR', name: 'Pakistani Rupee' },
+    { code: 'BDT', name: 'Bangladeshi Taka' },
+];
+
 const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'currency' | 'notifications' | 'security'>('general');
   const [newCategory, setNewCategory] = useState('');
   const [newPayment, setNewPayment] = useState('');
-  const [newCurrency, setNewCurrency] = useState({ code: '', name: '' });
+  const [currencySearch, setCurrencySearch] = useState('');
+  const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
   
   // Currency State
-  const [rates, setRates] = useState<ExchangeRates | null>(null);
-  const [isLoadingRates, setIsLoadingRates] = useState(false);
+  const [isUpdatingRates, setIsUpdatingRates] = useState(false);
 
   // Security State
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
@@ -45,6 +89,17 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     const value = translations[settings.language][key];
     return value !== undefined ? value : key;
   };
+
+  // Auto-Update Check
+  useEffect(() => {
+      const checkAndAutoUpdate = async () => {
+          if (shouldAutoUpdate(settings.lastRatesUpdate)) {
+              console.log("Auto-updating exchange rates...");
+              handleRefreshRates();
+          }
+      };
+      checkAndAutoUpdate();
+  }, []);
 
   // General Handlers
   const handleAddCategory = () => {
@@ -62,12 +117,26 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   }
 
   // Currency Handlers
-  const fetchRates = async () => {
-    setIsLoadingRates(true);
-    const data = await fetchExchangeRates(settings.currencyApi.provider, settings.currencyApi.apiKey);
-    setRates(data);
-    setIsLoadingRates(false);
+  const handleRefreshRates = async () => {
+    setIsUpdatingRates(true);
+    const codesToFetch = settings.customCurrencies.map(c => c.code);
+    const newRates = await getRatesFromAI(codesToFetch);
+    
+    if (newRates) {
+        onUpdateSettings({
+            ...settings,
+            exchangeRates: { ...settings.exchangeRates, ...newRates },
+            lastRatesUpdate: Date.now()
+        });
+    }
+    setIsUpdatingRates(false);
   };
+
+  const filteredCurrencies = ISO_CURRENCIES.filter(c => 
+    (c.code.toLowerCase().includes(currencySearch.toLowerCase()) || 
+     c.name.toLowerCase().includes(currencySearch.toLowerCase())) &&
+    !settings.customCurrencies.some(existing => existing.code === c.code)
+  );
 
   // Notification Handlers
   const handleTestTelegram = async () => {
@@ -102,6 +171,11 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     } finally {
         setIsTestingTelegram(false);
     }
+  };
+
+  const formatLastUpdated = (timestamp: number) => {
+      if (!timestamp) return 'Never';
+      return new Date(timestamp).toLocaleString();
   };
 
   return (
@@ -251,87 +325,129 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
         {/* CURRENCY TAB */}
         {activeTab === 'currency' && (
-            <div className="space-y-8 max-w-2xl">
-                <section>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('supported_currencies')}</h3>
-                    <div className="flex gap-2 mb-3">
-                        <input 
-                            type="text" placeholder="Code (e.g. TWD)" 
-                            className="w-24 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
-                            value={newCurrency.code} onChange={e => setNewCurrency({...newCurrency, code: e.target.value.toUpperCase()})}
-                        />
-                         <input 
-                            type="text" placeholder="Name (e.g. New Taiwan Dollar)" 
-                            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
-                            value={newCurrency.name} onChange={e => setNewCurrency({...newCurrency, name: e.target.value})}
-                        />
-                        <button 
-                            onClick={() => {
-                                if(newCurrency.code && newCurrency.name) {
-                                    onUpdateSettings({...settings, customCurrencies: [...settings.customCurrencies, newCurrency]});
-                                    setNewCurrency({code: '', name: ''});
-                                }
-                            }} 
-                            className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                        ><Plus size={20}/></button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                         {settings.customCurrencies.map(c => (
-                            <span key={c.code} className="px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2">
-                                <b>{c.code}</b> - {c.name}
-                                <button onClick={() => onUpdateSettings({...settings, customCurrencies: settings.customCurrencies.filter(cur => cur.code !== c.code)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
-                            </span>
-                        ))}
-                    </div>
-                </section>
-
-                <section>
-                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('exchange_rate_api')}</h3>
-                     <div className="grid gap-4">
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('provider')}</label>
-                            <select 
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none"
-                                value={settings.currencyApi.provider}
-                                onChange={e => onUpdateSettings({...settings, currencyApi: {...settings.currencyApi, provider: e.target.value as any}})}
-                            >
-                                <option value="none">None (Use Mock Data)</option>
-                                <option value="tianapi">TianAPI</option>
-                                <option value="apilayer">ApiLayer</option>
-                            </select>
-                         </div>
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('api_key')}</label>
-                            <input 
-                                type="password"
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none"
-                                value={settings.currencyApi.apiKey}
-                                onChange={e => onUpdateSettings({...settings, currencyApi: {...settings.currencyApi, apiKey: e.target.value}})}
-                            />
-                         </div>
-                     </div>
-                </section>
-
-                <section>
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('realtime_rates')} ({t('base_usd')})</h3>
-                        <button onClick={fetchRates} disabled={isLoadingRates} className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg">
-                            <RefreshCw size={20} className={isLoadingRates ? "animate-spin" : ""} />
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {rates ? Object.entries(rates).map(([code, rate]) => (
-                             <div key={code} className="p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
-                                <span className="text-sm text-gray-500 dark:text-gray-400">USD to {code}</span>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white">{rate}</p>
-                             </div>
-                        )) : (
-                            <div className="col-span-3 text-center py-4 text-gray-400">
-                                Click refresh to load rates
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                
+                {/* Left Col: Real-time Rates */}
+                <div className="xl:col-span-5 space-y-6">
+                     <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-5 border border-gray-200 dark:border-gray-600">
+                        <div className="flex justify-between items-center mb-4">
+                             <div className="flex items-center gap-2">
+                                <RefreshCw size={18} className="text-blue-500"/>
+                                <h3 className="font-bold text-gray-800 dark:text-white text-sm">{t('realtime_rates')} ({t('base_usd')})</h3>
                             </div>
-                        )}
-                    </div>
-                </section>
+                            <button 
+                                onClick={handleRefreshRates} 
+                                disabled={isUpdatingRates} 
+                                className="p-2 bg-white dark:bg-slate-600 text-gray-500 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-slate-500 rounded-lg transition-all shadow-sm"
+                                title={t('refresh_rates')}
+                            >
+                                <RefreshCw size={16} className={isUpdatingRates ? "animate-spin text-primary-600" : ""} />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-3 mb-4 max-h-[400px] overflow-y-auto pr-1">
+                            {settings.customCurrencies.filter(c => c.code !== 'USD').map(c => (
+                                <div key={c.code} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-gray-600">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-gray-800 dark:text-white">{c.code}</span>
+                                        <span className="text-xs text-gray-400 dark:text-gray-500">{c.name}</span>
+                                    </div>
+                                    <span className="text-lg font-mono font-medium text-gray-700 dark:text-gray-200">
+                                        {settings.exchangeRates[c.code]?.toFixed(4) || '-.--'}
+                                    </span>
+                                </div>
+                            ))}
+                            {settings.customCurrencies.filter(c => c.code !== 'USD').length === 0 && (
+                                <div className="text-center py-6 text-gray-400 text-sm">
+                                    Add currencies to see rates.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-600 pt-3">
+                             <span>{t('last_updated')}: {formatLastUpdated(settings.lastRatesUpdate)}</span>
+                             {isUpdatingRates && <span className="text-primary-500 animate-pulse">Updating...</span>}
+                        </div>
+                     </div>
+
+                     <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                         <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                            {t('ai_rate_info')}
+                         </p>
+                     </div>
+                </div>
+
+                {/* Right Col: Currency Management */}
+                <div className="xl:col-span-7 space-y-6">
+                     <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm h-full flex flex-col">
+                         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('manage_currencies')}</h3>
+                         
+                         {/* Search Add */}
+                         <div className="relative mb-6">
+                            <div className="flex items-center gap-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-primary-500 transition-all">
+                                <Search size={20} className="text-gray-400" />
+                                <input 
+                                    type="text" 
+                                    placeholder={t('search_currency')} 
+                                    className="flex-1 bg-transparent outline-none dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm" 
+                                    value={currencySearch}
+                                    onChange={(e) => setCurrencySearch(e.target.value)}
+                                    onFocus={() => setShowCurrencyDropdown(true)}
+                                    onBlur={() => setTimeout(() => setShowCurrencyDropdown(false), 200)}
+                                />
+                            </div>
+                            
+                            {/* Dropdown Results */}
+                            {showCurrencyDropdown && currencySearch && (
+                                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-800 border border-gray-100 dark:border-gray-600 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-fade-in">
+                                    {filteredCurrencies.length > 0 ? filteredCurrencies.map(c => (
+                                        <button 
+                                            key={c.code}
+                                            onClick={() => {
+                                                onUpdateSettings({...settings, customCurrencies: [...settings.customCurrencies, c]});
+                                                setCurrencySearch('');
+                                            }}
+                                            className="w-full text-left px-5 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-between transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0"
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-gray-800 dark:text-white text-sm">{c.code}</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{c.name}</span>
+                                            </div>
+                                            <div className="w-6 h-6 bg-primary-50 dark:bg-slate-600 rounded-full flex items-center justify-center text-primary-600 dark:text-primary-400">
+                                                <Plus size={14} />
+                                            </div>
+                                        </button>
+                                    )) : (
+                                        <div className="p-4 text-center text-gray-500 text-sm">No matches found</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Active Currencies Grid */}
+                        <div className="flex-1">
+                             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('supported_currencies')} ({settings.customCurrencies.length})</h4>
+                             <div className="flex flex-wrap gap-2">
+                                {settings.customCurrencies.map(c => (
+                                    <div key={c.code} className="group flex items-center gap-2 pl-3 pr-2 py-1.5 bg-gray-50 hover:bg-white dark:bg-slate-700/50 dark:hover:bg-slate-700 border border-gray-200 hover:border-primary-200 dark:border-gray-600 dark:hover:border-primary-500/50 rounded-lg transition-all shadow-sm hover:shadow-md">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-gray-800 dark:text-white leading-none">{c.code}</span>
+                                            <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">{c.name.split(' ')[0]}</span>
+                                        </div>
+                                        {c.code !== 'USD' && (
+                                            <button 
+                                                onClick={() => onUpdateSettings({...settings, customCurrencies: settings.customCurrencies.filter(cur => cur.code !== c.code)})} 
+                                                className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                            >
+                                                <XIcon size={14}/>
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                     </div>
+                </div>
             </div>
         )}
 
@@ -474,9 +590,5 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     </div>
   );
 };
-
-const XIcon: React.FC<{size?: number}> = ({size = 16}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-);
 
 export default Settings;

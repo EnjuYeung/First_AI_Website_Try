@@ -1,55 +1,77 @@
+
+import { GoogleGenAI } from "@google/genai";
 import { ExchangeRates } from '../types';
 
-export const fetchExchangeRates = async (provider: string, apiKey: string): Promise<ExchangeRates> => {
-  // Mock fallback data
-  const mockRates: ExchangeRates = {
-    'USD': 1,
-    'CNY': 7.23,
-    'EUR': 0.92,
-    'GBP': 0.79,
-    'JPY': 151.5,
-    'KRW': 1340,
-    'SGD': 1.35
-  };
+// Check if we need to update based on 12:00 PM daily schedule
+export const shouldAutoUpdate = (lastUpdate: number): boolean => {
+    const now = new Date();
+    const last = new Date(lastUpdate);
 
-  if (!apiKey || provider === 'none') {
-    return new Promise(resolve => setTimeout(() => resolve(mockRates), 500)); // Simulate delay
-  }
+    // If never updated
+    if (lastUpdate === 0) return true;
 
-  // Real API implementation skeleton
-  try {
-    let url = '';
-    if (provider === 'tianapi') {
-      url = `https://apis.tianapi.com/fxrate/index?key=${apiKey}&from=USD&to=CNY`; // Simplified for example
-      // In a real app, you'd fetch all needed pairs or a base USD endpoint
-    } else if (provider === 'apilayer') {
-      url = `https://api.apilayer.com/exchangerates_data/latest?base=USD&apikey=${apiKey}`;
+    // 1. Check if it's a different day
+    const isSameDay = now.toDateString() === last.toDateString();
+    
+    // 2. Check if current time is past 12:00 PM
+    const isPastNoon = now.getHours() >= 12;
+
+    // If it's a new day and it's past noon, we should have an update for "today"
+    if (!isSameDay && isPastNoon) {
+        return true;
     }
 
-    if (!url) return mockRates;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('API request failed');
-    
-    const data = await response.json();
-    
-    // Mapping logic depends on specific API response structure
-    // This is a placeholder for successful fetch logic
-    if (provider === 'apilayer' && data.rates) {
-        return {
-            'USD': 1,
-            'CNY': data.rates.CNY,
-            'EUR': data.rates.EUR,
-            'GBP': data.rates.GBP,
-            'JPY': data.rates.JPY,
-            'KRW': data.rates.KRW,
-            'SGD': data.rates.SGD
-        }
+    // Also update if the data is older than 24 hours (fallback)
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    if (now.getTime() - lastUpdate > twentyFourHours) {
+        return true;
     }
 
-    return mockRates; // Fallback if parsing fails or implementation incomplete
-  } catch (error) {
-    console.error("Currency Fetch Error:", error);
-    return mockRates;
-  }
+    return false;
+};
+
+export const getRatesFromAI = async (targetCurrencies: string[]): Promise<ExchangeRates | null> => {
+    if (!process.env.API_KEY) {
+        console.error("Missing API_KEY for Gemini");
+        return null;
+    }
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        // Filter out USD as it's the base
+        const symbols = targetCurrencies.filter(c => c !== 'USD');
+        if (symbols.length === 0) return { 'USD': 1 };
+
+        const prompt = `
+          You are a financial assistant. 
+          Provide the current approximate exchange rates for the following currencies against USD (Base 1).
+          Currencies: ${symbols.join(', ')}.
+          
+          Return ONLY a raw JSON object. No markdown formatting, no code blocks, no explanations.
+          Example format: { "CNY": 7.23, "EUR": 0.92 }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json'
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("Empty response from AI");
+
+        const rates = JSON.parse(text);
+        
+        // Ensure USD is present
+        rates['USD'] = 1;
+
+        return rates;
+
+    } catch (error) {
+        console.error("AI Currency Update Failed:", error);
+        return null;
+    }
 };

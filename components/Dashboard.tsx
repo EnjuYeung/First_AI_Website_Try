@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 import { Subscription, Frequency } from '../types';
-import { DollarSign, Calendar, TrendingUp, CreditCard, Activity, CheckCircle, Clock } from 'lucide-react';
+import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, CreditCard, PieChart as PieChartIcon } from 'lucide-react';
 import { translations } from '../services/i18n';
 
 interface Props {
@@ -36,11 +36,6 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
     // Safety check to prevent infinite loops if start date is invalid
     if (isNaN(currentDate.getTime())) return events;
 
-    // Advance to start of range if needed, or just iterate from start
-    // Simple iteration is safer for accuracy with variable month lengths
-    
-    // Optimization: If start date is far in past, jump closer (logic simplified here for robustness)
-    
     while (currentDate <= endRange) {
       if (currentDate >= startRange) {
         events.push(new Date(currentDate));
@@ -60,7 +55,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
         case Frequency.YEARLY:
           currentDate.setFullYear(currentDate.getFullYear() + 1);
           break;
-        default: // Should not happen, prevent infinite loop
+        default: 
           currentDate.setMonth(currentDate.getMonth() + 1);
       }
     }
@@ -76,13 +71,17 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
 
     // Ranges
     const monthStart = new Date(currentYear, currentMonth, 1);
-    const monthEnd = new Date(currentYear, currentMonth + 1, 0); // Last day of month
+    const monthEnd = new Date(currentYear, currentMonth + 1, 0); 
     const yearStart = new Date(currentYear, 0, 1);
     const yearEnd = new Date(currentYear, 11, 31);
     const last7DaysStart = new Date(today);
     last7DaysStart.setDate(today.getDate() - 7);
     const next7DaysEnd = new Date(today);
     next7DaysEnd.setDate(today.getDate() + 7);
+    
+    // Last 12 Months Range (for Top Sub/Category)
+    const last12MonthsStart = new Date(today);
+    last12MonthsStart.setFullYear(today.getFullYear() - 1);
 
     // Stats
     let monthlyPaid = 0;
@@ -96,6 +95,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
     const recentPayments: BillingEvent[] = [];
     const upcomingRenewals: BillingEvent[] = [];
     const yearlyPaidByCategory: Record<string, number> = {};
+    
+    // Maps for Top Sub/Category (Last 12 Months)
+    const last12MSubTotal: Record<string, {name: string, value: number, currency: string}> = {};
+    const last12MCategoryTotal: Record<string, number> = {};
 
     subscriptions.forEach(sub => {
       // 1. Status Counts
@@ -104,11 +107,6 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
       } else {
         activeCount++;
       }
-
-      // Only process Active subs for financial projections? 
-      // Requirement isn't specific, but usually "Pending" implies active. 
-      // "Paid" should account for everything that was paid, even if now cancelled.
-      // Assuming: Paid calculation includes all. Pending includes only Active.
 
       // 2. Monthly Logic
       const monthEvents = getBillingEventsInRange(sub, monthStart, monthEnd);
@@ -125,25 +123,20 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
       yearEvents.forEach(date => {
         if (date <= today) {
             yearlyPaid += sub.price;
-            // Accumulate for Breakdown Chart
             yearlyPaidByCategory[sub.category] = (yearlyPaidByCategory[sub.category] || 0) + sub.price;
         } else if (sub.status !== 'cancelled') {
             yearlyPending += sub.price;
         }
       });
 
-      // 4. Recent Payments (Last 7 Days, including today)
-      // Range: [Today - 7, Today]
+      // 4. Recent Payments (Last 7 Days)
       const recentEvents = getBillingEventsInRange(sub, last7DaysStart, today);
       recentEvents.forEach(date => {
         recentPayments.push({ sub, date, cost: sub.price });
       });
 
-      // 5. Upcoming Renewals (Next 7 Days, excluding today for strict future, or from tomorrow)
-      // Usually "Upcoming" implies future. Let's say (Today < date <= Today+7)
+      // 5. Upcoming Renewals (Next 7 Days)
       if (sub.status !== 'cancelled') {
-          // We can use nextBillingDate directly if available and valid, or calculate
-          // Using nextBillingDate from prop is safer if user manually set it
           if (sub.nextBillingDate) {
               const nextDate = new Date(sub.nextBillingDate);
               nextDate.setHours(0,0,0,0);
@@ -152,15 +145,38 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
               }
           }
       }
+
+      // 6. Last 12 Months Logic (For Highest Sub & Top Category)
+      const last12MEvents = getBillingEventsInRange(sub, last12MonthsStart, today);
+      last12MEvents.forEach(() => {
+        // Sub Total
+        if (!last12MSubTotal[sub.id]) {
+            last12MSubTotal[sub.id] = { name: sub.name, value: 0, currency: sub.currency };
+        }
+        last12MSubTotal[sub.id].value += sub.price;
+
+        // Category Total
+        last12MCategoryTotal[sub.category] = (last12MCategoryTotal[sub.category] || 0) + sub.price;
+      });
     });
 
-    // Sorting
-    recentPayments.sort((a, b) => b.date.getTime() - a.date.getTime()); // Newest first
-    upcomingRenewals.sort((a, b) => a.date.getTime() - b.date.getTime()); // Soonest first
+    // Determine Highest Sub (Last 12M)
+    let highestSub = { name: 'None', value: 0, currency: 'USD' };
+    Object.values(last12MSubTotal).forEach(item => {
+        if (item.value > highestSub.value) highestSub = item;
+    });
 
-    // Pie Chart Data (Monthly Spend by Category - using Monthly Paid + Monthly Pending or just Monthly Cost?)
-    // Requirement says "Monthly Spend by Category". Usually implies total monthly obligation.
-    // Let's use the standard monthly cost for the Pie Chart to show "Budget Distribution".
+    // Determine Top Category (Last 12M)
+    let topCategory = { name: 'None', value: 0 };
+    Object.entries(last12MCategoryTotal).forEach(([cat, val]) => {
+        if (val > topCategory.value) topCategory = { name: cat, value: val };
+    });
+
+    // Sorting Tables
+    recentPayments.sort((a, b) => b.date.getTime() - a.date.getTime()); 
+    upcomingRenewals.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // Pie Chart Data (Monthly Budget)
     const getStandardMonthlyCost = (sub: Subscription) => {
         switch (sub.frequency) {
             case Frequency.MONTHLY: return sub.price;
@@ -204,12 +220,13 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
       recentPayments,
       upcomingRenewals,
       categoryData,
-      yearlyBreakdownData
+      yearlyBreakdownData,
+      highestSub,
+      topCategory
     };
   }, [subscriptions]);
 
 
-  // Helper for Date Display
   const formatDate = (date: Date) => {
     return date.toISOString().split('T')[0];
   };
@@ -227,7 +244,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Stats Cards */}
+      {/* Stats Cards Row 1: Money & Counts */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Monthly Card */}
@@ -288,6 +305,42 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
         </div>
       </div>
 
+       {/* Stats Cards Row 2: Highlights (Moved from Statistics) */}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           {/* Highest Sub */}
+           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('highest_sub')}</p>
+                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.highestSub.name}>
+                        {dashboardData.highestSub.name}
+                     </h3>
+                     <p className="text-xs text-gray-400 mt-1">
+                        {dashboardData.highestSub.currency === 'USD' ? '$' : dashboardData.highestSub.currency}
+                        {dashboardData.highestSub.value.toFixed(2)} / 12mo
+                     </p>
+                </div>
+                <div className="p-3 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-xl">
+                    <CreditCard size={24}/>
+                </div>
+           </div>
+
+           {/* Top Category */}
+           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('top_category')}</p>
+                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.topCategory.name}>
+                        {dashboardData.topCategory.name}
+                     </h3>
+                     <p className="text-xs text-gray-400 mt-1">
+                        ${dashboardData.topCategory.value.toFixed(2)} / 12mo
+                     </p>
+                </div>
+                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-xl">
+                    <PieChartIcon size={24}/>
+                </div>
+           </div>
+       </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Spend */}
@@ -340,8 +393,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
                     <LabelList 
                         dataKey="value" 
                         position="right" 
-                        formatter={(val: number, index: number) => {
-                             // Access payload via dashboardData
+                        formatter={(val: number) => {
                              const item = dashboardData.yearlyBreakdownData.find(d => d.value === val);
                              return item ? `$${val} (${item.percentage}%)` : `$${val}`;
                         }}

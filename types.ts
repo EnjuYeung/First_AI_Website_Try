@@ -69,6 +69,10 @@ export interface NotificationRule {
   reminderDays: number;
 }
 
+export interface ExchangeRates {
+  [key: string]: number; // e.g., 'CNY': 7.23
+}
+
 export interface AppSettings {
   language: 'zh' | 'en';
   timezone: string;
@@ -76,10 +80,8 @@ export interface AppSettings {
   customCategories: string[];
   customPaymentMethods: string[];
   customCurrencies: CurrencyConfig[];
-  currencyApi: {
-    provider: 'tianapi' | 'apilayer' | 'none';
-    apiKey: string;
-  };
+  exchangeRates: ExchangeRates; // Store rates locally
+  lastRatesUpdate: number; // Timestamp of last update
   notifications: {
     telegram: {
       enabled: boolean;
@@ -97,8 +99,4 @@ export interface AppSettings {
     twoFactorEnabled: boolean;
     lastPasswordChange: string;
   };
-}
-
-export interface ExchangeRates {
-  [key: string]: number; // e.g., 'CNY': 7.23
 }
