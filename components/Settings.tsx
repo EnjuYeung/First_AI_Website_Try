@@ -330,7 +330,11 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 {mode === 'light' && <Sun size={16} />}
                                 {mode === 'dark' && <Moon size={16} />}
                                 {mode === 'system' && <Monitor size={16} />}
-                                <span className="capitalize">{mode}</span>
+                                <span className="capitalize">
+                                  {mode === 'light' && t('theme_light')}
+                                  {mode === 'dark' && t('theme_dark')}
+                                  {mode === 'system' && t('theme_system')}
+                                </span>
                             </button>
                         ))}
                     </div>
@@ -572,7 +576,6 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                         >
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-gray-800 dark:text-white text-sm">{c.code}</span>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{c.name}</span>
                                             </div>
                                             <div className="w-6 h-6 bg-primary-50 dark:bg-slate-600 rounded-full flex items-center justify-center text-primary-600 dark:text-primary-400">
                                                 <Plus size={14} />
@@ -591,10 +594,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                              <div className="flex flex-wrap gap-2">
                                 {settings.customCurrencies.map(c => (
                                     <div key={c.code} className="group flex items-center gap-2 pl-3 pr-2 py-1.5 bg-gray-50 hover:bg-white dark:bg-slate-700/50 dark:hover:bg-slate-700 border border-gray-200 hover:border-primary-200 dark:border-gray-600 dark:hover:border-primary-500/50 rounded-lg transition-all shadow-sm hover:shadow-md">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-gray-800 dark:text-white leading-none">{c.code}</span>
-                                            <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">{c.name.split(' ')[0]}</span>
-                                        </div>
+                                        <span className="text-sm font-bold text-gray-800 dark:text-white leading-none">{c.code}</span>
                                         {c.code !== 'USD' && (
                                             <button 
                                                 onClick={() => onUpdateSettings({...settings, customCurrencies: settings.customCurrencies.filter(cur => cur.code !== c.code)})} 

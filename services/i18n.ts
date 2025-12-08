@@ -36,6 +36,9 @@ export const translations = {
     security: "Security",
     ai_integration: "AI Integration",
     appearance: "Appearance",
+    theme_light: "Light",
+    theme_dark: "Dark",
+    theme_system: "System",
     language: "Language",
     timezone: "Timezone",
     categories: "Categories",
@@ -206,7 +209,8 @@ export const translations = {
     logging_in: "Signing in...",
     invalid_credentials: "Invalid username or password",
     welcome_back: "Welcome back!",
-    login_subtitle: "Manage your subscriptions intelligently"
+    login_subtitle: "Manage your subscriptions intelligently",
+    service_placeholder: "e.g. Netflix, Spotify"
   },
   zh: {
     app_name: "Sub_Management",
@@ -245,9 +249,12 @@ export const translations = {
     security: "安全",
     ai_integration: "AI模型",
     appearance: "外观主题",
+    theme_light: "浅色",
+    theme_dark: "深色",
+    theme_system: "跟随系统",
     language: "语言",
     timezone: "时区",
-    categories: "分类管理",
+    categories: "分类",
     payment_methods: "支付方式管理",
     supported_currencies: "支持货币",
     exchange_rate_api: "汇率 API",
@@ -415,7 +422,8 @@ export const translations = {
     logging_in: "登录中...",
     invalid_credentials: "用户名或密码错误",
     welcome_back: "欢迎回来！",
-    login_subtitle: "智能管理您的订阅服务"
+    login_subtitle: "智能管理您的订阅服务",
+    service_placeholder: "例如：奈飞、Spotify"
   }
 };
 

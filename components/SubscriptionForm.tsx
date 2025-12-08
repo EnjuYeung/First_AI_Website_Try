@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Upload, RefreshCw, Image as ImageIcon, Bell, CheckCircle2, XCircle } from 'lucide-react';
+import { X, RefreshCw, Bell, CheckCircle2, XCircle } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
 
@@ -16,6 +16,19 @@ interface Props {
 const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, settings, lang }) => {
   const t = getT(lang);
   
+  const frequencyLabel = (freq: Frequency) => {
+    if (lang === 'zh') {
+      switch (freq) {
+        case Frequency.MONTHLY: return '月度';
+        case Frequency.QUARTERLY: return '季度';
+        case Frequency.SEMI_ANNUALLY: return '半年';
+        case Frequency.YEARLY: return '年度';
+        default: return freq;
+      }
+    }
+    return freq;
+  };
+
   const [formData, setFormData] = useState<Partial<Subscription>>({
     name: '',
     price: 0,
@@ -27,7 +40,6 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     startDate: new Date().toISOString().split('T')[0],
     nextBillingDate: '',
     notes: '',
-    iconUrl: '',
     notificationsEnabled: true
   });
 
@@ -103,7 +115,6 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           startDate: today,
           nextBillingDate: initialNextBill, // Set calculated value immediately
           notes: '',
-          iconUrl: '',
           notificationsEnabled: true
         });
       }
@@ -121,18 +132,6 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
       setFormData(prev => ({ ...prev, nextBillingDate: calculated }));
     }
   }, [formData.startDate, formData.frequency, isOpen, calculateNextDate, formData.nextBillingDate]);
-
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, iconUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const generateId = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -166,115 +165,80 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Left Column: Icon */}
-            <div className="w-full md:w-1/3 space-y-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t('upload_icon')}</label>
-              
-              <div className="flex justify-center">
-                <div className="w-24 h-24 rounded-2xl bg-gray-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600 relative group">
-                  {formData.iconUrl ? (
-                    <>
-                      <img src={formData.iconUrl} alt="Preview" className="w-full h-full object-cover" />
-                      <button 
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, iconUrl: '' }))}
-                        className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white font-medium"
-                      >
-                        {t('remove')}
-                      </button>
-                    </>
-                  ) : (
-                    <ImageIcon className="text-gray-400" size={32} />
-                  )}
-                </div>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div className="w-full py-2 bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition flex items-center justify-center space-x-2">
-                  <Upload size={16} />
-                  <span>{t('upload_icon')}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Details */}
-            <div className="w-full md:w-2/3 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('service_name')}</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/40 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{t('service_name')}</h3>
                 <input
                   required
                   type="text"
-                  placeholder="e.g. Netflix, Spotify"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  placeholder={t('service_placeholder')}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('price')}</label>
-                  <input
-                    required
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                    value={formData.price}
-                    onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
-                  />
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('price')}</label>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      value={formData.price}
+                      onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('currency')}</label>
+                    <select
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      value={formData.currency}
+                      onChange={e => setFormData({...formData, currency: e.target.value})}
+                    >
+                      {settings.customCurrencies.map(c => (
+                          <option key={c.code} value={c.code}>{c.code}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('currency')}</label>
-                  <select
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                    value={formData.currency}
-                    onChange={e => setFormData({...formData, currency: e.target.value})}
-                  >
-                    {settings.customCurrencies.map(c => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.name})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('frequency')}</label>
-                  <select
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('frequency')}</label>
+                    <select
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                     value={formData.frequency}
                     onChange={e => setFormData({...formData, frequency: e.target.value as Frequency})}
                   >
                     {Object.values(Frequency).map(f => (
-                      <option key={f} value={f}>{f}</option>
+                      <option key={f} value={f}>{frequencyLabel(f as Frequency)}</option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('categories')}</label>
-                  <select
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                    value={formData.category}
-                    onChange={e => setFormData({...formData, category: e.target.value})}
-                  >
-                    {settings.customCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('categories')}</label>
+                    <select
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      value={formData.category}
+                      onChange={e => setFormData({...formData, category: e.target.value})}
+                    >
+                      {settings.customCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
+            </div>
 
-               {/* Payment Method & Status Row */}
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('payment_methods')}</label>
                     <select
@@ -287,66 +251,56 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                         ))}
                     </select>
                  </div>
-                 <div>
+                 <div className="space-y-1">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('status')}</label>
-                    <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setFormData({...formData, status: 'active'})}
-                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                              formData.status === 'active' 
-                              ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' 
-                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:border-gray-600'
-                          }`}
-                        >
-                            <CheckCircle2 size={16} />
-                            {t('active')}
-                        </button>
-                         <button
-                          type="button"
-                          onClick={() => setFormData({...formData, status: 'cancelled'})}
-                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                              formData.status === 'cancelled' 
-                              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900' 
-                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:border-gray-600'
-                          }`}
-                        >
-                            <XCircle size={16} />
-                            {t('cancelled')}
-                        </button>
-                    </div>
+                    <select
+                      className={`w-full px-4 py-2 border rounded-lg font-semibold text-center focus:ring-2 focus:ring-primary-500 outline-none transition-colors ${
+                        formData.status === 'active' 
+                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' 
+                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900'
+                      }`}
+                      value={formData.status}
+                      onChange={e => setFormData({...formData, status: e.target.value as 'active' | 'cancelled'})}
+                    >
+                      <option value="active">{t('active')}</option>
+                      <option value="cancelled">{t('cancelled')}</option>
+                    </select>
+                 </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('start_date')}</label>
+                    <input
+                      type="date"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      value={formData.startDate}
+                      onChange={e => setFormData({...formData, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                       {t('next_billing_date')}
+                       <RefreshCw size={12} className="text-gray-400" />
+                     </label>
+                     <input
+                      type="date"
+                      readOnly
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-600 rounded-lg text-gray-500 dark:text-gray-300 cursor-not-allowed outline-none"
+                      value={formData.nextBillingDate}
+                     />
+                  </div>
                  </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('start_date')}</label>
-                  <input
-                    type="date"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                    value={formData.startDate}
-                    onChange={e => setFormData({...formData, startDate: e.target.value})}
-                  />
-                </div>
-                <div>
-                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                     {t('next_billing_date')}
-                     <RefreshCw size={12} className="text-gray-400" />
-                   </label>
-                   <input
-                    type="date"
-                    readOnly
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-600 rounded-lg text-gray-500 dark:text-gray-300 cursor-not-allowed outline-none"
-                    value={formData.nextBillingDate}
-                   />
-                </div>
-              </div>
-
               {/* Notification Toggle */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-100 dark:border-gray-600">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-slate-700 dark:to-slate-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
                   <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                       <Bell size={18} />
-                      <span className="text-sm font-medium">{t('enable_notifications')}</span>
+                      <div>
+                        <p className="text-sm font-semibold">{t('enable_notifications')}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('next_billing_date')} {t('notifications')}</p>
+                      </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
@@ -358,7 +312,6 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                     <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                   </label>
               </div>
-
             </div>
           </div>
 

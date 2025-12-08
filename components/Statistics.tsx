@@ -404,31 +404,47 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
   );
 
   const renderCategoryChart = () => (
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-            <Pie
-                data={categoryPieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={5}
-                dataKey="value"
-                label={({ name, percentage }) => `${name} (${percentage.toFixed(0)}%)`} 
-            >
-                {categoryPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-            </Pie>
-            <Tooltip 
-                    formatter={(value: number, name: string, props: any) => [
-                        `$${value.toFixed(2)} (${props.payload.count} subs)`, 
-                        `${name}`
-                    ]}
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-            />
-        </PieChart>
-    </ResponsiveContainer>
+    <div className="h-full flex items-center gap-6">
+      <div className="flex-1 h-full min-h-[240px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+              <Pie
+                  data={categoryPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={false}
+                  labelLine={false}
+              >
+                  {categoryPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+              </Pie>
+              <Tooltip 
+                      formatter={(value: number, name: string, props: any) => [
+                          `$${value.toFixed(2)} (${t('sub_count')}: ${props.payload.count})`, 
+                          `${name}`
+                      ]}
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+              />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="w-48 space-y-2">
+        {categoryPieData.map((entry, index) => (
+          <div key={entry.name} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                <span className="truncate" title={entry.name}>{entry.name}</span>
+              </div>
+              <span className="text-xs text-gray-400">{entry.percentage.toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 
   return (
@@ -553,11 +569,8 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
              
              <div className="flex-1 w-full min-h-0 relative">
                 {renderCategoryChart()}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                     <span className="text-sm font-medium text-gray-400">Total Spend</span>
-                </div>
-             </div>
-          </div>
+            </div>
+         </div>
       </div>
 
       {/* 4. Detailed History Section (Cards) */}
