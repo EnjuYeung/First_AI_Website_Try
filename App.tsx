@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
-import { Plus, LayoutDashboard, List, Settings as SettingsIcon, BarChart2, BellRing, Globe, Moon, Sun, LogOut, Home, CreditCard } from 'lucide-react';
+import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut } from 'lucide-react';
 import { Subscription, AppSettings } from './types';
 import { loadSubscriptions, saveSubscriptions, loadSettings, saveSettings } from './services/storageService';
-import { translations } from './services/i18n';
+import { getT } from './services/i18n';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
 import SubscriptionForm from './components/SubscriptionForm';
@@ -22,12 +23,12 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(loadSettings());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
+  
+  // Logout Modal State
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   // Helper for translations
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[settings.language][key];
-    return value !== undefined ? value : key;
-  };
+  const t = getT(settings.language);
 
   useEffect(() => {
     // Check for existing session
@@ -137,12 +138,15 @@ const App: React.FC = () => {
       setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
-      if (window.confirm(t('confirm_logout'))) {
-          localStorage.removeItem('auth_token');
-          setIsAuthenticated(false);
-          setActiveTab('dashboard'); // Reset tab
-      }
+  const handleLogoutClick = () => {
+      setIsLogoutModalOpen(true);
+  };
+
+  const handleLogoutConfirm = () => {
+      localStorage.removeItem('auth_token');
+      setIsAuthenticated(false);
+      setIsLogoutModalOpen(false);
+      setActiveTab('dashboard'); // Reset tab
   };
 
   if (isLoadingAuth) {
@@ -214,7 +218,7 @@ const App: React.FC = () => {
             <button onClick={toggleTheme} className="hover:text-white transition-colors" title={t('appearance')}>
                 {settings.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button onClick={handleLogout} className="hover:text-white transition-colors" title={t('logout')}><LogOut size={18} /></button>
+            <button onClick={handleLogoutClick} className="hover:text-white transition-colors" title={t('logout')}><LogOut size={18} /></button>
          </div>
       </header>
 
@@ -265,7 +269,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Modal */}
+      {/* Subscription Form Modal */}
       <SubscriptionForm 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -274,6 +278,35 @@ const App: React.FC = () => {
         settings={settings}
         lang={settings.language}
       />
+
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center">
+                  <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
+                      <LogOut size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('logout')}</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">
+                      {t('confirm_logout')}
+                  </p>
+                  <div className="flex gap-3">
+                      <button 
+                          onClick={() => setIsLogoutModalOpen(false)}
+                          className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-white font-medium rounded-xl transition-colors"
+                      >
+                          {t('cancel')}
+                      </button>
+                      <button 
+                          onClick={handleLogoutConfirm}
+                          className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors shadow-lg shadow-red-500/30"
+                      >
+                          {t('logout')}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

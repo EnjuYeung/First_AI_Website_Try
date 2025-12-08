@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { translations } from '../services/i18n';
+import { getT } from '../services/i18n';
 import { Lock, User, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface Props {
@@ -14,10 +15,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[lang][key];
-    return value !== undefined ? value : key;
-  };
+  const t = getT(lang);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

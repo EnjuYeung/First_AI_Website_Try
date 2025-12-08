@@ -25,6 +25,64 @@ export const DEFAULT_PAYMENT_METHODS = [
   'Other'
 ];
 
+export const COMMON_TIMEZONES = [
+  'UTC',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Singapore',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Australia/Sydney'
+];
+
+export const ISO_CURRENCIES = [
+    { code: 'USD', name: 'United States Dollar' },
+    { code: 'EUR', name: 'Euro' },
+    { code: 'CNY', name: 'Chinese Yuan' },
+    { code: 'GBP', name: 'British Pound' },
+    { code: 'JPY', name: 'Japanese Yen' },
+    { code: 'KRW', name: 'South Korean Won' },
+    { code: 'TWD', name: 'New Taiwan Dollar' },
+    { code: 'HKD', name: 'Hong Kong Dollar' },
+    { code: 'SGD', name: 'Singapore Dollar' },
+    { code: 'AUD', name: 'Australian Dollar' },
+    { code: 'CAD', name: 'Canadian Dollar' },
+    { code: 'CHF', name: 'Swiss Franc' },
+    { code: 'INR', name: 'Indian Rupee' },
+    { code: 'RUB', name: 'Russian Ruble' },
+    { code: 'BRL', name: 'Brazilian Real' },
+    { code: 'THB', name: 'Thai Baht' },
+    { code: 'VND', name: 'Vietnamese Dong' },
+    { code: 'IDR', name: 'Indonesian Rupiah' },
+    { code: 'MYR', name: 'Malaysian Ringgit' },
+    { code: 'PHP', name: 'Philippine Peso' },
+    { code: 'NZD', name: 'New Zealand Dollar' },
+    { code: 'ZAR', name: 'South African Rand' },
+    { code: 'MXN', name: 'Mexican Peso' },
+    { code: 'SEK', name: 'Swedish Krona' },
+    { code: 'NOK', name: 'Norwegian Krone' },
+    { code: 'DKK', name: 'Danish Krone' },
+    { code: 'TRY', name: 'Turkish Lira' },
+    { code: 'SAR', name: 'Saudi Riyal' },
+    { code: 'AED', name: 'United Arab Emirates Dirham' },
+    { code: 'PLN', name: 'Polish Zloty' },
+    { code: 'ILS', name: 'Israeli New Shekel' },
+    { code: 'ARS', name: 'Argentine Peso' },
+    { code: 'CLP', name: 'Chilean Peso' },
+    { code: 'COP', name: 'Colombian Peso' },
+    { code: 'EGP', name: 'Egyptian Pound' },
+    { code: 'HUF', name: 'Hungarian Forint' },
+    { code: 'CZK', name: 'Czech Koruna' },
+    { code: 'RON', name: 'Romanian Leu' },
+    { code: 'NGN', name: 'Nigerian Naira' },
+    { code: 'PKR', name: 'Pakistani Rupee' },
+    { code: 'BDT', name: 'Bangladeshi Taka' },
+];
+
 export interface Subscription {
   id: string;
   name: string;
@@ -73,6 +131,12 @@ export interface ExchangeRates {
   [key: string]: number; // e.g., 'CNY': 7.23
 }
 
+export interface AIConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
 export interface AppSettings {
   language: 'zh' | 'en';
   timezone: string;
@@ -82,6 +146,7 @@ export interface AppSettings {
   customCurrencies: CurrencyConfig[];
   exchangeRates: ExchangeRates; // Store rates locally
   lastRatesUpdate: number; // Timestamp of last update
+  aiConfig: AIConfig; // New AI Configuration
   notifications: {
     telegram: {
       enabled: boolean;

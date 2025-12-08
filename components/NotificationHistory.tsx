@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { translations } from '../services/i18n';
+import { getT } from '../services/i18n';
 import { loadNotificationHistory } from '../services/storageService';
 import { NotificationRecord, NotificationType, NotificationStatus, NotificationChannel } from '../types';
 import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, CreditCard, Calendar, AlertTriangle, Lightbulb, Mail, Send, ChevronRight } from 'lucide-react';
@@ -19,10 +19,7 @@ const NotificationHistory: React.FC<Props> = ({ lang }) => {
   const [typeFilter, setTypeFilter] = useState<NotificationType | 'all'>('all');
   const [channelFilter, setChannelFilter] = useState<NotificationChannel | 'all'>('all');
 
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[lang][key];
-    return value !== undefined ? value : key;
-  };
+  const t = getT(lang);
 
   useEffect(() => {
     const loaded = loadNotificationHistory();

@@ -1,76 +1,31 @@
 
-
 import React, { useState, useEffect } from 'react';
-import { AppSettings } from '../types';
+import { AppSettings, AIConfig, COMMON_TIMEZONES, ISO_CURRENCIES } from '../types';
 import { getRatesFromAI, shouldAutoUpdate } from '../services/currencyService';
-import { translations } from '../services/i18n';
-import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon } from 'lucide-react';
+import { getT } from '../services/i18n';
+import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Cpu, Info, Save } from 'lucide-react';
 
 interface Props {
     settings: AppSettings;
     onUpdateSettings: (settings: AppSettings) => void;
 }
 
-const COMMON_TIMEZONES = [
-  'UTC',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'Asia/Singapore',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'America/New_York',
-  'America/Los_Angeles',
-  'Australia/Sydney'
-];
+const Toast: React.FC<{ message: string, onClose: () => void }> = ({ message, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 2000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
 
-const ISO_CURRENCIES = [
-    { code: 'USD', name: 'United States Dollar' },
-    { code: 'EUR', name: 'Euro' },
-    { code: 'CNY', name: 'Chinese Yuan' },
-    { code: 'GBP', name: 'British Pound' },
-    { code: 'JPY', name: 'Japanese Yen' },
-    { code: 'KRW', name: 'South Korean Won' },
-    { code: 'TWD', name: 'New Taiwan Dollar' },
-    { code: 'HKD', name: 'Hong Kong Dollar' },
-    { code: 'SGD', name: 'Singapore Dollar' },
-    { code: 'AUD', name: 'Australian Dollar' },
-    { code: 'CAD', name: 'Canadian Dollar' },
-    { code: 'CHF', name: 'Swiss Franc' },
-    { code: 'INR', name: 'Indian Rupee' },
-    { code: 'RUB', name: 'Russian Ruble' },
-    { code: 'BRL', name: 'Brazilian Real' },
-    { code: 'THB', name: 'Thai Baht' },
-    { code: 'VND', name: 'Vietnamese Dong' },
-    { code: 'IDR', name: 'Indonesian Rupiah' },
-    { code: 'MYR', name: 'Malaysian Ringgit' },
-    { code: 'PHP', name: 'Philippine Peso' },
-    { code: 'NZD', name: 'New Zealand Dollar' },
-    { code: 'ZAR', name: 'South African Rand' },
-    { code: 'MXN', name: 'Mexican Peso' },
-    { code: 'SEK', name: 'Swedish Krona' },
-    { code: 'NOK', name: 'Norwegian Krone' },
-    { code: 'DKK', name: 'Danish Krone' },
-    { code: 'TRY', name: 'Turkish Lira' },
-    { code: 'SAR', name: 'Saudi Riyal' },
-    { code: 'AED', name: 'United Arab Emirates Dirham' },
-    { code: 'PLN', name: 'Polish Zloty' },
-    { code: 'ILS', name: 'Israeli New Shekel' },
-    { code: 'ARS', name: 'Argentine Peso' },
-    { code: 'CLP', name: 'Chilean Peso' },
-    { code: 'COP', name: 'Colombian Peso' },
-    { code: 'EGP', name: 'Egyptian Pound' },
-    { code: 'HUF', name: 'Hungarian Forint' },
-    { code: 'CZK', name: 'Czech Koruna' },
-    { code: 'RON', name: 'Romanian Leu' },
-    { code: 'NGN', name: 'Nigerian Naira' },
-    { code: 'PKR', name: 'Pakistani Rupee' },
-    { code: 'BDT', name: 'Bangladeshi Taka' },
-];
+    return (
+        <div className="fixed bottom-6 right-6 bg-green-600 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-fade-in z-50">
+            <CheckCircle size={20} />
+            <span className="font-medium">{message}</span>
+        </div>
+    );
+};
 
 const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'currency' | 'notifications' | 'security'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'currency' | 'notifications' | 'security'>('general');
   const [newCategory, setNewCategory] = useState('');
   const [newPayment, setNewPayment] = useState('');
   const [currencySearch, setCurrencySearch] = useState('');
@@ -83,18 +38,28 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [showQr, setShowQr] = useState(false);
 
+  // Alert Modal State
+  const [alertState, setAlertState] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string } | null>(null);
+  
+  // Toast State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   // Notification State
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
 
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[settings.language][key];
-    return value !== undefined ? value : key;
-  };
+  // AI Config Local State (Not saved immediately)
+  const [localAiConfig, setLocalAiConfig] = useState<AIConfig>(settings.aiConfig);
+
+  useEffect(() => {
+      setLocalAiConfig(settings.aiConfig);
+  }, [settings.aiConfig]);
+
+  const t = getT(settings.language);
 
   // Auto-Update Check
   useEffect(() => {
       const checkAndAutoUpdate = async () => {
-          if (shouldAutoUpdate(settings.lastRatesUpdate)) {
+          if (shouldAutoUpdate(settings.lastRatesUpdate) && settings.aiConfig.apiKey) {
               console.log("Auto-updating exchange rates...");
               handleRefreshRates();
           }
@@ -119,15 +84,40 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
   // Currency Handlers
   const handleRefreshRates = async () => {
+    if (!settings.aiConfig.apiKey || !settings.aiConfig.baseUrl) {
+         setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: "Please configure AI settings first to use real-time rates."
+        });
+        return;
+    }
+
     setIsUpdatingRates(true);
     const codesToFetch = settings.customCurrencies.map(c => c.code);
-    const newRates = await getRatesFromAI(codesToFetch);
+    const newRates = await getRatesFromAI(codesToFetch, settings.aiConfig);
     
     if (newRates) {
         onUpdateSettings({
             ...settings,
             exchangeRates: { ...settings.exchangeRates, ...newRates },
             lastRatesUpdate: Date.now()
+        });
+        if (!shouldAutoUpdate(settings.lastRatesUpdate)) { // If manual triggering
+             setAlertState({
+                isOpen: true,
+                type: 'success',
+                title: t('success_title'),
+                message: t('connection_success')
+            });
+        }
+    } else {
+         setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('connection_failed')
         });
     }
     setIsUpdatingRates(false);
@@ -139,12 +129,23 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     !settings.customCurrencies.some(existing => existing.code === c.code)
   );
 
+  // AI Configuration Handlers
+  const handleSaveAiConfig = () => {
+      onUpdateSettings({ ...settings, aiConfig: localAiConfig });
+      setToastMessage(t('ai_saved_toast'));
+  };
+
   // Notification Handlers
   const handleTestTelegram = async () => {
     const { botToken, chatId } = settings.notifications.telegram;
     
     if (!botToken || !chatId) {
-        alert("Please enter both Bot Token and Chat ID to test.");
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: "Please enter both Bot Token and Chat ID to test."
+        });
         return;
     }
 
@@ -162,13 +163,28 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         const data = await response.json();
         
         if (data.ok) {
-            alert("Message sent successfully! Check your Telegram.");
+            setAlertState({
+                isOpen: true,
+                type: 'success',
+                title: t('success_title'),
+                message: "Message sent successfully! Check your Telegram."
+            });
         } else {
-            alert(`Error from Telegram: ${data.description}`);
+             setAlertState({
+                isOpen: true,
+                type: 'error',
+                title: t('error_title'),
+                message: `Error from Telegram: ${data.description}`
+            });
         }
     } catch (error) {
         console.error("Telegram Test Error:", error);
-        alert("Failed to connect to Telegram API. Check your network or token.");
+         setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: "Failed to connect to Telegram API. Check your network or token."
+        });
     } finally {
         setIsTestingTelegram(false);
     }
@@ -178,12 +194,22 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     const { current, new: newPass, confirm } = passwords;
     
     if (!current || !newPass || !confirm) {
-        alert(t('password_error_empty'));
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('password_error_empty')
+        });
         return;
     }
 
     if (newPass !== confirm) {
-        alert(t('password_error_mismatch'));
+         setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('password_error_mismatch')
+        });
         return;
     }
 
@@ -197,7 +223,12 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         }
     });
 
-    alert(t('password_success'));
+    setAlertState({
+        isOpen: true,
+        type: 'success',
+        title: t('success_title'),
+        message: t('password_success')
+    });
   };
 
   const formatLastUpdated = (timestamp: number) => {
@@ -206,10 +237,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[600px] overflow-hidden">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[600px] overflow-hidden relative">
+      {/* Toast */}
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
       {/* Tabs */}
       <div className="flex border-b border-gray-100 dark:border-gray-700 overflow-x-auto">
-        {['general', 'currency', 'notifications', 'security'].map((tab) => (
+        {['general', 'ai', 'currency', 'notifications', 'security'].map((tab) => (
             <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -219,7 +253,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
             >
-                {t(tab as any)}
+                {t(tab === 'ai' ? 'ai_integration' : tab as any)}
             </button>
         ))}
       </div>
@@ -348,6 +382,106 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                     </div>
                 </section>
             </div>
+        )}
+
+        {/* AI INTEGRATION TAB */}
+        {activeTab === 'ai' && (
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+                 {/* Left Column: Form */}
+                 <div className="lg:col-span-8 space-y-8">
+                     <div>
+                         <div className="flex items-center gap-2 mb-2">
+                             <Cpu className="text-primary-600" size={24}/>
+                             <h3 className="text-xl font-bold text-gray-800 dark:text-white">{t('ai_title')}</h3>
+                         </div>
+                         <p className="text-sm text-gray-500 dark:text-gray-400">{t('ai_subtitle')}</p>
+                     </div>
+
+                     <div className="space-y-6">
+                        {/* URL */}
+                         <div className="space-y-2">
+                             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('chat_url')}</label>
+                             <input 
+                                type="text"
+                                value={localAiConfig.baseUrl}
+                                onChange={e => setLocalAiConfig({...localAiConfig, baseUrl: e.target.value})}
+                                placeholder={t('chat_url_placeholder')}
+                                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all font-mono text-sm"
+                             />
+                         </div>
+
+                         {/* API Key */}
+                         <div className="space-y-2">
+                             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('ai_api_key')}</label>
+                             <input 
+                                type="password"
+                                value={localAiConfig.apiKey}
+                                onChange={e => setLocalAiConfig({...localAiConfig, apiKey: e.target.value})}
+                                placeholder="sk-..."
+                                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all font-mono text-sm tracking-widest"
+                             />
+                         </div>
+
+                         {/* Model */}
+                         <div className="space-y-2">
+                             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('ai_model_name')}</label>
+                             <input 
+                                type="text"
+                                value={localAiConfig.model}
+                                onChange={e => setLocalAiConfig({...localAiConfig, model: e.target.value})}
+                                placeholder="e.g. gpt-4o, deepseek-chat"
+                                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all font-mono text-sm"
+                             />
+                         </div>
+
+                         {/* Action Buttons */}
+                         <div className="flex gap-4 pt-2">
+                             <button
+                                onClick={handleSaveAiConfig}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95"
+                             >
+                                <Save size={18} />
+                                <span>{t('ai_save')}</span>
+                             </button>
+                         </div>
+                     </div>
+                 </div>
+
+                 {/* Right Column: Tips */}
+                 <div className="lg:col-span-4">
+                     <div className="bg-gray-50 dark:bg-slate-700/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-700">
+                         <div className="flex items-center gap-2 mb-4 text-gray-800 dark:text-white font-bold">
+                             <Info size={18} />
+                             <span>{t('ai_config_desc')}</span>
+                         </div>
+                         <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                             <li className="flex gap-2 items-start">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
+                                 <span>{t('ai_desc_1')}</span>
+                             </li>
+                             <li className="flex gap-2 items-start">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
+                                 <span>{t('ai_desc_2')}</span>
+                             </li>
+                             <li className="flex gap-2 items-start">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
+                                 <span>{t('ai_desc_3')}</span>
+                             </li>
+                             <li className="flex gap-2 items-start">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
+                                 <span>{t('ai_desc_4')}</span>
+                             </li>
+                         </ul>
+                         
+                         <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30 rounded-xl flex items-start gap-3">
+                             <AlertTriangle size={18} className="text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
+                             <p className="text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed">
+                                 Ensure your provider supports standard OpenAI-compatible JSON responses for features like currency conversion to work correctly.
+                             </p>
+                         </div>
+                     </div>
+                 </div>
+             </div>
         )}
 
         {/* CURRENCY TAB */}
@@ -614,6 +748,29 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         )}
 
       </div>
+
+      {/* Alert Modal */}
+      {alertState && alertState.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-sm w-full p-6 border border-gray-100 dark:border-gray-700 transform scale-100 transition-all">
+                <div className="flex flex-col items-center text-center space-y-4">
+                    <div className={`p-3 rounded-full ${alertState.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
+                        {alertState.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{alertState.title}</h3>
+                        <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">{alertState.message}</p>
+                    </div>
+                    <button 
+                        onClick={() => setAlertState(null)}
+                        className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-white font-medium rounded-xl transition-colors"
+                    >
+                        {t('close')}
+                    </button>
+                </div>
+             </div>
+          </div>
+      )}
     </div>
   );
 };

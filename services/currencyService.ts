@@ -1,6 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
-import { ExchangeRates } from '../types';
+import { ExchangeRates, AIConfig } from '../types';
 
 // Check if we need to update based on 12:00 PM daily schedule
 export const shouldAutoUpdate = (lastUpdate: number): boolean => {
@@ -30,15 +29,13 @@ export const shouldAutoUpdate = (lastUpdate: number): boolean => {
     return false;
 };
 
-export const getRatesFromAI = async (targetCurrencies: string[]): Promise<ExchangeRates | null> => {
-    if (!process.env.API_KEY) {
-        console.error("Missing API_KEY for Gemini");
+export const getRatesFromAI = async (targetCurrencies: string[], config: AIConfig): Promise<ExchangeRates | null> => {
+    if (!config.apiKey || !config.baseUrl) {
+        console.error("Missing AI Configuration");
         return null;
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
         // Filter out USD as it's the base
         const symbols = targetCurrencies.filter(c => c !== 'USD');
         if (symbols.length === 0) return { 'USD': 1 };
@@ -52,18 +49,35 @@ export const getRatesFromAI = async (targetCurrencies: string[]): Promise<Exchan
           Example format: { "CNY": 7.23, "EUR": 0.92 }
         `;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json'
-            }
+        const response = await fetch(config.baseUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey}`
+            },
+            body: JSON.stringify({
+                model: config.model || 'gpt-3.5-turbo',
+                messages: [
+                    { role: "user", content: prompt }
+                ],
+                // Attempt to force JSON mode if supported by the provider, otherwise the prompt handles it
+                // response_format: { type: "json_object" } 
+            })
         });
 
-        const text = response.text;
-        if (!text) throw new Error("Empty response from AI");
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API Error: ${response.status} - ${errorText}`);
+        }
 
-        const rates = JSON.parse(text);
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+
+        if (!content) throw new Error("Empty response from AI");
+
+        // Simple cleanup to handle if model wraps in markdown code blocks
+        const cleanJson = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const rates = JSON.parse(cleanJson);
         
         // Ensure USD is present
         rates['USD'] = 1;

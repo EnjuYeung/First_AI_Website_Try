@@ -49,6 +49,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     'SGD': 1.34
   },
   lastRatesUpdate: 0,
+  aiConfig: {
+    baseUrl: '',
+    apiKey: '',
+    model: ''
+  },
   notifications: {
     telegram: { enabled: false, botToken: '', chatId: '' },
     email: { enabled: false, emailAddress: '' },
@@ -96,9 +101,10 @@ export const loadSettings = (): AppSettings => {
             ...parsed.notifications, 
             rules: {...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules} 
         },
-        // Ensure exchangeRates structure exists if loading old data
+        // Ensure structure exists if loading old data
         exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
-        customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies
+        customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
+        aiConfig: parsed.aiConfig || DEFAULT_SETTINGS.aiConfig
     };
   } catch (error) {
     return DEFAULT_SETTINGS;
@@ -107,82 +113,11 @@ export const loadSettings = (): AppSettings => {
 
 // --- Notification Storage ---
 
-const generateMockNotifications = (): NotificationRecord[] => {
-  const records: NotificationRecord[] = [
-    {
-      id: '1',
-      subscriptionName: 'Netflix',
-      type: 'renewal_success',
-      status: 'success',
-      channel: 'telegram',
-      timestamp: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
-      details: {
-        amount: 15.99,
-        currency: 'USD',
-        date: new Date().toISOString().split('T')[0],
-        paymentMethod: 'Credit Card',
-        receiver: '123456789',
-        message: 'Payment processed successfully.'
-      }
-    },
-    {
-      id: '2',
-      subscriptionName: 'Spotify',
-      type: 'renewal_reminder',
-      status: 'success',
-      channel: 'email',
-      timestamp: Date.now() - 1000 * 60 * 60 * 25, // Yesterday
-      details: {
-        amount: 9.99,
-        currency: 'USD',
-        date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString().split('T')[0], // 2 days from now
-        daysUntil: 2,
-        receiver: 'user@example.com',
-        message: 'Please ensure sufficient funds.'
-      }
-    },
-    {
-      id: '3',
-      subscriptionName: 'Adobe Creative Cloud',
-      type: 'renewal_failed',
-      status: 'failed',
-      channel: 'telegram',
-      timestamp: Date.now() - 1000 * 60 * 60 * 48, // 2 days ago
-      details: {
-        amount: 54.99,
-        currency: 'USD',
-        date: new Date().toISOString().split('T')[0],
-        errorReason: 'Insufficient funds',
-        receiver: '123456789'
-      }
-    },
-    {
-      id: '4',
-      subscriptionName: 'GitHub Copilot',
-      type: 'renewal_reminder',
-      status: 'success',
-      channel: 'telegram',
-      timestamp: Date.now() - 1000 * 60 * 60 * 72, // 3 days ago
-      details: {
-        amount: 10.00,
-        currency: 'USD',
-        daysUntil: 3,
-        date: new Date().toISOString().split('T')[0],
-        receiver: '123456789'
-      }
-    }
-  ];
-  return records;
-};
-
 export const loadNotificationHistory = (): NotificationRecord[] => {
   try {
     const data = localStorage.getItem(NOTIFICATIONS_KEY);
     if (!data) {
-        // Return Mock Data for demonstration if empty
-        const mocks = generateMockNotifications();
-        saveNotificationHistory(mocks);
-        return mocks;
+        return [];
     }
     return JSON.parse(data);
   } catch (error) {

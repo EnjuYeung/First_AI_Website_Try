@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Subscription, Frequency } from '../types';
 import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Maximize2, Minimize2, Calendar } from 'lucide-react';
-import { translations } from '../services/i18n';
+import { getT } from '../services/i18n';
 
 interface Props {
   subscriptions: Subscription[];
@@ -20,7 +20,7 @@ type ChartType = 'line' | 'bar';
 type TimeRange = '12m' | '6m' | 'ytd' | 'all';
 type HistoryMode = 'month' | 'quarter' | 'year';
 type FullScreenChart = 'trend' | 'distribution' | 'category' | null;
-type Translator = (key: keyof typeof translations['en']) => string;
+type Translator = (key: any) => string;
 
 interface PaymentRecord {
     subId: string;
@@ -140,10 +140,7 @@ const ModalWithPagination: React.FC<{ title: string, records: PaymentRecord[], o
 };
 
 const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
-    const t = (key: keyof typeof translations['en']) => {
-        const value = translations[lang][key];
-        return value !== undefined ? value : key;
-    };
+    const t = getT(lang);
 
     // --- State ---
     const [trendType, setTrendType] = useState<ChartType>('line');
@@ -568,7 +565,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
           <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <div>
                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('payment_details')}</h3>
-                   <p className="text-sm text-gray-500">{t(`history_3_${historyMode}s` as keyof typeof translations['en'])}</p>
+                   <p className="text-sm text-gray-500">{t(`history_3_${historyMode}s`)}</p>
                </div>
                
                <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1">

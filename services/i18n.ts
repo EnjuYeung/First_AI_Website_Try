@@ -1,5 +1,3 @@
-
-
 export const translations = {
   en: {
     app_name: "Sub_Management",
@@ -36,6 +34,7 @@ export const translations = {
     currency: "Currency",
     notifications: "Notifications",
     security: "Security",
+    ai_integration: "AI Integration",
     appearance: "Appearance",
     language: "Language",
     timezone: "Timezone",
@@ -79,6 +78,8 @@ export const translations = {
     password_success: "Password updated successfully!",
     password_error_mismatch: "New passwords do not match.",
     password_error_empty: "Please fill in all password fields.",
+    success_title: "Success",
+    error_title: "Error",
     scan_qr: "Scan this with Google Authenticator",
     verify: "Verify",
     enable_notifications: "Enable Notifications",
@@ -123,7 +124,7 @@ export const translations = {
     api_configuration: "API Configuration",
     refresh_rates: "Refresh",
     last_updated: "Last Updated",
-    ai_rate_info: "Exchange rates are updated daily at 12:00 PM via Gemini AI. You can also manually refresh.",
+    ai_rate_info: "Exchange rates are updated daily at 12:00 PM via your configured AI Model.",
     line_chart: "Line Chart",
     bar_chart: "Bar Chart",
     last_12_months: "Last 12 Months",
@@ -154,6 +155,20 @@ export const translations = {
     exit_full_screen: "Exit Full Screen",
     logout: "Logout",
     confirm_logout: "Are you sure you want to logout?",
+    // AI Config
+    ai_title: "AI Large Model Integration",
+    ai_subtitle: "Configure AI service to enhance system capabilities",
+    chat_url: "Chat URL",
+    chat_url_placeholder: "https://api.openai.com/v1/chat/completions",
+    ai_api_key: "API Key",
+    ai_model_name: "Model Name",
+    ai_config_desc: "Configuration Tips",
+    ai_desc_1: "Ensure the API interface address is complete and accessible.",
+    ai_desc_2: "URL path is a full conversation endpoint, do not omit suffix like chat/completions.",
+    ai_desc_3: "API Key will be stored encrypted locally, please keep it safe.",
+    ai_desc_4: "Model name must match the name provided by the service provider.",
+    ai_save: "Save Configuration",
+    ai_saved_toast: "Configuration saved successfully!",
     // Notification History
     notif_total: "Total",
     notif_sent: "Sent",
@@ -228,6 +243,7 @@ export const translations = {
     currency: "货币",
     notifications: "通知",
     security: "安全",
+    ai_integration: "AI模型",
     appearance: "外观主题",
     language: "语言",
     timezone: "时区",
@@ -271,6 +287,8 @@ export const translations = {
     password_success: "密码更新成功！",
     password_error_mismatch: "新密码不匹配。",
     password_error_empty: "请填写所有密码字段。",
+    success_title: "成功",
+    error_title: "错误",
     scan_qr: "使用 Google Authenticator 扫描",
     verify: "验证",
     enable_notifications: "开启通知",
@@ -315,7 +333,7 @@ export const translations = {
     api_configuration: "接口配置",
     refresh_rates: "刷新",
     last_updated: "上次更新",
-    ai_rate_info: "汇率每天 12:00 通过 AI 自动更新，您也可以手动刷新。",
+    ai_rate_info: "汇率每天 12:00 通过配置的 AI 模型自动更新，您也可以手动刷新。",
     line_chart: "折线图",
     bar_chart: "柱状图",
     last_12_months: "近12个月",
@@ -346,6 +364,20 @@ export const translations = {
     exit_full_screen: "退出全屏",
     logout: "登出",
     confirm_logout: "您确定要退出登录吗？",
+    // AI Config
+    ai_title: "AI大模型接入",
+    ai_subtitle: "配置 AI 服务以增强系统功能",
+    chat_url: "对话 URL",
+    chat_url_placeholder: "https://api.openai.com/v1/chat/completions",
+    ai_api_key: "API Key",
+    ai_model_name: "模型名称",
+    ai_config_desc: "配置说明",
+    ai_desc_1: "请确保 API 接口地址完整且可访问",
+    ai_desc_2: "URL的路径是完整对话，不要省略结尾的chat/completions",
+    ai_desc_3: "API Key 将加密保存，请妥善保管",
+    ai_desc_4: "模型名称需要与服务商提供的名称一致",
+    ai_save: "保存配置",
+    ai_saved_toast: "配置保存成功！",
     // Notification History
     notif_total: "总数",
     notif_sent: "已发送",
@@ -385,4 +417,8 @@ export const translations = {
     welcome_back: "欢迎回来！",
     login_subtitle: "智能管理您的订阅服务"
   }
+};
+
+export const getT = (lang: 'en' | 'zh') => (key: keyof typeof translations['en']) => {
+    return translations[lang][key] || key;
 };

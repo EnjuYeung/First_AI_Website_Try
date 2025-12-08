@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Upload, RefreshCw, Image as ImageIcon, Bell, CheckCircle2, XCircle } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
-import { translations } from '../services/i18n';
+import { getT } from '../services/i18n';
 
 interface Props {
   isOpen: boolean;
@@ -14,10 +14,7 @@ interface Props {
 }
 
 const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, settings, lang }) => {
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[lang][key];
-    return value !== undefined ? value : key; // allow empty string
-  };
+  const t = getT(lang);
   
   const [formData, setFormData] = useState<Partial<Subscription>>({
     name: '',

@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Subscription, Frequency } from '../types';
 import { Edit2, Trash2, ExternalLink, CreditCard, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Check, X, Copy, LayoutGrid, List } from 'lucide-react';
-import { translations } from '../services/i18n';
+import { getT } from '../services/i18n';
 
 interface Props {
   subscriptions: Subscription[];
@@ -105,10 +105,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
   const [sortConfig, setSortConfig] = useState<{ key: 'price' | 'nextBillingDate' | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
 
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[lang][key];
-    return value !== undefined ? value : key;
-  };
+  const t = getT(lang);
 
   // Clear selection when filters or search change to avoid confusing interactions
   useEffect(() => {

@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 import { Subscription, Frequency } from '../types';
 import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, CreditCard, PieChart as PieChartIcon } from 'lucide-react';
-import { translations } from '../services/i18n';
+import { getT } from '../services/i18n';
 
 interface Props {
   subscriptions: Subscription[];
@@ -20,10 +20,7 @@ interface BillingEvent {
 
 const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
   
-  const t = (key: keyof typeof translations['en']) => {
-    const value = translations[lang][key];
-    return value !== undefined ? value : key;
-  };
+  const t = getT(lang);
 
   // Helper: Calculate all billing occurrences for a subscription within a date range
   const getBillingEventsInRange = (sub: Subscription, startRange: Date, endRange: Date): Date[] => {
