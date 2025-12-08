@@ -67,8 +67,7 @@ const App: React.FC = () => {
       setNotifications(data.notifications || []);
       applyTheme(data.settings);
     } catch (err) {
-      console.error('Failed to load data, logging out', err);
-      handleLogoutConfirm();
+      console.error('Failed to load data', err);
     } finally {
       setIsDataLoading(false);
     }

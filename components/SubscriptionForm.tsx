@@ -238,13 +238,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
             <div className="space-y-4">
               <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm space-y-4">
-                 <div className="grid grid-cols-2 gap-4 items-stretch">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                    <div className="flex flex-col">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         {lang === 'zh' ? '支付方式' : t('payment_methods')}
                       </label>
                       <select
-                          className="w-full h-12 px-4 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none min-w-[170px] text-sm"
+                          className="w-full h-12 px-4 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none min-w-[200px] text-sm text-left"
                           value={formData.paymentMethod}
                           onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
                       >
@@ -270,7 +270,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                    </div>
                  </div>
 
-                 <div className="grid grid-cols-2 gap-4 items-stretch">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                   <div className="flex flex-col">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('start_date')}</label>
                     <input

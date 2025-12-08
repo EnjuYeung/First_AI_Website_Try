@@ -138,6 +138,21 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
     ];
   }, [lang]);
 
+  const currencySymbol = (code: string) => {
+    const map: Record<string, string> = {
+      USD: '$',
+      CNY: '¥',
+      EUR: '€',
+      GBP: '£',
+      HKD: 'HK$',
+      JPY: '¥',
+      SGD: 'S$',
+      AUD: 'A$',
+      CAD: 'C$'
+    };
+    return map[code] || code;
+  };
+
   // --- Sorting & Filtering Logic ---
 
   const handleSort = (key: 'price' | 'nextBillingDate' | 'name') => {
@@ -493,7 +508,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                           {renderStatusBadge(sub.status)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-medium text-gray-900 dark:text-white">{sub.currency === 'USD' ? '$' : sub.currency} {sub.price.toFixed(2)}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{currencySymbol(sub.currency)}{sub.price.toFixed(2)}</span>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -625,7 +640,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                          
                          <div className="flex items-baseline mb-4">
                             <span className={`text-2xl font-bold mr-1 ${sub.status === 'cancelled' ? 'text-gray-400 dark:text-gray-500 decoration-slate-400' : 'text-gray-900 dark:text-white'}`}>
-                                {sub.currency === 'USD' ? '$' : sub.currency}{sub.price}
+                                {currencySymbol(sub.currency)}{sub.price}
                             </span>
                             <span className="text-xs text-gray-500">
                                 / {sub.frequency === Frequency.MONTHLY ? 'mo' : sub.frequency === Frequency.YEARLY ? 'yr' : 'cycle'}

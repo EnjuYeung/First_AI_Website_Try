@@ -76,6 +76,8 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   const t = getT(settings.language);
   const isTwoFactorActive = settings.security.twoFactorEnabled;
   const isTwoFactorPending = !!settings.security.pendingTwoFactorSecret;
+  const categories = settings.customCategories || [];
+  const payments = settings.customPaymentMethods || [];
 
   // Auto-Update Check
   useEffect(() => {
@@ -586,7 +588,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                         <button onClick={handleAddCategory} className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={20}/></button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {settings.customCategories.map((cat, idx) => (
+                        {categories.map((cat, idx) => (
                             <span
                                 key={cat}
                                 draggable
@@ -600,7 +602,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 title={lang === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
                             >
                                 {cat}
-                                <button onClick={() => onUpdateSettings({...settings, customCategories: settings.customCategories.filter(c => c !== cat)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
+                                <button onClick={() => onUpdateSettings({...settings, customCategories: categories.filter(c => c !== cat)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
                     </div>
@@ -620,7 +622,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                         <button onClick={handleAddPayment} className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={20}/></button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {settings.customPaymentMethods.map((pm, idx) => (
+                        {payments.map((pm, idx) => (
                             <span
                                 key={pm}
                                 draggable
@@ -634,7 +636,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 title={lang === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
                             >
                                 {pm}
-                                <button onClick={() => onUpdateSettings({...settings, customPaymentMethods: settings.customPaymentMethods.filter(p => p !== pm)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
+                                <button onClick={() => onUpdateSettings({...settings, customPaymentMethods: payments.filter(p => p !== pm)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
                     </div>

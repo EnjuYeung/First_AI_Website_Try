@@ -165,10 +165,13 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       });
     });
 
-    // Determine Highest Sub (Last 12M)
+    // Determine Highest Sub (by single billing amount, converted to USD)
     let highestSub = { name: 'None', value: 0, currency: 'USD' };
-    Object.values(last12MSubTotal).forEach(item => {
-        if (item.value > highestSub.value) highestSub = item;
+    subscriptions.forEach(sub => {
+        const usd = toUSD(sub.price, sub.currency);
+        if (usd > highestSub.value) {
+            highestSub = { name: sub.name, value: usd, currency: 'USD' };
+        }
     });
 
     // Determine Top Category (Last 12M)
@@ -321,8 +324,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                         {dashboardData.highestSub.name}
                      </h3>
                      <p className="text-xs text-gray-400 mt-1">
-                        {dashboardData.highestSub.currency === 'USD' ? '$' : dashboardData.highestSub.currency}
-                        {dashboardData.highestSub.value.toFixed(2)} / 12mo
+                        ${dashboardData.highestSub.value.toFixed(2)} / 12mo
                      </p>
                 </div>
                 <div className="p-3 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-xl">
@@ -402,28 +404,31 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('yearly_expenditure_breakdown')}</h3>
           {dashboardData.yearlyBreakdownData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 5, right: 60, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" width={90} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}}
-                  contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                />
-                <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={24}>
-                    <LabelList 
-                        dataKey="value" 
-                        position="right" 
-                        formatter={(val: number) => {
-                             const item = dashboardData.yearlyBreakdownData.find(d => d.value === val);
-                             return item ? `$${val} (${item.percentage}%)` : `$${val}`;
-                        }}
-                        style={{ fontSize: '11px', fill: '#6b7280', fontWeight: 500 }}
+            <div className="h-full overflow-x-auto">
+              <div className="min-w-[720px] h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 5, right: 80, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                    <Tooltip 
+                      cursor={{fill: 'transparent'}}
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={24}>
+                        <LabelList 
+                            dataKey="value" 
+                            position="right" 
+                            formatter={(val: number, _name: string, entry: any) => {
+                                 return `$${val} (${entry?.percentage ?? 0}%)`;
+                            }}
+                            style={{ fontSize: '11px', fill: '#6b7280', fontWeight: 500 }}
+                        />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center text-gray-400">
               No paid data this year
