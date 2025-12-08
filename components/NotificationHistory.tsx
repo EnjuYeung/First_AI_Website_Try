@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getT } from '../services/i18n';
 import { loadNotificationHistory } from '../services/storageService';
 import { NotificationRecord, NotificationType, NotificationStatus, NotificationChannel } from '../types';
-import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, CreditCard, Calendar, AlertTriangle, Lightbulb, Mail, Send, ChevronRight } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, CreditCard, Calendar, AlertTriangle, Lightbulb, Mail, Send } from 'lucide-react';
 
 interface Props {
   lang: 'en' | 'zh';

@@ -100,18 +100,6 @@ export interface Subscription {
   notificationsEnabled: boolean;
 }
 
-export interface SpendingData {
-  name: string;
-  value: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  timestamp: number;
-}
-
 // --- Settings Types ---
 
 export interface CurrencyConfig {

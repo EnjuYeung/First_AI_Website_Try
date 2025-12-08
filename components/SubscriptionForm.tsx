@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, RefreshCw, Bell, CheckCircle2, XCircle } from 'lucide-react';
+import { X, RefreshCw, Bell } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
 
