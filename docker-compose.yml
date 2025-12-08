@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    ports:
+      - "3001:80" # host 3001 -> container 80
+    depends_on:
+      - backend
+    networks:
+      - appnet
+
+  backend:
+    build:
+      context: ./server
+    env_file:
+      - ./server/.env
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge

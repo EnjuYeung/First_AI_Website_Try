@@ -22,17 +22,27 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
     setIsLoading(true);
     setError('');
 
-    // Simulate Network Request
-    setTimeout(() => {
-        // MOCK AUTHENTICATION LOGIC
-        // In a real app, you would send a POST request to your backend here.
-        if (username === 'admin' && password === 'admin') {
-            onLogin('mock_session_token_12345');
-        } else {
+    try {
+        const resp = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!resp.ok) {
             setError(t('invalid_credentials'));
-            setIsLoading(false);
+            return;
         }
-    }, 800);
+
+        const data = await resp.json();
+        localStorage.setItem('auth_token', data.token);
+        onLogin(data.token);
+    } catch (err) {
+        console.error('Login error:', err);
+        setError(t('connection_failed') || 'Network error');
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -99,7 +109,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
-                        placeholder="admin"
+                        placeholder="passwords"
                     />
                 </div>
             </div>
@@ -124,7 +134,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
         </form>
 
         <div className="p-4 bg-gray-50 dark:bg-slate-700/50 text-center text-xs text-gray-400">
-            Demo Credentials: admin / admin
+            Demo Credentials: admin / passwords
         </div>
       </div>
     </div>
