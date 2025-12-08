@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import speakeasy from 'speakeasy';
 
 dotenv.config();
 
@@ -100,6 +101,8 @@ const defaultSettings = () => ({
   },
   security: {
     twoFactorEnabled: false,
+    twoFactorSecret: '',
+    pendingTwoFactorSecret: '',
     lastPasswordChange: new Date().toISOString()
   }
 });
@@ -140,10 +143,12 @@ const loadUserData = async (username) => {
   try {
     const buf = await fs.readFile(userDataPath(username), 'utf-8');
     const parsed = JSON.parse(buf);
+    const mergedSettings = { ...defaultSettings(), ...parsed.settings };
+    mergedSettings.security = { ...defaultSettings().security, ...(parsed.settings?.security || {}) };
     return {
       subscriptions: parsed.subscriptions || [],
       notifications: parsed.notifications || [],
-      settings: { ...defaultSettings(), ...parsed.settings }
+      settings: mergedSettings
     };
   } catch (err) {
     const initial = defaultUserData();
@@ -157,7 +162,11 @@ const saveUserData = async (username, data) => {
   const payload = {
     subscriptions: data.subscriptions || [],
     notifications: data.notifications || [],
-    settings: { ...defaultSettings(), ...data.settings }
+    settings: { 
+      ...defaultSettings(), 
+      ...data.settings,
+      security: { ...defaultSettings().security, ...(data.settings?.security || {}) }
+    }
   };
   await fs.writeFile(userDataPath(username), JSON.stringify(payload, null, 2), 'utf-8');
 };
@@ -204,6 +213,60 @@ app.get('/api/data', authMiddleware, async (req, res) => {
 app.put('/api/data', authMiddleware, async (req, res) => {
   const { subscriptions = [], settings = {}, notifications = [] } = req.body || {};
   await saveUserData(req.user.username, { subscriptions, settings, notifications });
+  res.json({ success: true });
+});
+
+app.post('/api/2fa/init', authMiddleware, async (req, res) => {
+  const data = await loadUserData(req.user.username);
+  const secret = speakeasy.generateSecret({
+    length: 20,
+    name: `Subm (${req.user.username})`,
+    issuer: 'Subm'
+  });
+
+  data.settings = data.settings || defaultSettings();
+  data.settings.security = data.settings.security || defaultSettings().security;
+  data.settings.security.pendingTwoFactorSecret = secret.base32;
+  data.settings.security.twoFactorEnabled = false;
+
+  await saveUserData(req.user.username, data);
+
+  res.json({ secret: secret.base32, otpauthUrl: secret.otpauth_url });
+});
+
+app.post('/api/2fa/verify', authMiddleware, async (req, res) => {
+  const { code } = req.body || {};
+  if (!code) return res.status(400).json({ message: 'Missing code' });
+
+  const data = await loadUserData(req.user.username);
+  const secret = data.settings?.security?.pendingTwoFactorSecret || data.settings?.security?.twoFactorSecret;
+
+  if (!secret) return res.status(400).json({ message: 'No pending secret' });
+
+  const verified = speakeasy.totp.verify({
+    secret,
+    encoding: 'base32',
+    token: code,
+    window: 1
+  });
+
+  if (!verified) return res.status(400).json({ message: 'Invalid code' });
+
+  data.settings.security.twoFactorEnabled = true;
+  data.settings.security.twoFactorSecret = secret;
+  data.settings.security.pendingTwoFactorSecret = '';
+
+  await saveUserData(req.user.username, data);
+
+  res.json({ success: true, secret });
+});
+
+app.post('/api/2fa/disable', authMiddleware, async (req, res) => {
+  const data = await loadUserData(req.user.username);
+  data.settings.security.twoFactorEnabled = false;
+  data.settings.security.twoFactorSecret = '';
+  data.settings.security.pendingTwoFactorSecret = '';
+  await saveUserData(req.user.username, data);
   res.json({ success: true });
 });
 

@@ -47,6 +47,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   security: {
     twoFactorEnabled: false,
+    twoFactorSecret: '',
+    pendingTwoFactorSecret: '',
     lastPasswordChange: new Date().toISOString(),
   }
 };
@@ -79,6 +81,10 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       ...DEFAULT_SETTINGS.notifications,
       ...parsed.notifications,
       rules: { ...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules }
+    },
+    security: {
+      ...DEFAULT_SETTINGS.security,
+      ...parsed.security
     },
     exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
     customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,

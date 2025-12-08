@@ -37,6 +37,10 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   // Security State
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [showQr, setShowQr] = useState(false);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [twoFaQrUrl, setTwoFaQrUrl] = useState<string | null>(null);
+  const [is2faBusy, setIs2faBusy] = useState(false);
+  const [is2faVerifying, setIs2faVerifying] = useState(false);
 
   // Alert Modal State
   const [alertState, setAlertState] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string } | null>(null);
@@ -54,7 +58,20 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
       setLocalAiConfig(settings.aiConfig);
   }, [settings.aiConfig]);
 
+  useEffect(() => {
+      if (settings.security.pendingTwoFactorSecret) {
+          const otpauth = `otpauth://totp/Subm?secret=${settings.security.pendingTwoFactorSecret}&issuer=Subm`;
+          setTwoFaQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauth)}`);
+          setShowQr(true);
+      } else {
+          setTwoFaQrUrl(null);
+          setShowQr(false);
+      }
+  }, [settings.security.pendingTwoFactorSecret]);
+
   const t = getT(settings.language);
+  const isTwoFactorActive = settings.security.twoFactorEnabled;
+  const isTwoFactorPending = !!settings.security.pendingTwoFactorSecret;
 
   // Auto-Update Check
   useEffect(() => {
@@ -256,6 +273,166 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
             title: t('error_title'),
             message: t('connection_failed') || 'Network error'
         });
+    }
+  };
+
+  const startTwoFactor = async () => {
+    setIs2faBusy(true);
+    try {
+        const resp = await fetch('/api/2fa/init', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+            }
+        });
+
+        if (!resp.ok) {
+            setAlertState({
+                isOpen: true,
+                type: 'error',
+                title: t('error_title'),
+                message: t('connection_failed') || 'Init failed'
+            });
+            return;
+        }
+
+        const data = await resp.json();
+        const otpauth = data.otpauthUrl || `otpauth://totp/Subm?secret=${data.secret}&issuer=Subm`;
+        setTwoFaQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauth)}`);
+        setShowQr(true);
+        onUpdateSettings({
+            ...settings,
+            security: {
+                ...settings.security,
+                twoFactorEnabled: false,
+                pendingTwoFactorSecret: data.secret,
+                twoFactorSecret: settings.security.twoFactorSecret || ''
+            }
+        });
+    } catch (error) {
+        console.error('2FA init failed', error);
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('connection_failed') || 'Network error'
+        });
+    } finally {
+        setIs2faBusy(false);
+    }
+  };
+
+  const verifyTwoFactor = async () => {
+    if (!twoFaCode) {
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('password_error_empty')
+        });
+        return;
+    }
+
+    setIs2faVerifying(true);
+    try {
+        const resp = await fetch('/api/2fa/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+            },
+            body: JSON.stringify({ code: twoFaCode })
+        });
+
+        if (!resp.ok) {
+            setAlertState({
+                isOpen: true,
+                type: 'error',
+                title: t('error_title'),
+                message: t('invalid_credentials')
+            });
+            return;
+        }
+
+        const data = await resp.json();
+        setTwoFaCode('');
+        setTwoFaQrUrl(null);
+        setShowQr(false);
+        onUpdateSettings({
+            ...settings,
+            security: {
+                ...settings.security,
+                twoFactorEnabled: true,
+                twoFactorSecret: data.secret || settings.security.twoFactorSecret || '',
+                pendingTwoFactorSecret: ''
+            }
+        });
+        setToastMessage(t('success_title'));
+    } catch (error) {
+        console.error('2FA verify failed', error);
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('connection_failed') || 'Network error'
+        });
+    } finally {
+        setIs2faVerifying(false);
+    }
+  };
+
+  const disableTwoFactor = async () => {
+    setIs2faBusy(true);
+    try {
+        const resp = await fetch('/api/2fa/disable', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+            }
+        });
+        if (!resp.ok) {
+            setAlertState({
+                isOpen: true,
+                type: 'error',
+                title: t('error_title'),
+                message: t('connection_failed') || 'Network error'
+            });
+            return;
+        }
+
+        setTwoFaCode('');
+        setTwoFaQrUrl(null);
+        setShowQr(false);
+        onUpdateSettings({
+            ...settings,
+            security: {
+                ...settings.security,
+                twoFactorEnabled: false,
+                twoFactorSecret: '',
+                pendingTwoFactorSecret: ''
+            }
+        });
+        setToastMessage(t('success_title'));
+    } catch (error) {
+        console.error('2FA disable failed', error);
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('connection_failed') || 'Network error'
+        });
+    } finally {
+        setIs2faBusy(false);
+    }
+  };
+
+  const handleToggleTwoFactor = (enabled: boolean) => {
+    if (enabled) {
+        startTwoFactor();
+    } else {
+        disableTwoFactor();
     }
   };
 
@@ -750,24 +927,44 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                      <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('two_factor')}</h3>
                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" checked={settings.security.twoFactorEnabled} onChange={e => {
-                                onUpdateSettings({...settings, security: {...settings.security, twoFactorEnabled: e.target.checked}});
-                                if(e.target.checked) setShowQr(true);
-                                else setShowQr(false);
-                            }} className="sr-only peer" />
+                            <input 
+                                type="checkbox" 
+                                checked={isTwoFactorActive || isTwoFactorPending || showQr} 
+                                onChange={e => handleToggleTwoFactor(e.target.checked)} 
+                                className="sr-only peer" 
+                                disabled={is2faBusy || is2faVerifying}
+                            />
                             <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:bg-primary-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-                        </label>
+                         </label>
                      </div>
-                     {showQr && settings.security.twoFactorEnabled && (
-                         <div className="p-6 bg-gray-50 dark:bg-slate-700 rounded-xl flex flex-col items-center">
-                             <div className="w-48 h-48 bg-white p-2 mb-4">
-                                 {/* Mock QR Code */}
-                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/Subscrybe:User?secret=JBSWY3DPEHPK3PXP&issuer=Subscrybe" alt="2FA QR" />
+                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                        {isTwoFactorActive ? '已开启双重认证' : '未开启双重认证'}
+                     </p>
+                     {(showQr || isTwoFactorPending || twoFaQrUrl) && (
+                         <div className="p-6 bg-gray-50 dark:bg-slate-700 rounded-xl flex flex-col items-center gap-4">
+                             <div className="w-48 h-48 bg-white p-2">
+                                 {twoFaQrUrl ? (
+                                    <img src={twoFaQrUrl} alt="2FA QR" className="w-full h-full object-contain" />
+                                 ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">Loading...</div>
+                                 )}
                              </div>
-                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 text-center">{t('scan_qr')}</p>
-                             <div className="flex gap-2">
-                                 <input type="text" placeholder="Enter 6-digit code" className="px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white" />
-                                 <button className="px-4 py-2 bg-green-600 text-white rounded-lg">{t('verify')}</button>
+                             <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{t('scan_qr')}</p>
+                             <div className="flex gap-2 w-full max-w-sm">
+                                 <input 
+                                    type="text" 
+                                    placeholder="Enter 6-digit code" 
+                                    className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white" 
+                                    value={twoFaCode}
+                                    onChange={e => setTwoFaCode(e.target.value)}
+                                 />
+                                 <button 
+                                    onClick={verifyTwoFactor}
+                                    disabled={is2faVerifying}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-60"
+                                 >
+                                    {is2faVerifying ? t('logging_in') : t('verify')}
+                                 </button>
                              </div>
                          </div>
                      )}

@@ -150,6 +150,8 @@ export interface AppSettings {
   };
   security: {
     twoFactorEnabled: boolean;
+    twoFactorSecret?: string;
+    pendingTwoFactorSecret?: string;
     lastPasswordChange: string;
   };
 }
