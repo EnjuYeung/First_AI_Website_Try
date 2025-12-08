@@ -103,7 +103,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
-  const [sortConfig, setSortConfig] = useState<{ key: 'price' | 'nextBillingDate' | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState<{ key: 'price' | 'nextBillingDate' | 'name' | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
 
   const t = getT(lang);
 
@@ -140,7 +140,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
   // --- Sorting & Filtering Logic ---
 
-  const handleSort = (key: 'price' | 'nextBillingDate') => {
+  const handleSort = (key: 'price' | 'nextBillingDate' | 'name') => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
@@ -180,6 +180,11 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
         let aValue: any = a[sortConfig.key];
         let bValue: any = b[sortConfig.key];
+
+        if (sortConfig.key === 'name') {
+          aValue = (a.name || '').toLowerCase();
+          bValue = (b.name || '').toLowerCase();
+        }
 
         // Date comparison
         if (sortConfig.key === 'nextBillingDate') {
@@ -393,7 +398,19 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                             />
                          </div>
                     </th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('service')}</th>
+                    <th 
+                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group"
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('service')}
+                        {sortConfig.key === 'name' ? (
+                          sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-primary-600"/> : <ArrowDown size={14} className="text-primary-600"/>
+                        ) : (
+                          <ArrowUpDown size={14} className="text-gray-300 group-hover:text-gray-500"/>
+                        )}
+                      </div>
+                    </th>
                     
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('status')}</th>
 

@@ -54,6 +54,10 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   // AI Config Local State (Not saved immediately)
   const [localAiConfig, setLocalAiConfig] = useState<AIConfig>(settings.aiConfig);
 
+  // Drag-and-drop state
+  const [dragCatIndex, setDragCatIndex] = useState<number | null>(null);
+  const [dragPayIndex, setDragPayIndex] = useState<number | null>(null);
+
   useEffect(() => {
       setLocalAiConfig(settings.aiConfig);
   }, [settings.aiConfig]);
@@ -97,7 +101,30 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         onUpdateSettings({...settings, customPaymentMethods: [...settings.customPaymentMethods, newPayment]});
         setNewPayment('');
     }
-  }
+  };
+
+  const reorderList = (list: string[], from: number, to: number) => {
+    const arr = [...list];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    return arr;
+  };
+
+  const handleCategoryDragStart = (index: number) => setDragCatIndex(index);
+  const handleCategoryDrop = (index: number) => {
+    if (dragCatIndex === null || dragCatIndex === index) return;
+    const reordered = reorderList(settings.customCategories, dragCatIndex, index);
+    onUpdateSettings({ ...settings, customCategories: reordered });
+    setDragCatIndex(null);
+  };
+
+  const handlePaymentDragStart = (index: number) => setDragPayIndex(index);
+  const handlePaymentDrop = (index: number) => {
+    if (dragPayIndex === null || dragPayIndex === index) return;
+    const reordered = reorderList(settings.customPaymentMethods, dragPayIndex, index);
+    onUpdateSettings({ ...settings, customPaymentMethods: reordered });
+    setDragPayIndex(null);
+  };
 
   // Currency Handlers
   const handleRefreshRates = async () => {
@@ -559,8 +586,19 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                         <button onClick={handleAddCategory} className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={20}/></button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {settings.customCategories.map(cat => (
-                            <span key={cat} className="px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2">
+                        {settings.customCategories.map((cat, idx) => (
+                            <span
+                                key={cat}
+                                draggable
+                                onDragStart={() => handleCategoryDragStart(idx)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={() => handleCategoryDrop(idx)}
+                                onDragEnd={() => setDragCatIndex(null)}
+                                className={`px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
+                                    dragCatIndex === idx ? 'ring-2 ring-primary-400' : ''
+                                }`}
+                                title={lang === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
+                            >
                                 {cat}
                                 <button onClick={() => onUpdateSettings({...settings, customCategories: settings.customCategories.filter(c => c !== cat)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
@@ -582,8 +620,19 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                         <button onClick={handleAddPayment} className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={20}/></button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {settings.customPaymentMethods.map(pm => (
-                            <span key={pm} className="px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2">
+                        {settings.customPaymentMethods.map((pm, idx) => (
+                            <span
+                                key={pm}
+                                draggable
+                                onDragStart={() => handlePaymentDragStart(idx)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={() => handlePaymentDrop(idx)}
+                                onDragEnd={() => setDragPayIndex(null)}
+                                className={`px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
+                                    dragPayIndex === idx ? 'ring-2 ring-primary-400' : ''
+                                }`}
+                                title={lang === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
+                            >
                                 {pm}
                                 <button onClick={() => onUpdateSettings({...settings, customPaymentMethods: settings.customPaymentMethods.filter(p => p !== pm)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>

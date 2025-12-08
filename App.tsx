@@ -274,7 +274,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="animate-fade-in">
-          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={settings.language} />}
+          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={settings.language} settings={settings} />}
           
           {activeTab === 'list' && (
             <SubscriptionList 
@@ -288,7 +288,7 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'analytics' && (
-            <Statistics subscriptions={subscriptions} lang={settings.language} />
+            <Statistics subscriptions={subscriptions} settings={settings} lang={settings.language} />
           )}
 
           {activeTab === 'notifications' && (

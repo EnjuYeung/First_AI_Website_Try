@@ -1,12 +1,13 @@
 
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
-import { Subscription, Frequency } from '../types';
+import { Subscription, Frequency, AppSettings } from '../types';
 import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, CreditCard, PieChart as PieChartIcon } from 'lucide-react';
 import { getT } from '../services/i18n';
 
 interface Props {
   subscriptions: Subscription[];
+  settings: AppSettings;
   lang: 'en' | 'zh';
 }
 
@@ -18,9 +19,15 @@ interface BillingEvent {
   cost: number;
 }
 
-const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
+const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
   
   const t = getT(lang);
+  const toUSD = (amount: number, currency: string) => {
+    if (!amount) return 0;
+    if (!currency || currency === 'USD') return amount;
+    const rate = settings.exchangeRates?.[currency] || 1;
+    return rate === 0 ? amount : amount / rate;
+  };
 
   // Helper: Calculate all billing occurrences for a subscription within a date range
   const getBillingEventsInRange = (sub: Subscription, startRange: Date, endRange: Date): Date[] => {
@@ -59,7 +66,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
     return events;
   };
 
-  const dashboardData = useMemo(() => {
+    const dashboardData = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -109,27 +116,28 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
       const monthEvents = getBillingEventsInRange(sub, monthStart, monthEnd);
       monthEvents.forEach(date => {
          if (date <= today) {
-             monthlyPaid += sub.price;
+             monthlyPaid += toUSD(sub.price, sub.currency);
          } else if (sub.status !== 'cancelled') {
-             monthlyPending += sub.price;
+             monthlyPending += toUSD(sub.price, sub.currency);
          }
       });
 
       // 3. Yearly Logic & Breakdown
       const yearEvents = getBillingEventsInRange(sub, yearStart, yearEnd);
       yearEvents.forEach(date => {
+        const usd = toUSD(sub.price, sub.currency);
         if (date <= today) {
-            yearlyPaid += sub.price;
-            yearlyPaidByCategory[sub.category] = (yearlyPaidByCategory[sub.category] || 0) + sub.price;
+            yearlyPaid += usd;
+            yearlyPaidByCategory[sub.category] = (yearlyPaidByCategory[sub.category] || 0) + usd;
         } else if (sub.status !== 'cancelled') {
-            yearlyPending += sub.price;
+            yearlyPending += usd;
         }
       });
 
       // 4. Recent Payments (Last 7 Days)
       const recentEvents = getBillingEventsInRange(sub, last7DaysStart, today);
       recentEvents.forEach(date => {
-        recentPayments.push({ sub, date, cost: sub.price });
+        recentPayments.push({ sub, date, cost: toUSD(sub.price, sub.currency) });
       });
 
       // 5. Upcoming Renewals (Next 7 Days)
@@ -138,7 +146,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
               const nextDate = new Date(sub.nextBillingDate);
               nextDate.setHours(0,0,0,0);
               if (nextDate > today && nextDate <= next7DaysEnd) {
-                  upcomingRenewals.push({ sub, date: nextDate, cost: sub.price });
+                  upcomingRenewals.push({ sub, date: nextDate, cost: toUSD(sub.price, sub.currency) });
               }
           }
       }
@@ -150,10 +158,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
         if (!last12MSubTotal[sub.id]) {
             last12MSubTotal[sub.id] = { name: sub.name, value: 0, currency: sub.currency };
         }
-        last12MSubTotal[sub.id].value += sub.price;
+        last12MSubTotal[sub.id].value += toUSD(sub.price, sub.currency);
 
         // Category Total
-        last12MCategoryTotal[sub.category] = (last12MCategoryTotal[sub.category] || 0) + sub.price;
+        last12MCategoryTotal[sub.category] = (last12MCategoryTotal[sub.category] || 0) + toUSD(sub.price, sub.currency);
       });
     });
 
@@ -175,12 +183,13 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
 
     // Pie Chart Data (Monthly Budget)
     const getStandardMonthlyCost = (sub: Subscription) => {
+        const usd = toUSD(sub.price, sub.currency);
         switch (sub.frequency) {
-            case Frequency.MONTHLY: return sub.price;
-            case Frequency.QUARTERLY: return sub.price / 3;
-            case Frequency.SEMI_ANNUALLY: return sub.price / 6;
-            case Frequency.YEARLY: return sub.price / 12;
-            default: return sub.price;
+            case Frequency.MONTHLY: return usd;
+            case Frequency.QUARTERLY: return usd / 3;
+            case Frequency.SEMI_ANNUALLY: return usd / 6;
+            case Frequency.YEARLY: return usd / 12;
+            default: return usd;
         }
     };
     
@@ -221,7 +230,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang }) => {
       highestSub,
       topCategory
     };
-  }, [subscriptions]);
+  }, [subscriptions, settings.exchangeRates]);
 
 
   const formatDate = (date: Date) => {

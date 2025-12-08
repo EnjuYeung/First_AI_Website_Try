@@ -12,6 +12,7 @@ interface Props {
 const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,8 +27,13 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
         const resp = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, code })
         });
+
+        if (resp.status === 403) {
+            setError('需要输入双重验证码');
+            return;
+        }
 
         if (!resp.ok) {
             setError(t('invalid_credentials'));
@@ -110,6 +116,20 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
                         onChange={e => setPassword(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
                         placeholder="passwords"
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">2FA</label>
+                <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input 
+                        type="text" 
+                        value={code}
+                        onChange={e => setCode(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
+                        placeholder="6-digit code (2FA, 如已启用)"
                     />
                 </div>
             </div>

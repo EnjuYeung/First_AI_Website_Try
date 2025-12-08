@@ -4,12 +4,13 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Legend, PieChart, Pie, Cell, ComposedChart
 } from 'recharts';
-import { Subscription, Frequency } from '../types';
+import { Subscription, Frequency, AppSettings } from '../types';
 import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Maximize2, Minimize2, Calendar } from 'lucide-react';
 import { getT } from '../services/i18n';
 
 interface Props {
   subscriptions: Subscription[];
+  settings: AppSettings;
   lang: 'en' | 'zh';
 }
 
@@ -29,6 +30,7 @@ interface PaymentRecord {
     date: Date;
     formattedDate: string;
     amount: number;
+    amountUsd: number;
     currency: string;
     status: string;
 }
@@ -49,7 +51,7 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
                   <th className="px-4 py-3">{t('service_name')}</th>
                   <th className="px-4 py-3">{t('payment_date')}</th>
                   <th className="px-4 py-3">{t('category')}</th>
-                  <th className="px-4 py-3 text-right">{t('cost')}</th>
+                  <th className="px-4 py-3 text-right">{t('cost')} (USD)</th>
               </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -59,7 +61,7 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.formattedDate}</td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.category}</td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
-                          {rec.currency === 'USD' ? '$' : rec.currency} {rec.amount.toFixed(2)}
+                          ${rec.amountUsd.toFixed(2)}
                       </td>
                   </tr>
               ))}
@@ -139,8 +141,15 @@ const ModalWithPagination: React.FC<{ title: string, records: PaymentRecord[], o
   );
 };
 
-const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
+const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const t = getT(lang);
+
+    const convertToUSD = (amount: number, currency: string) => {
+        if (!amount) return 0;
+        if (!currency || currency === 'USD') return amount;
+        const rate = settings.exchangeRates?.[currency] || 1;
+        return rate === 0 ? amount : amount / rate;
+    };
 
     // --- State ---
     const [trendType, setTrendType] = useState<ChartType>('line');
@@ -177,6 +186,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
                 date: new Date(currentDate),
                 formattedDate: currentDate.toISOString().split('T')[0],
                 amount: sub.price,
+                amountUsd: convertToUSD(sub.price, sub.currency),
                 currency: sub.currency,
                 status: sub.status || 'active'
             });
@@ -194,12 +204,12 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
 
     const allPayments = useMemo(() => {
         return subscriptions.flatMap(sub => getAllBillingEvents(sub)).sort((a, b) => b.date.getTime() - a.date.getTime());
-    }, [subscriptions]);
+    }, [subscriptions, settings.exchangeRates]);
 
     // --- Data Processing ---
 
     // 1. Lifetime Spend
-    const lifetimeSpend = useMemo(() => allPayments.reduce((acc, curr) => acc + curr.amount, 0), [allPayments]);
+    const lifetimeSpend = useMemo(() => allPayments.reduce((acc, curr) => acc + curr.amountUsd, 0), [allPayments]);
 
     // 2. Trend Data (Line/Bar)
     const trendData = useMemo(() => {
@@ -230,10 +240,10 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
             if (p.date >= startDate) {
                 const key = p.date.toLocaleString('default', { month: 'short', year: '2-digit' });
                 if (dataMap[key]) {
-                    dataMap[key].total += p.amount;
+                    dataMap[key].total += p.amountUsd;
                     dataMap[key].count += 1;
                     const catKey = p.category as string;
-                    dataMap[key][catKey] = (dataMap[key][catKey] || 0) + p.amount;
+                    dataMap[key][catKey] = (dataMap[key][catKey] || 0) + p.amountUsd;
                 }
             }
         });
@@ -257,9 +267,9 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
         allPayments.forEach(p => {
              if (p.date >= startDate) {
                  if (!totals[p.category]) totals[p.category] = { value: 0, count: 0 };
-                 totals[p.category].value += p.amount;
+                 totals[p.category].value += p.amountUsd;
                  totals[p.category].count += 1;
-                 grandTotal += p.amount;
+                 grandTotal += p.amountUsd;
              }
         });
 
@@ -280,12 +290,12 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
         subscriptions.filter(s => s.status === 'active').forEach(sub => {
              const day = new Date(sub.startDate).getDate();
              if (day >= 1 && day <= 31) {
-                 days[day - 1].amount += sub.price;
+                 days[day - 1].amount += convertToUSD(sub.price, sub.currency);
                  days[day - 1].count += 1;
              }
         });
         return days;
-    }, [subscriptions]);
+    }, [subscriptions, settings.exchangeRates]);
 
 
     // 5. Historical Data Buckets (Month/Quarter/Year)
@@ -304,7 +314,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
                      p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear()
                  );
                  const days = getDaysInMonth(d.getFullYear(), d.getMonth());
-                 groups.push({ title, total: records.reduce((s, c) => s + c.amount, 0), count: records.length, days, records });
+                 groups.push({ title, total: records.reduce((s, c) => s + c.amountUsd, 0), count: records.length, days, records });
              }
         } else if (historyMode === 'quarter') {
              // Last 3 Quarters
@@ -320,7 +330,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
                  
                  const records = allPayments.filter(p => p.date >= qStart && p.date <= qEnd);
                  const days = Math.floor((qEnd.getTime() - qStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                 groups.push({ title, total: records.reduce((s, c) => s + c.amount, 0), count: records.length, days, records });
+                 groups.push({ title, total: records.reduce((s, c) => s + c.amountUsd, 0), count: records.length, days, records });
              }
         } else if (historyMode === 'year') {
              // Last 3 Years
@@ -329,7 +339,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
                  const title = y.toString();
                  const records = allPayments.filter(p => p.date.getFullYear() === y);
                  const days = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
-                 groups.push({ title, total: records.reduce((s, c) => s + c.amount, 0), count: records.length, days, records });
+                 groups.push({ title, total: records.reduce((s, c) => s + c.amountUsd, 0), count: records.length, days, records });
              }
         }
         return groups;
@@ -392,11 +402,26 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang }) => {
             <Tooltip
                 cursor={{fill: 'rgba(0,0,0,0.05)'}}
                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
-                formatter={(value: number, name: string, props: any) => [
-                    `$${value.toFixed(2)}`,
-                    `${t('sub_count')}: ${props.payload.count}`
-                ]}
-                labelFormatter={(label) => `${t('today').replace('Today', 'Day')} ${label}`}
+                formatter={(value: number, _name: string, props: any) => {
+                    return [
+                        `$${value.toFixed(2)}`,
+                        `${t('sub_count')}: ${props?.payload?.count || 0}`
+                    ];
+                }}
+                labelFormatter={(label) => `${label}日`}
+                content={({ label, payload }) => {
+                    if (!payload || !payload.length) return null;
+                    const p = payload[0];
+                    const amount = p.value as number;
+                    const count = p.payload?.count ?? 0;
+                    return (
+                        <div className="p-3 rounded-xl bg-white shadow-md border border-gray-100 text-sm text-gray-700 space-y-1">
+                            <div className="font-semibold text-gray-900">{`${label}日`}</div>
+                            <div className="text-gray-600">{`${t('sub_count')}: ${count}`}</div>
+                            <div className="text-gray-600">{`${t('total_amount')}: $${amount.toFixed(2)}`}</div>
+                        </div>
+                    );
+                }}
             />
             <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} name="amount" />
         </BarChart>

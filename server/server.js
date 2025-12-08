@@ -191,11 +191,31 @@ const authMiddleware = (req, res, next) => {
 
 // --- Routes ---
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, code } = req.body || {};
   if (username !== credentials.username) return res.status(401).json({ message: 'Invalid credentials' });
 
   const ok = await bcrypt.compare(password, ADMIN_HASH);
   if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+
+  const data = await loadUserData(username);
+  const sec = data.settings?.security || defaultSettings().security;
+
+  if (sec.twoFactorEnabled && sec.twoFactorSecret) {
+    if (!code) {
+      return res.status(403).json({ message: 'two_factor_required' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: sec.twoFactorSecret,
+      encoding: 'base32',
+      token: code,
+      window: 1
+    });
+
+    if (!verified) {
+      return res.status(401).json({ message: 'invalid_2fa' });
+    }
+  }
 
   const token = signToken({ username });
   res.json({ token, username });

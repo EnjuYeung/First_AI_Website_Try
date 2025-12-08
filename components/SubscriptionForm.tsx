@@ -238,47 +238,49 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
             <div className="space-y-4">
               <div className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm space-y-4">
-                 <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('payment_methods')}</label>
-                    <select
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                        value={formData.paymentMethod}
-                        onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
-                    >
-                        {settings.customPaymentMethods.map(pm => (
-                        <option key={pm} value={pm}>{pm}</option>
-                        ))}
-                    </select>
-                 </div>
-                 <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('status')}</label>
-                    <select
-                      className={`w-full px-4 py-2 border rounded-lg font-semibold text-center focus:ring-2 focus:ring-primary-500 outline-none transition-colors ${
-                        formData.status === 'active' 
-                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' 
-                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900'
-                      }`}
-                      value={formData.status}
-                      onChange={e => setFormData({...formData, status: e.target.value as 'active' | 'cancelled'})}
-                    >
-                      <option value="active">{t('active')}</option>
-                      <option value="cancelled">{t('cancelled')}</option>
-                    </select>
-                 </div>
+                 <div className="grid grid-cols-2 gap-4 items-stretch">
+                   <div className="flex flex-col">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {lang === 'zh' ? '支付方式' : t('payment_methods')}
+                      </label>
+                      <select
+                          className="w-full h-12 px-4 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none min-w-[170px] text-sm"
+                          value={formData.paymentMethod}
+                          onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
+                      >
+                          {settings.customPaymentMethods.map(pm => (
+                          <option key={pm} value={pm}>{pm}</option>
+                          ))}
+                      </select>
+                   </div>
+                   <div className="flex flex-col">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('status')}</label>
+                      <select
+                        className={`w-full h-12 px-4 border rounded-lg font-semibold text-center focus:ring-2 focus:ring-primary-500 outline-none transition-colors ${
+                          formData.status === 'active' 
+                          ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' 
+                          : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900'
+                        }`}
+                        value={formData.status}
+                        onChange={e => setFormData({...formData, status: e.target.value as 'active' | 'cancelled'})}
+                      >
+                        <option value="active">{t('active')}</option>
+                        <option value="cancelled">{t('cancelled')}</option>
+                      </select>
+                   </div>
                  </div>
 
-                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                 <div className="grid grid-cols-2 gap-4 items-stretch">
+                  <div className="flex flex-col">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('start_date')}</label>
                     <input
                       type="date"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      className="w-full h-12 px-4 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
                       value={formData.startDate}
                       onChange={e => setFormData({...formData, startDate: e.target.value})}
                     />
                   </div>
-                  <div>
+                  <div className="flex flex-col">
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                        {t('next_billing_date')}
                        <RefreshCw size={12} className="text-gray-400" />
@@ -286,7 +288,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                      <input
                       type="date"
                       readOnly
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-600 rounded-lg text-gray-500 dark:text-gray-300 cursor-not-allowed outline-none"
+                      className="w-full h-12 px-4 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-600 rounded-lg text-gray-600 dark:text-gray-200 cursor-not-allowed outline-none font-mono text-sm tracking-wide"
                       value={formData.nextBillingDate}
                      />
                   </div>
