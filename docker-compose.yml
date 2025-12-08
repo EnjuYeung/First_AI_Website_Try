@@ -15,9 +15,14 @@ services:
       context: ./server
     env_file:
       - ./server/.env
+    volumes:
+      - backend-data:/app/data
     networks:
       - appnet
 
 networks:
   appnet:
     driver: bridge
+
+volumes:
+  backend-data:

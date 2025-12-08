@@ -190,7 +190,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     }
   };
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
     const { current, new: newPass, confirm } = passwords;
     
     if (!current || !newPass || !confirm) {
@@ -213,22 +213,50 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         return;
     }
 
-    // Simulate success since we don't have backend auth
-    setPasswords({ current: '', new: '', confirm: '' });
-    onUpdateSettings({
-        ...settings,
-        security: {
-            ...settings.security,
-            lastPasswordChange: new Date().toISOString()
-        }
-    });
+    try {
+        const resp = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+            },
+            body: JSON.stringify({ currentPassword: current, newPassword: newPass })
+        });
 
-    setAlertState({
-        isOpen: true,
-        type: 'success',
-        title: t('success_title'),
-        message: t('password_success')
-    });
+        if (!resp.ok) {
+            setAlertState({
+                isOpen: true,
+                type: 'error',
+                title: t('error_title'),
+                message: t('invalid_credentials')
+            });
+            return;
+        }
+
+        setPasswords({ current: '', new: '', confirm: '' });
+        onUpdateSettings({
+            ...settings,
+            security: {
+                ...settings.security,
+                lastPasswordChange: new Date().toISOString()
+            }
+        });
+
+        setAlertState({
+            isOpen: true,
+            type: 'success',
+            title: t('success_title'),
+            message: t('password_success')
+        });
+    } catch (error) {
+        console.error('Password update failed', error);
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: t('connection_failed') || 'Network error'
+        });
+    }
   };
 
   const formatLastUpdated = (timestamp: number) => {

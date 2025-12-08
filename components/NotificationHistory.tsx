@@ -1,16 +1,15 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
-import { loadNotificationHistory } from '../services/storageService';
 import { NotificationRecord, NotificationType, NotificationStatus, NotificationChannel } from '../types';
 import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, CreditCard, Calendar, AlertTriangle, Lightbulb, Mail, Send } from 'lucide-react';
 
 interface Props {
   lang: 'en' | 'zh';
+  notifications: NotificationRecord[];
 }
 
-const NotificationHistory: React.FC<Props> = ({ lang }) => {
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Filters
@@ -21,24 +20,23 @@ const NotificationHistory: React.FC<Props> = ({ lang }) => {
 
   const t = getT(lang);
 
-  useEffect(() => {
-    const loaded = loadNotificationHistory();
-    // Sort by timestamp desc
-    setNotifications(loaded.sort((a, b) => b.timestamp - a.timestamp));
-  }, []);
-
   // --- Statistics ---
+  const sortedNotifications = useMemo(
+    () => [...notifications].sort((a, b) => b.timestamp - a.timestamp),
+    [notifications]
+  );
+
   const stats = useMemo(() => {
-    const total = notifications.length;
-    const sent = notifications.filter(n => n.status === 'success').length;
-    const failed = notifications.filter(n => n.status === 'failed').length;
+    const total = sortedNotifications.length;
+    const sent = sortedNotifications.filter(n => n.status === 'success').length;
+    const failed = sortedNotifications.filter(n => n.status === 'failed').length;
     const rate = total > 0 ? Math.round((sent / total) * 100) : 0;
     return { total, sent, failed, rate };
-  }, [notifications]);
+  }, [sortedNotifications]);
 
   // --- Filtering ---
   const filteredNotifications = useMemo(() => {
-    return notifications.filter(n => {
+    return sortedNotifications.filter(n => {
       const matchesSearch = 
         n.subscriptionName.toLowerCase().includes(search.toLowerCase()) || 
         (n.details.message && n.details.message.toLowerCase().includes(search.toLowerCase())) ||

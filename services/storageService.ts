@@ -1,34 +1,13 @@
 
 import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, NotificationRecord } from '../types';
 
-const STORAGE_KEY = 'subscrybe_data_v1';
-const SETTINGS_KEY = 'subscrybe_settings_v1';
-const NOTIFICATIONS_KEY = 'subscrybe_notifications_v1';
+const API_BASE = '/api';
 
-export const saveSubscriptions = (subs: Subscription[]): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
-  } catch (error) {
-    console.error('Failed to save to local storage', error);
-  }
-};
-
-export const loadSubscriptions = (): Subscription[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return [];
-    
-    const parsed = JSON.parse(data);
-    // Migration: Ensure all subscriptions have a status
-    return parsed.map((sub: any) => ({
-      ...sub,
-      status: sub.status || 'active'
-    }));
-  } catch (error) {
-    console.error('Failed to load from local storage', error);
-    return [];
-  }
-};
+export interface PersistedData {
+  subscriptions: Subscription[];
+  settings: AppSettings;
+  notifications: NotificationRecord[];
+}
 
 const DEFAULT_SETTINGS: AppSettings = {
   language: 'zh',
@@ -72,63 +51,71 @@ const DEFAULT_SETTINGS: AppSettings = {
   }
 };
 
-export const saveSettings = (settings: AppSettings): void => {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  } catch (error) {
-    console.error('Failed to save settings', error);
-  }
+const defaultData = (): PersistedData => ({
+  subscriptions: [],
+  settings: getDefaultSettings(),
+  notifications: []
+});
+
+export const getDefaultSettings = (): AppSettings => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+const authHeaders = () => {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
 };
 
-export const loadSettings = (): AppSettings => {
-  try {
-    const data = localStorage.getItem(SETTINGS_KEY);
-    if (!data) return DEFAULT_SETTINGS;
-    
-    // Merge with default to handle new fields in future updates
-    const parsed = JSON.parse(data);
-    
-    // Clean up legacy fields if they exist in local storage
-    if ('currencyApi' in parsed) {
-        delete parsed.currencyApi;
-    }
+const mergeSettings = (incoming?: AppSettings): AppSettings => {
+  const parsed = incoming || {};
+  if ('currencyApi' in parsed) {
+    // @ts-ignore
+    delete (parsed as any).currencyApi;
+  }
+  return {
+    ...getDefaultSettings(),
+    ...parsed,
+    notifications: {
+      ...DEFAULT_SETTINGS.notifications,
+      ...parsed.notifications,
+      rules: { ...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules }
+    },
+    exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
+    customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
+    aiConfig: parsed.aiConfig || DEFAULT_SETTINGS.aiConfig
+  };
+};
 
-    return { 
-        ...DEFAULT_SETTINGS, 
-        ...parsed, 
-        notifications: { 
-            ...DEFAULT_SETTINGS.notifications, 
-            ...parsed.notifications, 
-            rules: {...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules} 
-        },
-        // Ensure structure exists if loading old data
-        exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
-        customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
-        aiConfig: parsed.aiConfig || DEFAULT_SETTINGS.aiConfig
+export const fetchAllData = async (): Promise<PersistedData> => {
+  try {
+    const resp = await fetch(`${API_BASE}/data`, {
+      headers: authHeaders()
+    });
+    if (resp.status === 401) throw new Error('unauthorized');
+    if (!resp.ok) throw new Error('failed_to_fetch');
+    const data = await resp.json();
+    return {
+      subscriptions: data.subscriptions || [],
+      notifications: data.notifications || [],
+      settings: mergeSettings(data.settings)
     };
-  } catch (error) {
-    return DEFAULT_SETTINGS;
-  }
-};
-
-// --- Notification Storage ---
-
-export const loadNotificationHistory = (): NotificationRecord[] => {
-  try {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (!data) {
-        return [];
+  } catch (error: any) {
+    if (error?.message === 'unauthorized') {
+      throw error;
     }
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
+    console.error('Failed to fetch data from server', error);
+    return defaultData();
   }
 };
 
-export const saveNotificationHistory = (records: NotificationRecord[]): void => {
+export const saveAllData = async (data: PersistedData): Promise<void> => {
   try {
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(records));
+    await fetch(`${API_BASE}/data`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(data)
+    });
   } catch (error) {
-    console.error('Failed to save notifications', error);
+    console.error('Failed to save data to server', error);
   }
 };

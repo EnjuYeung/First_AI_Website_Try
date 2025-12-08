@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut } from 'lucide-react';
-import { Subscription, AppSettings } from './types';
-import { loadSubscriptions, saveSubscriptions, loadSettings, saveSettings } from './services/storageService';
+import { Subscription, AppSettings, NotificationRecord } from './types';
+import { fetchAllData, saveAllData, getDefaultSettings } from './services/storageService';
 import { getT } from './services/i18n';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
@@ -16,11 +16,13 @@ const App: React.FC = () => {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   // App State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>('dashboard');
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(loadSettings());
+  const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
   
@@ -38,27 +40,54 @@ const App: React.FC = () => {
     }
     setIsLoadingAuth(false);
 
-    const loadedSubs = loadSubscriptions();
-    setSubscriptions(loadedSubs);
+    if (token) {
+        loadRemoteData();
+    }
+  }, []);
 
-    // Initial Theme Load
-    if (settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  // Apply theme whenever settings change
+  useEffect(() => {
+    applyTheme(settings);
+  }, [settings.theme]);
+
+  const applyTheme = (themeSettings: AppSettings) => {
+    if (themeSettings.theme === 'dark' || (themeSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
     } else {
         document.documentElement.classList.remove('dark');
     }
-  }, []);
+  };
+
+  const loadRemoteData = async () => {
+    setIsDataLoading(true);
+    try {
+      const data = await fetchAllData();
+      setSubscriptions(data.subscriptions);
+      setSettings(data.settings);
+      setNotifications(data.notifications || []);
+      applyTheme(data.settings);
+    } catch (err) {
+      console.error('Failed to load data, logging out', err);
+      handleLogoutConfirm();
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
+  const persistData = (partial?: { subscriptions?: Subscription[]; settings?: AppSettings; notifications?: NotificationRecord[] }) => {
+    const payload = {
+      subscriptions: partial?.subscriptions ?? subscriptions,
+      settings: partial?.settings ?? settings,
+      notifications: partial?.notifications ?? notifications
+    };
+    saveAllData(payload);
+  };
 
   // Update settings handler
   const handleUpdateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
-    saveSettings(newSettings);
-    // Apply theme
-    if (newSettings.theme === 'dark' || (newSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
+    applyTheme(newSettings);
+    persistData({ settings: newSettings });
   };
 
   const handleSaveSubscription = (sub: Subscription) => {
@@ -69,7 +98,7 @@ const App: React.FC = () => {
       updated = [...subscriptions, sub];
     }
     setSubscriptions(updated);
-    saveSubscriptions(updated);
+    persistData({ subscriptions: updated });
     setEditingSub(null);
   };
 
@@ -77,7 +106,7 @@ const App: React.FC = () => {
     if (window.confirm(t('confirm_delete'))) {
       const updated = subscriptions.filter(s => s.id !== id);
       setSubscriptions(updated);
-      saveSubscriptions(updated);
+      persistData({ subscriptions: updated });
     }
   };
 
@@ -86,7 +115,7 @@ const App: React.FC = () => {
     if (window.confirm(message)) {
       const updated = subscriptions.filter(s => !ids.includes(s.id));
       setSubscriptions(updated);
-      saveSubscriptions(updated);
+      persistData({ subscriptions: updated });
     }
   };
 
@@ -109,7 +138,7 @@ const App: React.FC = () => {
 
     const updated = [...subscriptions, newSub];
     setSubscriptions(updated);
-    saveSubscriptions(updated);
+    persistData({ subscriptions: updated });
   };
 
   const handleEditSubscription = (sub: Subscription) => {
@@ -136,6 +165,7 @@ const App: React.FC = () => {
   const handleLogin = (token: string) => {
       localStorage.setItem('auth_token', token);
       setIsAuthenticated(true);
+      loadRemoteData();
   };
 
   const handleLogoutClick = () => {
@@ -262,7 +292,7 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'notifications' && (
-            <NotificationHistory lang={settings.language} />
+            <NotificationHistory lang={settings.language} notifications={notifications} />
           )}
           
           {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={handleUpdateSettings} />}
