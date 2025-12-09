@@ -37,6 +37,14 @@
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
       }
+      /* Remove default focus outline on Recharts elements to avoid blue border */
+      .recharts-wrapper:focus,
+      .recharts-wrapper *:focus,
+      .recharts-surface:focus,
+      .recharts-surface *:focus,
+      .recharts-responsive-container:focus {
+        outline: none !important;
+      }
       /* Custom scrollbar for chat */
       .scrollbar-hide::-webkit-scrollbar {
           display: none;

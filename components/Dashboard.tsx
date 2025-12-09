@@ -257,8 +257,27 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     return diffDays;
   };
 
-  const yearlyVisibleRows = Math.min(dashboardData.yearlyBreakdownData.length || 5, 5);
-  const yearlyChartHeight = Math.max(dashboardData.yearlyBreakdownData.length, 5) * 48;
+  const renderYearlyLabel = (props: any) => {
+    const { x = 0, y = 0, width = 0, height = 0, value, payload } = props;
+    const text = `$${value} (${payload?.percentage ?? 0}%)`;
+    const labelX = x + width - 8; // keep inside the bar
+    const labelY = y + height / 2 + 4;
+    return (
+      <text
+        x={labelX}
+        y={labelY}
+        textAnchor="end"
+        fill="#6b7280"
+        fontSize={11}
+        fontWeight={500}
+      >
+        {text}
+      </text>
+    );
+  };
+
+  const yearlyVisibleRows = Math.min(dashboardData.yearlyBreakdownData.length || 6, 6);
+  const yearlyChartHeight = Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -412,13 +431,13 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         </div>
 
         {/* Yearly Breakdown Bar Chart */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 overflow-hidden">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('yearly_expenditure_breakdown')}</h3>
           {dashboardData.yearlyBreakdownData.length > 0 ? (
             <div className="h-full overflow-y-auto relative" style={{ maxHeight: 6 * 52 + 80 }}>
-              <div style={{ height: Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52 }}>
+              <div style={{ height: Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52, overflow: 'hidden' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
+                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 24, left: 10, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" hide domain={[0, 'dataMax']} />
                     <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
@@ -427,14 +446,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28}>
-                        <LabelList 
-                            dataKey="value" 
-                            position="right" 
-                            formatter={(val: number, _name: string, entry: any) => {
-                                 return `$${val} (${entry?.percentage ?? 0}%)`;
-                            }}
-                            style={{ fontSize: '11px', fill: '#6b7280', fontWeight: 500 }}
-                        />
+                        <LabelList dataKey="value" content={renderYearlyLabel} />
                         {dashboardData.yearlyBreakdownData.map((entry, idx) => (
                           <Cell key={entry.name} fill={dashboardData.categoryColorMap[entry.name] || COLORS[idx % COLORS.length]} />
                         ))}
