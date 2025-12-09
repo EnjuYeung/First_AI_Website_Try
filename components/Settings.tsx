@@ -74,6 +74,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   }, [settings.security.pendingTwoFactorSecret]);
 
   const t = getT(settings.language);
+  const currentLanguage = settings.language;
   const isTwoFactorActive = settings.security.twoFactorEnabled;
   const isTwoFactorPending = !!settings.security.pendingTwoFactorSecret;
   const categories = settings.customCategories || [];
@@ -599,7 +600,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 className={`px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
                                     dragCatIndex === idx ? 'ring-2 ring-primary-400' : ''
                                 }`}
-                                title={lang === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
+                                title={currentLanguage === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
                             >
                                 {cat}
                                 <button onClick={() => onUpdateSettings({...settings, customCategories: categories.filter(c => c !== cat)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
@@ -633,7 +634,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 className={`px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
                                     dragPayIndex === idx ? 'ring-2 ring-primary-400' : ''
                                 }`}
-                                title={lang === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
+                                title={currentLanguage === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
                             >
                                 {pm}
                                 <button onClick={() => onUpdateSettings({...settings, customPaymentMethods: payments.filter(p => p !== pm)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
