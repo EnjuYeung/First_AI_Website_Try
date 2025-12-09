@@ -74,7 +74,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   }, [settings.security.pendingTwoFactorSecret]);
 
   const t = getT(settings.language);
-  const currentLanguage = settings.language;
+  const currentLanguage = settings.language || 'en';
   const isTwoFactorActive = settings.security.twoFactorEnabled;
   const isTwoFactorPending = !!settings.security.pendingTwoFactorSecret;
   const categories = settings.customCategories || [];
