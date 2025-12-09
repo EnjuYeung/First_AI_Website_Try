@@ -443,19 +443,6 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                         )}
                       </div>
                     </th>
-                    <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group"
-                      onClick={() => handleSort('category')}
-                    >
-                      <div className="flex items-center gap-1">
-                        {t('category')}
-                        {sortConfig.key === 'category' ? (
-                          sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-primary-600"/> : <ArrowDown size={14} className="text-primary-600"/>
-                        ) : (
-                          <ArrowUpDown size={14} className="text-gray-300 group-hover:text-gray-500"/>
-                        )}
-                      </div>
-                    </th>
                     
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('status')}</th>
 
