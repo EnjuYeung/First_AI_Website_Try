@@ -366,12 +366,13 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           {subscriptions.length > 0 ? (
             <div className="h-full flex items-center gap-6">
               <div className="flex-1 h-full min-h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
-                    <Pie
-                      data={dashboardData.categoryData}
-                      cx="50%"
-                      cy="50%"
+                <div className="w-full h-full outline-none" tabIndex={-1}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+                      <Pie
+                        data={dashboardData.categoryData}
+                        cx="50%"
+                        cy="50%"
                       innerRadius={60}
                       outerRadius={100}
                       paddingAngle={5}
@@ -388,7 +389,8 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
                   </PieChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                </div>
               </div>
               <div className="w-48 space-y-2">
                 {dashboardData.categoryData.map((entry, index) => (
@@ -413,18 +415,18 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('yearly_expenditure_breakdown')}</h3>
           {dashboardData.yearlyBreakdownData.length > 0 ? (
-            <div className="h-full overflow-y-auto" style={{ maxHeight: yearlyVisibleRows * 52 + 80 }}>
-              <div style={{ height: yearlyChartHeight }}>
+            <div className="h-full overflow-y-auto relative" style={{ maxHeight: 6 * 52 + 80 }}>
+              <div style={{ height: Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 40, left: 10, bottom: 10 }}>
+                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" hide />
+                    <XAxis type="number" hide domain={[0, 'dataMax']} />
                     <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
                     <Tooltip 
                       cursor={{fill: 'transparent'}}
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28}>
                         <LabelList 
                             dataKey="value" 
                             position="right" 
