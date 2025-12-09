@@ -46,6 +46,11 @@
           scrollbar-width: none;
       }
     </style>
+    <script>
+      // Ensure a global language fallback so bundled code never hits an undefined `lang`
+      window.lang = window.lang || localStorage.getItem('lang') || 'en';
+      var lang = window.lang;
+    </script>
   <script type="importmap">
 {
   "imports": {
