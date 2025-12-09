@@ -103,7 +103,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
-  const [sortConfig, setSortConfig] = useState<{ key: 'price' | 'nextBillingDate' | 'name' | 'category' | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState<{ key: 'price' | 'nextBillingDate' | 'name' | 'category' | 'paymentMethod' | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
 
   const t = getT(lang);
 
@@ -155,7 +155,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
   // --- Sorting & Filtering Logic ---
 
-  const handleSort = (key: 'price' | 'nextBillingDate' | 'name' | 'category') => {
+  const handleSort = (key: 'price' | 'nextBillingDate' | 'name' | 'category' | 'paymentMethod') => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
@@ -203,6 +203,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
         if (sortConfig.key === 'category') {
           aValue = (a.category || '').toLowerCase();
           bValue = (b.category || '').toLowerCase();
+        }
+        if (sortConfig.key === 'paymentMethod') {
+          aValue = (a.paymentMethod || 'credit card').toLowerCase();
+          bValue = (b.paymentMethod || 'credit card').toLowerCase();
         }
 
         // Date comparison
@@ -404,7 +408,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
           // LIST VIEW
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left align-middle">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-slate-700 border-b border-gray-100 dark:border-gray-700">
                     <th className="px-6 py-4 w-12">
@@ -418,7 +422,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                          </div>
                     </th>
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group"
+                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center gap-1">
@@ -431,7 +435,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group"
+                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('category')}
                     >
                       <div className="flex items-center gap-1">
@@ -444,10 +448,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('status')}</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{t('status')}</th>
 
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group"
+                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('price')}
                     >
                       <div className="flex items-center gap-1">
@@ -460,11 +464,23 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('frequency')}</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('payment')}</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{t('frequency')}</th>
+                    <th 
+                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
+                      onClick={() => handleSort('paymentMethod')}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t('payment')}
+                        {sortConfig.key === 'paymentMethod' ? (
+                          sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-primary-600"/> : <ArrowDown size={14} className="text-primary-600"/>
+                        ) : (
+                          <ArrowUpDown size={14} className="text-gray-300 group-hover:text-gray-500"/>
+                        )}
+                      </div>
+                    </th>
                     
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group"
+                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('nextBillingDate')}
                     >
                        <div className="flex items-center gap-1">
@@ -477,7 +493,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">{t('actions')}</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right whitespace-nowrap">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -496,7 +512,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                             />
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
                           {sub.iconUrl ? (
                               <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-600 border border-gray-200 dark:border-gray-600 overflow-hidden flex-shrink-0">
@@ -521,16 +537,16 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                         {sub.category || '-'}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                           {renderStatusBadge(sub.status)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className="font-medium text-gray-900 dark:text-white">{currencySymbol(sub.currency)}{sub.price.toFixed(2)}</span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             sub.frequency === Frequency.MONTHLY ? 'bg-blue-100 text-blue-800' : 
                             sub.frequency === Frequency.YEARLY ? 'bg-purple-100 text-purple-800' :
@@ -539,16 +555,16 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                           {sub.frequency}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                           <div className="flex items-center space-x-1">
                               <CreditCard size={14} className="text-gray-400"/>
                               <span>{sub.paymentMethod || 'Credit Card'}</span>
                           </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {renderDateBadge(sub.nextBillingDate)}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end space-x-1">
                           <button 
                             onClick={(e) => { e.stopPropagation(); onEdit(sub); }}
@@ -577,7 +593,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                   ))}
                   {filteredSubscriptions.length === 0 && (
                     <tr>
-                       <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                       <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           No subscriptions found matching your criteria.
                        </td>
                     </tr>
