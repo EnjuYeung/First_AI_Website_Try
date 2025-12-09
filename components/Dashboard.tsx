@@ -209,6 +209,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         value: parseFloat(categoryDataMap[key].toFixed(2)),
         percentage: totalMonthlyBudget > 0 ? Math.round((categoryDataMap[key] / totalMonthlyBudget) * 100) : 0
     })).sort((a, b) => b.value - a.value);
+    const categoryColorMap = categoryData.reduce<Record<string, string>>((acc, cur, idx) => {
+      acc[cur.name] = COLORS[idx % COLORS.length];
+      return acc;
+    }, {});
 
 
     // Bar Chart Data (Yearly Paid Breakdown)
@@ -231,7 +235,9 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       categoryData,
       yearlyBreakdownData,
       highestSub,
-      topCategory
+      topCategory,
+      categoryColorMap,
+      totalMonthlyBudget
     };
   }, [subscriptions, settings.exchangeRates]);
 
@@ -250,6 +256,9 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
+
+  const yearlyVisibleRows = Math.min(dashboardData.yearlyBreakdownData.length || 5, 5);
+  const yearlyChartHeight = Math.max(dashboardData.yearlyBreakdownData.length, 5) * 48;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -404,10 +413,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('yearly_expenditure_breakdown')}</h3>
           {dashboardData.yearlyBreakdownData.length > 0 ? (
-            <div className="h-full overflow-x-auto">
-              <div className="min-w-[720px] h-full">
+            <div className="h-full overflow-y-auto" style={{ maxHeight: yearlyVisibleRows * 52 + 80 }}>
+              <div style={{ height: yearlyChartHeight }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 5, right: 80, left: 10, bottom: 5 }}>
+                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 40, left: 10, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
@@ -415,7 +424,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                       cursor={{fill: 'transparent'}}
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
-                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={24}>
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
                         <LabelList 
                             dataKey="value" 
                             position="right" 
@@ -424,6 +433,9 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                             }}
                             style={{ fontSize: '11px', fill: '#6b7280', fontWeight: 500 }}
                         />
+                        {dashboardData.yearlyBreakdownData.map((entry, idx) => (
+                          <Cell key={entry.name} fill={dashboardData.categoryColorMap[entry.name] || COLORS[idx % COLORS.length]} />
+                        ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -448,7 +460,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     <h3 className="font-bold text-gray-800 dark:text-white">{t('recent_payments')}</h3>
                 </div>
             </div>
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-y-auto flex-1" style={{ maxHeight: 240 }}>
                 {dashboardData.recentPayments.length > 0 ? (
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-slate-700/50">
@@ -486,7 +498,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     <h3 className="font-bold text-gray-800 dark:text-white">{t('upcoming_renewals')}</h3>
                 </div>
             </div>
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-y-auto flex-1" style={{ maxHeight: 240 }}>
                  {dashboardData.upcomingRenewals.length > 0 ? (
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-slate-700/50">
