@@ -1008,16 +1008,15 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                  {/* Rules */}
                  <section className="space-y-3">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('rules')}</h3>
-                    <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-                        {/* 续订提醒，单独一行占满 */}
-                        <div className="md:col-span-2">
-                          {renderRuleCard('renewalReminder', t('renewal_reminder'), true)}
+                    <div className="space-y-3">
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {renderRuleCard('renewalReminder', t('renewal_reminder'), true)}
+                            {renderRuleCard('renewalFailed', t('renewal_failed'))}
                         </div>
-                        {/* 第二行：续订失败 与 续订成功 并排 */}
-                        {renderRuleCard('renewalFailed', t('renewal_failed'))}
-                        {renderRuleCard('renewalSuccess', t('renewal_success'))}
-                        {/* 第三行：订阅变更 占一格，与空格对齐 */}
-                        {renderRuleCard('subscriptionChange', t('subscription_changes'))}
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {renderRuleCard('renewalSuccess', t('renewal_success'))}
+                            {renderRuleCard('subscriptionChange', t('subscription_changes'))}
+                        </div>
                     </div>
                  </section>
             </div>

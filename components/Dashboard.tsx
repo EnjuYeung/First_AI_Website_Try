@@ -276,6 +276,17 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     );
   };
 
+  const renderYearlyTooltip = ({ payload }: any) => {
+    if (!payload || !payload.length) return null;
+    const data = payload[0]?.payload;
+    if (!data) return null;
+    return (
+      <div className="bg-white rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+        {`${data.name} (${data.percentage ?? 0}%)：$${Number(data.value || 0).toFixed(1)}`}
+      </div>
+    );
+  };
+
   const yearlyVisibleRows = Math.min(dashboardData.yearlyBreakdownData.length || 6, 6);
   const yearlyChartHeight = Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52;
 
@@ -443,11 +454,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
                     <Tooltip 
                       cursor={{fill: 'transparent'}}
-                      formatter={(val: number, _name: string, entry: any) => {
-                        const pct = entry?.payload?.percentage ?? 0;
-                        return [`${t('cost')}: $${val.toFixed(1)}`, `${entry?.payload?.name} (${pct}%)`];
-                      }}
-                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                      content={renderYearlyTooltip}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28}>
                         {/* Hide labels by default; hover shows tooltip already */}
