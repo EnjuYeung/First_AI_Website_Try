@@ -41,7 +41,13 @@ const DEFAULT_SETTINGS: AppSettings = {
       renewalReminder: true,
       renewalSuccess: false,
       subscriptionChange: true,
-      reminderDays: 3
+      reminderDays: 3,
+      channels: {
+        renewalFailed: ['telegram', 'email'],
+        renewalReminder: ['telegram', 'email'],
+        renewalSuccess: ['telegram', 'email'],
+        subscriptionChange: ['telegram', 'email'],
+      }
     },
     scheduledTask: false,
   },
@@ -80,7 +86,14 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     notifications: {
       ...DEFAULT_SETTINGS.notifications,
       ...parsed.notifications,
-      rules: { ...DEFAULT_SETTINGS.notifications.rules, ...parsed.notifications?.rules }
+      rules: { 
+        ...DEFAULT_SETTINGS.notifications.rules, 
+        ...parsed.notifications?.rules,
+        channels: {
+          ...DEFAULT_SETTINGS.notifications.rules.channels,
+          ...(parsed.notifications?.rules?.channels || {})
+        }
+      }
     },
     security: {
       ...DEFAULT_SETTINGS.security,

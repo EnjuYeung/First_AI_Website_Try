@@ -113,6 +113,12 @@ export interface NotificationRule {
   renewalSuccess: boolean;
   subscriptionChange: boolean;
   reminderDays: number;
+  channels: {
+    renewalFailed: NotificationChannel[];
+    renewalReminder: NotificationChannel[];
+    renewalSuccess: NotificationChannel[];
+    subscriptionChange: NotificationChannel[];
+  };
 }
 
 export interface ExchangeRates {

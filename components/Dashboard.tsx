@@ -446,7 +446,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28}>
-                        <LabelList dataKey="value" content={renderYearlyLabel} />
+                        {/* Hide labels by default; hover shows tooltip already */}
                         {dashboardData.yearlyBreakdownData.map((entry, idx) => (
                           <Cell key={entry.name} fill={dashboardData.categoryColorMap[entry.name] || COLORS[idx % COLORS.length]} />
                         ))}

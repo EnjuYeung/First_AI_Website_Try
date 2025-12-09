@@ -51,7 +51,7 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
                   <th className="px-4 py-3">{t('service_name')}</th>
                   <th className="px-4 py-3">{t('payment_date')}</th>
                   <th className="px-4 py-3">{t('category')}</th>
-                  <th className="px-4 py-3 text-right">{t('cost')} (USD)</th>
+                  <th className="px-4 py-3 text-right">{t('cost')}</th>
               </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -61,7 +61,7 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.formattedDate}</td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.category}</td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
-                          ${rec.amountUsd.toFixed(2)}
+                          {rec.currency ? `${rec.currency} ${rec.amount.toFixed(2)}` : `$${rec.amount.toFixed(2)}`}
                       </td>
                   </tr>
               ))}
@@ -155,7 +155,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const [trendType, setTrendType] = useState<ChartType>('line');
     const [trendRange, setTrendRange] = useState<TimeRange>('12m');
     const [categoryRange, setCategoryRange] = useState<TimeRange>('12m');
-    const [fullScreenChart, setFullScreenChart] = useState<FullScreenChart>(null);
     
     // Detailed History State
     const [historyMode, setHistoryMode] = useState<HistoryMode>('month');
@@ -475,15 +474,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       
-      {/* Full Screen Modal */}
-      {fullScreenChart && (
-          <FullScreenModal onClose={() => setFullScreenChart(null)} t={t}>
-              {fullScreenChart === 'trend' && renderTrendChart()}
-              {fullScreenChart === 'distribution' && renderDistributionChart()}
-              {fullScreenChart === 'category' && renderCategoryChart()}
-          </FullScreenModal>
-      )}
-
       {/* Lifetime Modal */}
       {showLifetimeModal && (
           <ModalWithPagination 

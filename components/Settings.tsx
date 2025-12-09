@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, AIConfig, COMMON_TIMEZONES, ISO_CURRENCIES } from '../types';
+import { AppSettings, AIConfig, COMMON_TIMEZONES, ISO_CURRENCIES, NotificationChannel } from '../types';
 import { getRatesFromAI, shouldAutoUpdate } from '../services/currencyService';
 import { getT } from '../services/i18n';
 import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Cpu, Info, Save } from 'lucide-react';
@@ -458,6 +458,26 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     }
   };
 
+  const toggleRuleChannel = (ruleKey: keyof typeof settings.notifications.rules.channels, channel: NotificationChannel, checked: boolean) => {
+    const current = settings.notifications.rules.channels?.[ruleKey] || [];
+    const next = checked ? Array.from(new Set([...current, channel])) : current.filter(c => c !== channel);
+    onUpdateSettings({
+      ...settings,
+      notifications: {
+        ...settings.notifications,
+        rules: {
+          ...settings.notifications.rules,
+          channels: {
+            ...settings.notifications.rules.channels,
+            [ruleKey]: next
+          }
+        }
+      }
+    });
+  };
+
+  const channelLabel = (ch: NotificationChannel) => ch === 'telegram' ? t('telegram_bot') : t('email');
+
   const handleToggleTwoFactor = (enabled: boolean) => {
     if (enabled) {
         startTwoFactor();
@@ -871,9 +891,9 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
         {/* NOTIFICATIONS TAB */}
         {activeTab === 'notifications' && (
-            <div className="space-y-8 max-w-2xl">
+            <div className="grid gap-8 lg:grid-cols-2">
                  {/* Channels */}
-                 <section>
+                 <section className="space-y-6">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('channels')}</h3>
                     
                     <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl mb-4">
@@ -922,7 +942,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                  </section>
 
                  {/* Rules */}
-                 <section>
+                 <section className="space-y-3">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('rules')}</h3>
                     <div className="space-y-3">
                         {[
@@ -954,6 +974,29 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                         />
                                         <span className="text-sm text-gray-600 dark:text-gray-400">{t('days_before')}</span>
                                     </div>
+                                )}
+
+                                {/* Channel Selection */}
+                                {(settings.notifications.rules as any)[rule.key] && (
+                                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex flex-wrap gap-3 animate-fade-in">
+                                    {(['telegram','email'] as NotificationChannel[]).map(ch => {
+                                        const enabled = (settings.notifications as any)[ch]?.enabled;
+                                        const selected = settings.notifications.rules.channels?.[rule.key as keyof typeof settings.notifications.rules.channels]?.includes(ch);
+                                        return (
+                                          <label key={ch} className={`flex items-center gap-2 text-sm ${enabled ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                                            <input
+                                              type="checkbox"
+                                              disabled={!enabled}
+                                              checked={!!selected}
+                                              onChange={e => toggleRuleChannel(rule.key as keyof typeof settings.notifications.rules.channels, ch, e.target.checked)}
+                                              className="w-4 h-4 accent-primary-600"
+                                            />
+                                            <span>{channelLabel(ch)}</span>
+                                            {!enabled && <span className="text-xs">({t('enable_notifications')})</span>}
+                                          </label>
+                                        );
+                                    })}
+                                  </div>
                                 )}
                              </div>
                         ))}
