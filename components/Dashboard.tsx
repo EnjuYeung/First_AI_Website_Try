@@ -443,6 +443,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
                     <Tooltip 
                       cursor={{fill: 'transparent'}}
+                      formatter={(val: number, _name: string, entry: any) => {
+                        const pct = entry?.payload?.percentage ?? 0;
+                        return [`${t('cost')}: $${val.toFixed(1)}`, `${entry?.payload?.name} (${pct}%)`];
+                      }}
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28}>

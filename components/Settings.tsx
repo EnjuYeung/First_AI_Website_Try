@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AppSettings, AIConfig, COMMON_TIMEZONES, ISO_CURRENCIES, NotificationChannel } from '../types';
 import { getRatesFromAI, shouldAutoUpdate } from '../services/currencyService';
 import { getT } from '../services/i18n';
-import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Cpu, Info, Save } from 'lucide-react';
+import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Cpu, Info, Save, Mail } from 'lucide-react';
 
 interface Props {
     settings: AppSettings;
@@ -459,7 +459,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   };
 
   const toggleRuleChannel = (ruleKey: keyof typeof settings.notifications.rules.channels, channel: NotificationChannel, checked: boolean) => {
-    const current = settings.notifications.rules.channels?.[ruleKey] || [];
+    const baseChannels = settings.notifications.rules.channels || {
+      renewalFailed: [],
+      renewalReminder: [],
+      renewalSuccess: [],
+      subscriptionChange: [],
+    };
+    const current = baseChannels[ruleKey] || [];
     const next = checked ? Array.from(new Set([...current, channel])) : current.filter(c => c !== channel);
     onUpdateSettings({
       ...settings,
@@ -468,7 +474,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         rules: {
           ...settings.notifications.rules,
           channels: {
-            ...settings.notifications.rules.channels,
+            ...baseChannels,
             [ruleKey]: next
           }
         }
@@ -477,6 +483,62 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   };
 
   const channelLabel = (ch: NotificationChannel) => ch === 'telegram' ? t('telegram_bot') : t('email');
+
+  const renderRuleCard = (
+    key: 'renewalReminder' | 'renewalFailed' | 'renewalSuccess' | 'subscriptionChange',
+    label: string,
+    showReminderInput: boolean = false
+  ) => {
+    const enabled = (settings.notifications.rules as any)[key];
+    return (
+      <div className="flex flex-col p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
+         <div className="flex items-center justify-between">
+            <span className="text-gray-700 dark:text-gray-200">{label}</span>
+            <input 
+                type="checkbox" 
+                checked={enabled} 
+                onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, [key]: e.target.checked}}})}
+                className="w-5 h-5 text-primary-600 rounded"
+            />
+         </div>
+
+         {showReminderInput && settings.notifications.rules.renewalReminder && (
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex items-center gap-2 animate-fade-in">
+                <label className="text-sm text-gray-600 dark:text-gray-400">{t('remind_me')}</label>
+                <input 
+                    type="number" min="1" max="30" 
+                    className="w-16 px-2 py-1 border rounded dark:bg-slate-800 dark:border-gray-600 dark:text-white text-center"
+                    value={settings.notifications.rules.reminderDays}
+                    onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, reminderDays: parseInt(e.target.value)}}}) }
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400">{t('days_before')}</span>
+            </div>
+         )}
+
+         {enabled && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex flex-wrap gap-3 animate-fade-in">
+            {(['telegram','email'] as NotificationChannel[]).map(ch => {
+                const channelEnabled = (settings.notifications as any)[ch]?.enabled;
+                const selected = settings.notifications.rules.channels?.[key]?.includes(ch);
+                return (
+                  <label key={ch} className={`flex items-center gap-2 text-sm ${channelEnabled ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <input
+                      type="checkbox"
+                      disabled={!channelEnabled}
+                      checked={!!selected}
+                      onChange={e => toggleRuleChannel(key as keyof typeof settings.notifications.rules.channels, ch, e.target.checked)}
+                      className="w-4 h-4 accent-primary-600"
+                    />
+                    <span>{channelLabel(ch)}</span>
+                    {!channelEnabled && <span className="text-xs">({t('enable_notifications')})</span>}
+                  </label>
+                );
+            })}
+          </div>
+         )}
+      </div>
+    );
+  };
 
   const handleToggleTwoFactor = (enabled: boolean) => {
     if (enabled) {
@@ -891,115 +953,71 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
         {/* NOTIFICATIONS TAB */}
         {activeTab === 'notifications' && (
-            <div className="grid gap-8 lg:grid-cols-2">
+            <div className="space-y-8 max-w-4xl">
                  {/* Channels */}
                  <section className="space-y-6">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('channels')}</h3>
-                    
-                    <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl mb-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Send size={20} className="text-blue-500"/>
-                                <span className="font-semibold dark:text-white">{t('telegram_bot')}</span>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={settings.notifications.telegram.enabled} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, enabled: e.target.checked}}})} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                            </label>
-                        </div>
-                        {settings.notifications.telegram.enabled && (
-                            <div className="space-y-3">
-                                <input placeholder="Bot Token" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.botToken} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, botToken: e.target.value}}})} />
-                                <div className="flex gap-2">
-                                     <input placeholder="Chat ID" className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.chatId} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, chatId: e.target.value}}})} />
-                                     <button 
-                                        onClick={handleTestTelegram}
-                                        disabled={isTestingTelegram || !settings.notifications.telegram.botToken || !settings.notifications.telegram.chatId}
-                                        className="px-4 py-2 bg-gray-100 dark:bg-slate-600 dark:text-white rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
-                                     >
-                                         {isTestingTelegram ? <Loader2 size={16} className="animate-spin"/> : <Send size={16} />}
-                                         <span>Test</span>
-                                     </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl h-full">
+                          <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                  <Send size={20} className="text-blue-500"/>
+                                  <span className="font-semibold dark:text-white">{t('telegram_bot')}</span>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                  <input type="checkbox" checked={settings.notifications.telegram.enabled} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, enabled: e.target.checked}}})} className="sr-only peer" />
+                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                              </label>
+                          </div>
+                          {settings.notifications.telegram.enabled && (
+                              <div className="space-y-3">
+                                  <input placeholder="Bot Token" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.botToken} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, botToken: e.target.value}}})} />
+                                  <div className="flex gap-2">
+                                       <input placeholder="Chat ID" className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.chatId} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, chatId: e.target.value}}})} />
+                                       <button 
+                                          onClick={handleTestTelegram}
+                                          disabled={isTestingTelegram || !settings.notifications.telegram.botToken || !settings.notifications.telegram.chatId}
+                                          className="px-4 py-2 bg-gray-100 dark:bg-slate-600 dark:text-white rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
+                                       >
+                                           {isTestingTelegram ? <Loader2 size={16} className="animate-spin"/> : <Send size={16} />}
+                                           <span>Test</span>
+                                       </button>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
 
-                    <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold dark:text-white">{t('email')}</span>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={settings.notifications.email.enabled} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, email: {...settings.notifications.email, enabled: e.target.checked}}})} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                            </label>
-                        </div>
-                        {settings.notifications.email.enabled && (
-                             <input placeholder="Email Address" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.email.emailAddress} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, email: {...settings.notifications.email, emailAddress: e.target.value}}})} />
-                        )}
+                      <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl h-full">
+                          <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                  <Mail size={20} className="text-blue-500"/>
+                                  <span className="font-semibold dark:text-white">{t('email')}</span>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                  <input type="checkbox" checked={settings.notifications.email.enabled} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, email: {...settings.notifications.email, enabled: e.target.checked}}})} className="sr-only peer" />
+                                  <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                              </label>
+                          </div>
+                          {settings.notifications.email.enabled && (
+                               <input placeholder="Email Address" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.email.emailAddress} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, email: {...settings.notifications.email, emailAddress: e.target.value}}})} />
+                          )}
+                      </div>
                     </div>
                  </section>
 
                  {/* Rules */}
                  <section className="space-y-3">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('rules')}</h3>
-                    <div className="space-y-3">
-                        {[
-                            { key: 'renewalReminder', label: t('renewal_reminder') },
-                            { key: 'renewalFailed', label: t('renewal_failed') },
-                            { key: 'renewalSuccess', label: t('renewal_success') },
-                            { key: 'subscriptionChange', label: t('subscription_changes') },
-                        ].map((rule) => (
-                             <div key={rule.key} className="flex flex-col p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-700 dark:text-gray-200">{rule.label}</span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={(settings.notifications.rules as any)[rule.key]} 
-                                        onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, [rule.key]: e.target.checked}}})}
-                                        className="w-5 h-5 text-primary-600 rounded"
-                                    />
-                                </div>
-                                
-                                {/* Reminder Days Input - Only show for Renewal Reminder when enabled */}
-                                {rule.key === 'renewalReminder' && settings.notifications.rules.renewalReminder && (
-                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex items-center gap-2 animate-fade-in">
-                                        <label className="text-sm text-gray-600 dark:text-gray-400">{t('remind_me')}</label>
-                                        <input 
-                                            type="number" min="1" max="30" 
-                                            className="w-16 px-2 py-1 border rounded dark:bg-slate-800 dark:border-gray-600 dark:text-white text-center"
-                                            value={settings.notifications.rules.reminderDays}
-                                            onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, reminderDays: parseInt(e.target.value)}}}) }
-                                        />
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">{t('days_before')}</span>
-                                    </div>
-                                )}
-
-                                {/* Channel Selection */}
-                                {(settings.notifications.rules as any)[rule.key] && (
-                                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex flex-wrap gap-3 animate-fade-in">
-                                    {(['telegram','email'] as NotificationChannel[]).map(ch => {
-                                        const enabled = (settings.notifications as any)[ch]?.enabled;
-                                        const selected = settings.notifications.rules.channels?.[rule.key as keyof typeof settings.notifications.rules.channels]?.includes(ch);
-                                        return (
-                                          <label key={ch} className={`flex items-center gap-2 text-sm ${enabled ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
-                                            <input
-                                              type="checkbox"
-                                              disabled={!enabled}
-                                              checked={!!selected}
-                                              onChange={e => toggleRuleChannel(rule.key as keyof typeof settings.notifications.rules.channels, ch, e.target.checked)}
-                                              className="w-4 h-4 accent-primary-600"
-                                            />
-                                            <span>{channelLabel(ch)}</span>
-                                            {!enabled && <span className="text-xs">({t('enable_notifications')})</span>}
-                                          </label>
-                                        );
-                                    })}
-                                  </div>
-                                )}
-                             </div>
-                        ))}
+                    <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                        {/* 续订提醒，单独一行占满 */}
+                        <div className="md:col-span-2">
+                          {renderRuleCard('renewalReminder', t('renewal_reminder'), true)}
+                        </div>
+                        {/* 第二行：续订失败 与 续订成功 并排 */}
+                        {renderRuleCard('renewalFailed', t('renewal_failed'))}
+                        {renderRuleCard('renewalSuccess', t('renewal_success'))}
+                        {/* 第三行：订阅变更 占一格，与空格对齐 */}
+                        {renderRuleCard('subscriptionChange', t('subscription_changes'))}
                     </div>
                  </section>
             </div>
