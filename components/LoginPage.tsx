@@ -101,7 +101,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
                         value={username}
                         onChange={e => setUsername(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
-                        placeholder="luanyang5209"
                     />
                 </div>
             </div>
@@ -115,7 +114,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
-                        placeholder="passwords"
                     />
                 </div>
             </div>

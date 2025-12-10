@@ -137,7 +137,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       // 4. Recent Payments (Last 7 Days)
       const recentEvents = getBillingEventsInRange(sub, last7DaysStart, today);
       recentEvents.forEach(date => {
-        recentPayments.push({ sub, date, cost: toUSD(sub.price, sub.currency) });
+        recentPayments.push({ sub, date, cost: sub.price });
       });
 
       // 5. Upcoming Renewals (Next 7 Days)
@@ -146,7 +146,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
               const nextDate = new Date(sub.nextBillingDate);
               nextDate.setHours(0,0,0,0);
               if (nextDate > today && nextDate <= next7DaysEnd) {
-                  upcomingRenewals.push({ sub, date: nextDate, cost: toUSD(sub.price, sub.currency) });
+                  upcomingRenewals.push({ sub, date: nextDate, cost: sub.price });
               }
           }
       }
