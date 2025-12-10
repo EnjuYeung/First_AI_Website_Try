@@ -5,7 +5,7 @@ import {
   BarChart, Bar, Legend, PieChart, Pie, Cell, ComposedChart
 } from 'recharts';
 import { Subscription, Frequency, AppSettings } from '../types';
-import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Maximize2, Minimize2, Calendar } from 'lucide-react';
+import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { getT } from '../services/i18n';
 
 interface Props {
@@ -20,7 +20,6 @@ const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'
 type ChartType = 'line' | 'bar';
 type TimeRange = '12m' | '6m' | 'ytd' | 'all';
 type HistoryMode = 'month' | 'quarter' | 'year';
-type FullScreenChart = 'trend' | 'distribution' | 'category' | null;
 type Translator = (key: any) => string;
 
 interface PaymentRecord {
@@ -70,22 +69,6 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
               )}
           </tbody>
       </table>
-  </div>
-);
-
-const FullScreenModal: React.FC<{ children: React.ReactNode, onClose: () => void, t: Translator }> = ({ children, onClose, t }) => (
-  <div className="fixed inset-0 z-50 bg-white dark:bg-slate-900 flex flex-col animate-fade-in">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-slate-800">
-          <h2 className="text-lg font-bold text-gray-800 dark:text-white">{t('full_screen')}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-gray-500 dark:text-gray-300">
-              <Minimize2 size={24} />
-          </button>
-      </div>
-      <div className="flex-1 p-6 bg-gray-50 dark:bg-slate-900 overflow-hidden">
-          <div className="w-full h-full bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-             {children}
-          </div>
-      </div>
   </div>
 );
 
@@ -541,9 +524,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                  </select>
             </div>
          </div>
-         <button onClick={() => setFullScreenChart('trend')} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('full_screen')}>
-             <Maximize2 size={18} />
-         </button>
          
          <div className="flex-1 w-full min-h-0">
             {renderTrendChart()}
@@ -556,9 +536,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           {/* Payment Distribution */}
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col relative">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 pr-10">{t('payment_distribution')}</h3>
-            <button onClick={() => setFullScreenChart('distribution')} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('full_screen')}>
-                <Maximize2 size={18} />
-            </button>
             <div className="flex-1 w-full min-h-0">
                 {renderDistributionChart()}
             </div>
@@ -578,9 +555,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                      <option value="all">{t('all_time')}</option>
                  </select>
              </div>
-             <button onClick={() => setFullScreenChart('category')} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('full_screen')}>
-                <Maximize2 size={18} />
-             </button>
              
              <div className="flex-1 w-full min-h-0 relative">
                 {renderCategoryChart()}
