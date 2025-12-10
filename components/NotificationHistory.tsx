@@ -19,6 +19,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
   const [channelFilter, setChannelFilter] = useState<NotificationChannel | 'all'>('all');
 
   const t = getT(lang);
+  const searchLower = search.trim().toLowerCase();
 
   // --- Statistics ---
   const sortedNotifications = useMemo(
@@ -38,9 +39,9 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
   const filteredNotifications = useMemo(() => {
     return sortedNotifications.filter(n => {
       const matchesSearch = 
-        n.subscriptionName.toLowerCase().includes(search.toLowerCase()) || 
-        (n.details.message && n.details.message.toLowerCase().includes(search.toLowerCase())) ||
-        (n.details.receiver && n.details.receiver.toLowerCase().includes(search.toLowerCase()));
+        n.subscriptionName.toLowerCase().includes(searchLower) || 
+        (n.details.message && n.details.message.toLowerCase().includes(searchLower)) ||
+        (n.details.receiver && n.details.receiver.toLowerCase().includes(searchLower));
       
       const matchesStatus = statusFilter === 'all' || n.status === statusFilter;
       const matchesType = typeFilter === 'all' || n.type === typeFilter;
@@ -48,7 +49,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
 
       return matchesSearch && matchesStatus && matchesType && matchesChannel;
     });
-  }, [notifications, search, statusFilter, typeFilter, channelFilter]);
+  }, [sortedNotifications, searchLower, statusFilter, typeFilter, channelFilter]);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);

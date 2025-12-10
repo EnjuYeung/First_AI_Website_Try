@@ -16,7 +16,6 @@ const App: React.FC = () => {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isDataLoading, setIsDataLoading] = useState(false);
 
   // App State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>('dashboard');
@@ -59,7 +58,6 @@ const App: React.FC = () => {
   };
 
   const loadRemoteData = async () => {
-    setIsDataLoading(true);
     try {
       const data = await fetchAllData();
       setSubscriptions(data.subscriptions);
@@ -68,8 +66,6 @@ const App: React.FC = () => {
       applyTheme(data.settings);
     } catch (err) {
       console.error('Failed to load data', err);
-    } finally {
-      setIsDataLoading(false);
     }
   };
 
