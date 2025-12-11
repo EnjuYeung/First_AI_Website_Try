@@ -182,6 +182,21 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
       setToastMessage(t('ai_saved_toast'));
   };
 
+  const buildTestReminderMessage = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    return [
+      '🔔 续订提醒通知',
+      '',
+      '📌 订阅测试订阅即将付款',
+      '',
+      `📅 付款日期：${today}`,
+      '💰 订阅金额：0.00',
+      '💳 支付方式：测试支付方式',
+      '',
+      '⚠️ 请及时续订以避免服务中断。'
+    ].join('\n');
+  };
+
   // Notification Handlers
   const handleTestTelegram = async () => {
     const { botToken, chatId } = settings.notifications.telegram;
@@ -203,7 +218,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
-                text: "🔔 Subscrybe Test: Your notifications are correctly configured!"
+                text: buildTestReminderMessage()
             })
         });
         

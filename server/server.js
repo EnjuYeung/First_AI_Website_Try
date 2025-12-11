@@ -7,6 +7,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import speakeasy from 'speakeasy';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -19,9 +21,26 @@ const ENV_ADMIN_USER = process.env.ADMIN_USER || 'luanyang5209';
 const ENV_ADMIN_PASS = process.env.ADMIN_PASS || 'passwords';
 const JWT_SECRET = process.env.JWT_SECRET || 'hAhJwsNwQLc1b2tIGLjIupRVphNue5vbdPxoAoeBMUg=';
 const PORT = process.env.PORT || 3001;
+const NOTIFY_INTERVAL_MS = Number(process.env.NOTIFY_INTERVAL_MS || 10 * 60 * 1000); // default 10 minutes
 
 const DATA_DIR = path.join(__dirname, 'data');
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
+const DEFAULT_RULE_CHANNELS = {
+  renewalFailed: ['telegram', 'email'],
+  renewalReminder: ['telegram', 'email'],
+  renewalSuccess: ['telegram', 'email'],
+  subscriptionChange: ['telegram', 'email']
+};
+
+const smtpConfig = {
+  host: process.env.SMTP_HOST || '',
+  port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+  user: process.env.SMTP_USER || '',
+  pass: process.env.SMTP_PASS || '',
+  from: process.env.SMTP_FROM || process.env.SMTP_USER || ''
+};
+
+const hasSmtpConfig = !!(smtpConfig.host && smtpConfig.port && smtpConfig.user && smtpConfig.pass);
 
 // Allow only specific origins
 const allowedOrigins = [
@@ -95,7 +114,8 @@ const defaultSettings = () => ({
       renewalReminder: true,
       renewalSuccess: false,
       subscriptionChange: true,
-      reminderDays: 3
+      reminderDays: 3,
+      channels: { ...DEFAULT_RULE_CHANNELS }
     },
     scheduledTask: false
   },
@@ -145,6 +165,20 @@ const loadUserData = async (username) => {
     const parsed = JSON.parse(buf);
     const mergedSettings = { ...defaultSettings(), ...parsed.settings };
     mergedSettings.security = { ...defaultSettings().security, ...(parsed.settings?.security || {}) };
+    mergedSettings.notifications = {
+      ...defaultSettings().notifications,
+      ...(parsed.settings?.notifications || {}),
+      rules: {
+        ...defaultSettings().notifications.rules,
+        ...(parsed.settings?.notifications?.rules || {}),
+        channels: {
+          ...DEFAULT_RULE_CHANNELS,
+          ...(parsed.settings?.notifications?.rules?.channels ||
+            mergedSettings?.notifications?.rules?.channels ||
+            {})
+        }
+      }
+    };
     return {
       subscriptions: parsed.subscriptions || [],
       notifications: parsed.notifications || [],
@@ -165,7 +199,19 @@ const saveUserData = async (username, data) => {
     settings: { 
       ...defaultSettings(), 
       ...data.settings,
-      security: { ...defaultSettings().security, ...(data.settings?.security || {}) }
+      security: { ...defaultSettings().security, ...(data.settings?.security || {}) },
+      notifications: {
+        ...defaultSettings().notifications,
+        ...(data.settings?.notifications || {}),
+        rules: {
+          ...defaultSettings().notifications.rules,
+          ...(data.settings?.notifications?.rules || {}),
+          channels: {
+            ...DEFAULT_RULE_CHANNELS,
+            ...(data.settings?.notifications?.rules?.channels || {})
+          }
+        }
+      }
     }
   };
   await fs.writeFile(userDataPath(username), JSON.stringify(payload, null, 2), 'utf-8');
@@ -187,6 +233,277 @@ const authMiddleware = (req, res, next) => {
   } catch (err) {
     return res.status(401).json({ message: 'Invalid token' });
   }
+};
+
+// --- Notification helpers ---
+const emailTransporter = hasSmtpConfig
+  ? nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.port === 465,
+      auth: {
+        user: smtpConfig.user,
+        pass: smtpConfig.pass
+      }
+    })
+  : null;
+
+const formatReminderMessage = (subscription) => {
+  const date = subscription.nextBillingDate || '未填写';
+  const amount =
+    subscription.price && subscription.currency
+      ? `${subscription.price} ${subscription.currency}`
+      : subscription.price
+        ? `${subscription.price}`
+        : '未填写';
+  const payment = subscription.paymentMethod || '未填写';
+
+  return [
+    '🔔 续订提醒通知',
+    '',
+    `📌 订阅${subscription.name}即将付款`,
+    '',
+    `📅 付款日期：${date}`,
+    `💰 订阅金额：${amount}`,
+    `💳 支付方式：${payment}`,
+    '',
+    '⚠️ 请及时续订以避免服务中断。'
+  ].join('\n');
+};
+
+const formatRenewalSuccessMessage = (subscription) => {
+  const date = subscription.nextBillingDate || '未填写';
+  const amount =
+    subscription.price && subscription.currency
+      ? `${subscription.price} ${subscription.currency}`
+      : subscription.price
+        ? `${subscription.price}`
+        : '未填写';
+  const payment = subscription.paymentMethod || '未填写';
+
+  return [
+    '✅ 续订成功通知',
+    '',
+    `📌 订阅${subscription.name}已成功续订`,
+    '',
+    `📅 付款日期：${date}`,
+    `💰 订阅金额：${amount}`,
+    `💳 支付方式：${payment}`,
+    '',
+    '🎉 订阅已续费成功，服务将正常继续。'
+  ].join('\n');
+};
+
+const formatRenewalFailedMessage = (subscription) => {
+  const date = subscription.nextBillingDate || '未填写';
+  const amount =
+    subscription.price && subscription.currency
+      ? `${subscription.price} ${subscription.currency}`
+      : subscription.price
+        ? `${subscription.price}`
+        : '未填写';
+  const payment = subscription.paymentMethod || '未填写';
+
+  return [
+    '🚫 续订失败通知',
+    '',
+    `📌 订阅${subscription.name}续订失败`,
+    '',
+    `📅 尝试付款日期：${date}`,
+    `💰 订阅金额：${amount}`,
+    `💳 支付方式：${payment}`,
+    '',
+    '⚠️ 请检查支付方式或余额后重试。'
+  ].join('\n');
+};
+
+const formatSubscriptionChangeMessage = (subscription, note) => {
+  const date = subscription.nextBillingDate || '未填写';
+  const amount =
+    subscription.price && subscription.currency
+      ? `${subscription.price} ${subscription.currency}`
+      : subscription.price
+        ? `${subscription.price}`
+        : '未填写';
+  const payment = subscription.paymentMethod || '未填写';
+
+  return [
+    'ℹ️ 订阅变更通知',
+    '',
+    `📌 订阅${subscription.name}已更新`,
+    '',
+    `📅 下次付款日期：${date}`,
+    `💰 当前订阅金额：${amount}`,
+    `💳 支付方式：${payment}`,
+    `📝 变更说明：${note || '无'}`,
+    '',
+    '⚠️ 如非本人操作请检查订阅设置。'
+  ].join('\n');
+};
+
+const sendTelegramMessage = async (botToken, chatId, text) => {
+  const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text })
+  });
+
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    const errMsg = data?.description || `telegram_error_${resp.status}`;
+    throw new Error(errMsg);
+  }
+};
+
+const sendEmailMessage = async (to, subject, text) => {
+  if (!emailTransporter) {
+    throw new Error('smtp_not_configured');
+  }
+  await emailTransporter.sendMail({
+    from: smtpConfig.from || smtpConfig.user,
+    to,
+    subject,
+    text
+  });
+};
+
+const notificationAlreadySent = (notifications, subscription, channel) => {
+  return (notifications || []).some(
+    (n) =>
+      n.type === 'renewal_reminder' &&
+      n.subscriptionName === subscription.name &&
+      n.channel === channel &&
+      n.status === 'success' &&
+      n.details?.date === subscription.nextBillingDate
+  );
+};
+
+const randomId = () =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const daysUntilDate = (dateString) => {
+  if (!dateString) return Infinity;
+  const now = new Date();
+  const target = new Date(dateString);
+  const diff = target.getTime() - now.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+};
+
+const processRenewalReminders = async () => {
+  const username = credentials.username;
+  let data;
+
+  try {
+    data = await loadUserData(username);
+  } catch (err) {
+    console.error('Failed to load user data for reminders', err);
+    return;
+  }
+
+  const settings = data.settings || defaultSettings();
+  const reminderRule = settings.notifications?.rules?.renewalReminder;
+  const reminderDays = Number(settings.notifications?.rules?.reminderDays ?? 3);
+  const ruleChannels = settings.notifications?.rules?.channels || DEFAULT_RULE_CHANNELS;
+
+  if (!reminderRule) return;
+
+  const subs = data.subscriptions || [];
+  let changed = false;
+
+  for (const sub of subs) {
+    if (!sub?.notificationsEnabled) continue;
+    if (sub.status && sub.status !== 'active') continue;
+
+    const days = daysUntilDate(sub.nextBillingDate);
+    if (days < 0 || days > reminderDays) continue;
+
+    const message = formatReminderMessage(sub);
+    const dateLabel = sub.nextBillingDate || '';
+
+    const attemptChannel = async (channel) => {
+      const recordBase = {
+        id: randomId(),
+        subscriptionName: sub.name,
+        type: 'renewal_reminder',
+        channel,
+        timestamp: Date.now(),
+        details: {
+          date: dateLabel,
+          amount: sub.price,
+          currency: sub.currency,
+          paymentMethod: sub.paymentMethod,
+          message
+        }
+      };
+
+      if (notificationAlreadySent(data.notifications, sub, channel)) return;
+
+      try {
+        if (channel === 'telegram') {
+          const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
+          const allowed = (ruleChannels?.renewalReminder || []).includes('telegram');
+          if (!enabled || !botToken || !chatId || !allowed) return;
+          await sendTelegramMessage(botToken, chatId, message);
+        } else if (channel === 'email') {
+          const { enabled, emailAddress } = settings.notifications?.email || {};
+          const allowed = (ruleChannels?.renewalReminder || []).includes('email');
+          if (!enabled || !emailAddress || !allowed) return;
+          await sendEmailMessage(emailAddress, '续订提醒通知', message);
+        } else {
+          return;
+        }
+
+        data.notifications.push({
+          ...recordBase,
+          status: 'success'
+        });
+        changed = true;
+      } catch (err) {
+        data.notifications.push({
+          ...recordBase,
+          status: 'failed',
+          details: { ...recordBase.details, errorReason: err?.message || 'unknown_error' }
+        });
+        changed = true;
+      }
+    };
+
+    await attemptChannel('telegram');
+    await attemptChannel('email');
+  }
+
+  if (changed) {
+    try {
+      await saveUserData(username, data);
+    } catch (err) {
+      console.error('Failed to persist notifications history', err);
+    }
+  }
+};
+
+let reminderTimer = null;
+let reminderRunning = false;
+
+const startReminderScheduler = () => {
+  if (reminderTimer) return;
+
+  const tick = async () => {
+    if (reminderRunning) return;
+    reminderRunning = true;
+    try {
+      await processRenewalReminders();
+    } catch (err) {
+      console.error('Reminder tick failed', err);
+    } finally {
+      reminderRunning = false;
+    }
+  };
+
+  // Initial run
+  tick();
+  reminderTimer = setInterval(tick, NOTIFY_INTERVAL_MS);
 };
 
 // --- Routes ---
@@ -312,3 +629,6 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.listen(PORT, () => {
   console.log(`Auth server running on :${PORT}`);
 });
+
+// Start background reminder checks
+startReminderScheduler();
