@@ -16,20 +16,44 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Require critical secrets at startup to avoid weak defaults
+const requireEnv = (name) => {
+  const val = process.env[name];
+  if (!val) {
+    console.error(`[FATAL] Missing required environment variable: ${name}`);
+    process.exit(1);
+  }
+  return val;
+};
+
 // Environment variables (can be overridden in deployment)
-const ENV_ADMIN_USER = process.env.ADMIN_USER || 'luanyang5209';
-const ENV_ADMIN_PASS = process.env.ADMIN_PASS || 'passwords';
-const JWT_SECRET = process.env.JWT_SECRET || 'hAhJwsNwQLc1b2tIGLjIupRVphNue5vbdPxoAoeBMUg=';
+const ENV_ADMIN_USER = requireEnv('ADMIN_USER');
+const ENV_ADMIN_PASS = requireEnv('ADMIN_PASS');
+const JWT_SECRET = requireEnv('JWT_SECRET');
 const PORT = process.env.PORT || 3001;
 const NOTIFY_INTERVAL_MS = Number(process.env.NOTIFY_INTERVAL_MS || 10 * 60 * 1000); // default 10 minutes
+const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
+  {
+    lines: [
+      '🔔 续订提醒通知',
+      '',
+      '📌 订阅{{name}}即将付款',
+      '',
+      '📅 付款日期：{{nextBillingDate}}',
+      '💰 订阅金额：{{price}} {{currency}}',
+      '💳 支付方式：{{paymentMethod}}',
+      '',
+      '⚠️ 请及时续订以避免服务中断。'
+    ]
+  },
+  null,
+  2
+);
 
 const DATA_DIR = path.join(__dirname, 'data');
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
 const DEFAULT_RULE_CHANNELS = {
-  renewalFailed: ['telegram', 'email'],
-  renewalReminder: ['telegram', 'email'],
-  renewalSuccess: ['telegram', 'email'],
-  subscriptionChange: ['telegram', 'email']
+  renewalReminder: ['telegram', 'email']
 };
 
 const smtpConfig = {
@@ -110,12 +134,10 @@ const defaultSettings = () => ({
     telegram: { enabled: false, botToken: '', chatId: '' },
     email: { enabled: false, emailAddress: '' },
     rules: {
-      renewalFailed: true,
       renewalReminder: true,
-      renewalSuccess: false,
-      subscriptionChange: true,
       reminderDays: 3,
-      channels: { ...DEFAULT_RULE_CHANNELS }
+      channels: { ...DEFAULT_RULE_CHANNELS },
+      template: DEFAULT_REMINDER_TEMPLATE
     },
     scheduledTask: false
   },
@@ -165,18 +187,21 @@ const loadUserData = async (username) => {
     const parsed = JSON.parse(buf);
     const mergedSettings = { ...defaultSettings(), ...parsed.settings };
     mergedSettings.security = { ...defaultSettings().security, ...(parsed.settings?.security || {}) };
+    const parsedRules = parsed.settings?.notifications?.rules || {};
+    const normalizedRules = {
+      renewalReminder: parsedRules.renewalReminder !== undefined ? parsedRules.renewalReminder : defaultSettings().notifications.rules.renewalReminder,
+      reminderDays: parsedRules.reminderDays ?? defaultSettings().notifications.rules.reminderDays,
+      template: parsedRules.template || DEFAULT_REMINDER_TEMPLATE,
+      channels: {
+        ...DEFAULT_RULE_CHANNELS,
+        ...(parsedRules.channels || {})
+      }
+    };
     mergedSettings.notifications = {
       ...defaultSettings().notifications,
       ...(parsed.settings?.notifications || {}),
       rules: {
-        ...defaultSettings().notifications.rules,
-        ...(parsed.settings?.notifications?.rules || {}),
-        channels: {
-          ...DEFAULT_RULE_CHANNELS,
-          ...(parsed.settings?.notifications?.rules?.channels ||
-            mergedSettings?.notifications?.rules?.channels ||
-            {})
-        }
+        ...normalizedRules
       }
     };
     return {
@@ -204,8 +229,9 @@ const saveUserData = async (username, data) => {
         ...defaultSettings().notifications,
         ...(data.settings?.notifications || {}),
         rules: {
-          ...defaultSettings().notifications.rules,
-          ...(data.settings?.notifications?.rules || {}),
+          renewalReminder: data.settings?.notifications?.rules?.renewalReminder ?? defaultSettings().notifications.rules.renewalReminder,
+          reminderDays: data.settings?.notifications?.rules?.reminderDays ?? defaultSettings().notifications.rules.reminderDays,
+          template: data.settings?.notifications?.rules?.template || DEFAULT_REMINDER_TEMPLATE,
           channels: {
             ...DEFAULT_RULE_CHANNELS,
             ...(data.settings?.notifications?.rules?.channels || {})
@@ -248,97 +274,36 @@ const emailTransporter = hasSmtpConfig
     })
   : null;
 
-const formatReminderMessage = (subscription) => {
-  const date = subscription.nextBillingDate || '未填写';
-  const amount =
-    subscription.price && subscription.currency
-      ? `${subscription.price} ${subscription.currency}`
-      : subscription.price
-        ? `${subscription.price}`
-        : '未填写';
-  const payment = subscription.paymentMethod || '未填写';
-
-  return [
-    '🔔 续订提醒通知',
-    '',
-    `📌 订阅${subscription.name}即将付款`,
-    '',
-    `📅 付款日期：${date}`,
-    `💰 订阅金额：${amount}`,
-    `💳 支付方式：${payment}`,
-    '',
-    '⚠️ 请及时续订以避免服务中断。'
-  ].join('\n');
+const renderTemplate = (templateStr, subscription) => {
+  try {
+    const parsed = JSON.parse(templateStr || '');
+    if (!parsed?.lines || !Array.isArray(parsed.lines)) throw new Error('invalid_template');
+    const map = {
+      name: subscription.name || '未填写',
+      nextBillingDate: subscription.nextBillingDate || '未填写',
+      price: subscription.price ?? '',
+      currency: subscription.currency || '',
+      paymentMethod: subscription.paymentMethod || '未填写'
+    };
+    const replaceTokens = (line) =>
+      typeof line === 'string'
+        ? line
+            .replace(/{{\s*name\s*}}/g, map.name)
+            .replace(/{{\s*nextBillingDate\s*}}/g, map.nextBillingDate)
+            .replace(/{{\s*price\s*}}/g, map.price)
+            .replace(/{{\s*currency\s*}}/g, map.currency)
+            .replace(/{{\s*paymentMethod\s*}}/g, map.paymentMethod)
+        : '';
+    const lines = parsed.lines.map(replaceTokens).filter(Boolean);
+    return lines.join('\\n');
+  } catch (err) {
+    // Fallback to default template if parsing fails
+    return renderTemplate(DEFAULT_REMINDER_TEMPLATE, subscription);
+  }
 };
 
-const formatRenewalSuccessMessage = (subscription) => {
-  const date = subscription.nextBillingDate || '未填写';
-  const amount =
-    subscription.price && subscription.currency
-      ? `${subscription.price} ${subscription.currency}`
-      : subscription.price
-        ? `${subscription.price}`
-        : '未填写';
-  const payment = subscription.paymentMethod || '未填写';
-
-  return [
-    '✅ 续订成功通知',
-    '',
-    `📌 订阅${subscription.name}已成功续订`,
-    '',
-    `📅 付款日期：${date}`,
-    `💰 订阅金额：${amount}`,
-    `💳 支付方式：${payment}`,
-    '',
-    '🎉 订阅已续费成功，服务将正常继续。'
-  ].join('\n');
-};
-
-const formatRenewalFailedMessage = (subscription) => {
-  const date = subscription.nextBillingDate || '未填写';
-  const amount =
-    subscription.price && subscription.currency
-      ? `${subscription.price} ${subscription.currency}`
-      : subscription.price
-        ? `${subscription.price}`
-        : '未填写';
-  const payment = subscription.paymentMethod || '未填写';
-
-  return [
-    '🚫 续订失败通知',
-    '',
-    `📌 订阅${subscription.name}续订失败`,
-    '',
-    `📅 尝试付款日期：${date}`,
-    `💰 订阅金额：${amount}`,
-    `💳 支付方式：${payment}`,
-    '',
-    '⚠️ 请检查支付方式或余额后重试。'
-  ].join('\n');
-};
-
-const formatSubscriptionChangeMessage = (subscription, note) => {
-  const date = subscription.nextBillingDate || '未填写';
-  const amount =
-    subscription.price && subscription.currency
-      ? `${subscription.price} ${subscription.currency}`
-      : subscription.price
-        ? `${subscription.price}`
-        : '未填写';
-  const payment = subscription.paymentMethod || '未填写';
-
-  return [
-    'ℹ️ 订阅变更通知',
-    '',
-    `📌 订阅${subscription.name}已更新`,
-    '',
-    `📅 下次付款日期：${date}`,
-    `💰 当前订阅金额：${amount}`,
-    `💳 支付方式：${payment}`,
-    `📝 变更说明：${note || '无'}`,
-    '',
-    '⚠️ 如非本人操作请检查订阅设置。'
-  ].join('\n');
+const formatReminderMessage = (subscription, templateStr = DEFAULT_REMINDER_TEMPLATE) => {
+  return renderTemplate(templateStr, subscription);
 };
 
 const sendTelegramMessage = async (botToken, chatId, text) => {
@@ -419,7 +384,7 @@ const processRenewalReminders = async () => {
     const days = daysUntilDate(sub.nextBillingDate);
     if (days < 0 || days > reminderDays) continue;
 
-    const message = formatReminderMessage(sub);
+    const message = formatReminderMessage(sub, settings.notifications?.rules?.template);
     const dateLabel = sub.nextBillingDate || '';
 
     const attemptChannel = async (channel) => {

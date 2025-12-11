@@ -108,16 +108,11 @@ export interface CurrencyConfig {
 }
 
 export interface NotificationRule {
-  renewalFailed: boolean;
   renewalReminder: boolean;
-  renewalSuccess: boolean;
-  subscriptionChange: boolean;
   reminderDays: number;
+  template: string;
   channels: {
-    renewalFailed: NotificationChannel[];
     renewalReminder: NotificationChannel[];
-    renewalSuccess: NotificationChannel[];
-    subscriptionChange: NotificationChannel[];
   };
 }
 
@@ -164,7 +159,7 @@ export interface AppSettings {
 
 // --- Notification History Types ---
 
-export type NotificationType = 'renewal_reminder' | 'renewal_success' | 'renewal_failed' | 'subscription_change';
+export type NotificationType = 'renewal_reminder';
 export type NotificationStatus = 'success' | 'failed';
 export type NotificationChannel = 'telegram' | 'email';
 

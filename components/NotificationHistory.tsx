@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
-import { NotificationRecord, NotificationType, NotificationStatus, NotificationChannel } from '../types';
+import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
 import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, CreditCard, Calendar, AlertTriangle, Lightbulb, Mail, Send } from 'lucide-react';
 
 interface Props {
@@ -15,7 +15,6 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<NotificationStatus | 'all'>('all');
-  const [typeFilter, setTypeFilter] = useState<NotificationType | 'all'>('all');
   const [channelFilter, setChannelFilter] = useState<NotificationChannel | 'all'>('all');
 
   const t = getT(lang);
@@ -44,12 +43,11 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
         (n.details.receiver && n.details.receiver.toLowerCase().includes(searchLower));
       
       const matchesStatus = statusFilter === 'all' || n.status === statusFilter;
-      const matchesType = typeFilter === 'all' || n.type === typeFilter;
       const matchesChannel = channelFilter === 'all' || n.channel === channelFilter;
 
-      return matchesSearch && matchesStatus && matchesType && matchesChannel;
+      return matchesSearch && matchesStatus && matchesChannel;
     });
-  }, [sortedNotifications, searchLower, statusFilter, typeFilter, channelFilter]);
+  }, [sortedNotifications, searchLower, statusFilter, channelFilter]);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -74,15 +72,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
     );
   };
 
-  const getTypeLabel = (type: NotificationType) => {
-    switch (type) {
-      case 'renewal_reminder': return t('notif_type_renewal_reminder');
-      case 'renewal_success': return t('notif_type_renewal_success');
-      case 'renewal_failed': return t('notif_type_renewal_failed');
-      case 'subscription_change': return t('notif_type_subscription_change');
-      default: return type;
-    }
-  };
+  const getTypeLabel = () => t('notif_type_renewal_reminder');
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
@@ -145,20 +135,6 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
                       <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
 
-                  <div className="relative min-w-[160px]">
-                      <select 
-                        value={typeFilter} 
-                        onChange={e => setTypeFilter(e.target.value as any)}
-                        className="w-full appearance-none px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-600 rounded-xl outline-none dark:text-white text-sm pr-8 cursor-pointer"
-                      >
-                          <option value="all">{t('notif_filter_type')}</option>
-                          <option value="renewal_reminder">{t('notif_type_renewal_reminder')}</option>
-                          <option value="renewal_success">{t('notif_type_renewal_success')}</option>
-                          <option value="renewal_failed">{t('notif_type_renewal_failed')}</option>
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-
                   <div className="relative min-w-[140px]">
                       <select 
                         value={channelFilter} 
@@ -184,7 +160,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
          <div className="space-y-3">
              {filteredNotifications.map(notif => {
                  const isExpanded = expandedId === notif.id;
-                 const typeLabel = getTypeLabel(notif.type);
+                 const typeLabel = getTypeLabel();
 
                  return (
                      <div 

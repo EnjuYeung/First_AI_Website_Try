@@ -50,6 +50,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
   // Notification State
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+  const [templateText, setTemplateText] = useState(settings.notifications.rules.template);
 
   // AI Config Local State (Not saved immediately)
   const [localAiConfig, setLocalAiConfig] = useState<AIConfig>(settings.aiConfig);
@@ -61,6 +62,10 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   useEffect(() => {
       setLocalAiConfig(settings.aiConfig);
   }, [settings.aiConfig]);
+
+  useEffect(() => {
+      setTemplateText(settings.notifications.rules.template);
+  }, [settings.notifications.rules.template]);
 
   useEffect(() => {
       if (settings.security.pendingTwoFactorSecret) {
@@ -104,6 +109,36 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         onUpdateSettings({...settings, customPaymentMethods: [...settings.customPaymentMethods, newPayment]});
         setNewPayment('');
     }
+  };
+
+  // Template helpers
+  const parseTemplate = () => {
+    const parsed = JSON.parse(templateText || '{}');
+    if (!parsed.lines || !Array.isArray(parsed.lines) || parsed.lines.length === 0) {
+      throw new Error('invalid_template');
+    }
+    return parsed;
+  };
+
+  const renderTemplateMessage = (sub: { name: string; nextBillingDate: string; price: number | string; currency: string; paymentMethod: string; }) => {
+    const parsed = parseTemplate();
+    const map: Record<string, string | number> = {
+      name: sub.name || '未填写',
+      nextBillingDate: sub.nextBillingDate || '未填写',
+      price: sub.price ?? '',
+      currency: sub.currency || '',
+      paymentMethod: sub.paymentMethod || '未填写'
+    };
+    const replaceTokens = (line: string) =>
+      typeof line === 'string'
+        ? line
+            .replace(/{{\s*name\s*}}/g, String(map.name))
+            .replace(/{{\s*nextBillingDate\s*}}/g, String(map.nextBillingDate))
+            .replace(/{{\s*price\s*}}/g, String(map.price))
+            .replace(/{{\s*currency\s*}}/g, String(map.currency))
+            .replace(/{{\s*paymentMethod\s*}}/g, String(map.paymentMethod))
+        : '';
+    return parsed.lines.map(replaceTokens).join('\n');
   };
 
   const reorderList = (list: string[], from: number, to: number) => {
@@ -184,17 +219,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
   const buildTestReminderMessage = () => {
     const today = new Date().toISOString().slice(0, 10);
-    return [
-      '🔔 续订提醒通知',
-      '',
-      '📌 订阅测试订阅即将付款',
-      '',
-      `📅 付款日期：${today}`,
-      '💰 订阅金额：0.00',
-      '💳 支付方式：测试支付方式',
-      '',
-      '⚠️ 请及时续订以避免服务中断。'
-    ].join('\n');
+    return renderTemplateMessage({
+      name: '测试订阅',
+      nextBillingDate: today,
+      price: '0.00',
+      currency: '',
+      paymentMethod: '测试支付方式'
+    });
   };
 
   // Notification Handlers
@@ -211,6 +242,19 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         return;
     }
 
+    let message: string;
+    try {
+        message = buildTestReminderMessage();
+    } catch (err) {
+        setAlertState({
+            isOpen: true,
+            type: 'error',
+            title: t('error_title'),
+            message: "模板格式错误，请输入包含 lines 数组的 JSON。"
+        });
+        return;
+    }
+
     setIsTestingTelegram(true);
     try {
         const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -218,7 +262,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
-                text: buildTestReminderMessage()
+                text: message
             })
         });
         
@@ -469,18 +513,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
             message: t('connection_failed') || 'Network error'
         });
     } finally {
-        setIs2faBusy(false);
-    }
+    setIs2faBusy(false);
+  }
   };
 
-  const toggleRuleChannel = (ruleKey: keyof typeof settings.notifications.rules.channels, channel: NotificationChannel, checked: boolean) => {
-    const baseChannels = settings.notifications.rules.channels || {
-      renewalFailed: [],
-      renewalReminder: [],
-      renewalSuccess: [],
-      subscriptionChange: [],
-    };
-    const current = baseChannels[ruleKey] || [];
+  const toggleReminderChannel = (channel: NotificationChannel, checked: boolean) => {
+    const baseChannels = settings.notifications.rules.channels || { renewalReminder: [] };
+    const current = baseChannels.renewalReminder || [];
     const next = checked ? Array.from(new Set([...current, channel])) : current.filter(c => c !== channel);
     onUpdateSettings({
       ...settings,
@@ -490,69 +529,41 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
           ...settings.notifications.rules,
           channels: {
             ...baseChannels,
-            [ruleKey]: next
+            renewalReminder: next
           }
         }
       }
     });
   };
 
-  const channelLabel = (ch: NotificationChannel) => ch === 'telegram' ? t('telegram_bot') : t('email');
+  const handleSaveTemplate = () => {
+    try {
+      parseTemplate();
+      onUpdateSettings({
+        ...settings,
+        notifications: {
+          ...settings.notifications,
+          rules: { ...settings.notifications.rules, template: templateText }
+        }
+      });
+      setAlertState({
+        isOpen: true,
+        type: 'success',
+        title: t('success_title'),
+        message: '模板已保存'
+      });
+    } catch (err) {
+      setAlertState({
+        isOpen: true,
+        type: 'error',
+        title: t('error_title'),
+        message: "模板格式错误，请输入包含 lines 数组的 JSON。"
+      });
+    }
+  };
 
-  const renderRuleCard = (
-    key: 'renewalReminder' | 'renewalFailed' | 'renewalSuccess' | 'subscriptionChange',
-    label: string,
-    showReminderInput: boolean = false
-  ) => {
-    const enabled = (settings.notifications.rules as any)[key];
-    return (
-      <div className="flex flex-col p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
-         <div className="flex items-center justify-between">
-            <span className="text-gray-700 dark:text-gray-200">{label}</span>
-            <input 
-                type="checkbox" 
-                checked={enabled} 
-                onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, [key]: e.target.checked}}})}
-                className="w-5 h-5 text-primary-600 rounded"
-            />
-         </div>
-
-         {showReminderInput && settings.notifications.rules.renewalReminder && (
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex items-center gap-2 animate-fade-in">
-                <label className="text-sm text-gray-600 dark:text-gray-400">{t('remind_me')}</label>
-                <input 
-                    type="number" min="1" max="30" 
-                    className="w-16 px-2 py-1 border rounded dark:bg-slate-800 dark:border-gray-600 dark:text-white text-center"
-                    value={settings.notifications.rules.reminderDays}
-                    onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, reminderDays: parseInt(e.target.value)}}}) }
-                />
-                <span className="text-sm text-gray-600 dark:text-gray-400">{t('days_before')}</span>
-            </div>
-         )}
-
-         {enabled && (
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex flex-wrap gap-3 animate-fade-in">
-            {(['telegram','email'] as NotificationChannel[]).map(ch => {
-                const channelEnabled = (settings.notifications as any)[ch]?.enabled;
-                const selected = settings.notifications.rules.channels?.[key]?.includes(ch);
-                return (
-                  <label key={ch} className={`flex items-center gap-2 text-sm ${channelEnabled ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
-                    <input
-                      type="checkbox"
-                      disabled={!channelEnabled}
-                      checked={!!selected}
-                      onChange={e => toggleRuleChannel(key as keyof typeof settings.notifications.rules.channels, ch, e.target.checked)}
-                      className="w-4 h-4 accent-primary-600"
-                    />
-                    <span>{channelLabel(ch)}</span>
-                    {!channelEnabled && <span className="text-xs">({t('enable_notifications')})</span>}
-                  </label>
-                );
-            })}
-          </div>
-         )}
-      </div>
-    );
+  const handleTestTemplate = () => {
+    handleTestTelegram();
   };
 
   const handleToggleTwoFactor = (enabled: boolean) => {
@@ -1021,19 +1032,86 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                  </section>
 
                  {/* Rules */}
-                 <section className="space-y-3">
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('rules')}</h3>
-                    <div className="space-y-3">
-                        <div className="grid gap-3 md:grid-cols-2">
-                            {renderRuleCard('renewalReminder', t('renewal_reminder'), true)}
-                            {renderRuleCard('renewalFailed', t('renewal_failed'))}
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                            {renderRuleCard('renewalSuccess', t('renewal_success'))}
-                            {renderRuleCard('subscriptionChange', t('subscription_changes'))}
-                        </div>
+                  <section className="space-y-3">
+                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('rules')}</h3>
+                    <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-800 dark:text-white font-medium">{t('renewal_reminder')}</span>
+                        <input 
+                          type="checkbox" 
+                          checked={settings.notifications.rules.renewalReminder} 
+                          onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, renewalReminder: e.target.checked}}})}
+                          className="w-5 h-5 text-primary-600 rounded"
+                        />
+                      </div>
+
+                      {settings.notifications.rules.renewalReminder && (
+                        <>
+                          <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <label className="text-sm text-gray-600 dark:text-gray-400">{t('remind_me')}</label>
+                            <input 
+                                type="number" min="1" max="30" 
+                                className="w-16 px-2 py-1 border rounded dark:bg-slate-900 dark:border-gray-600 dark:text-white text-center"
+                                value={settings.notifications.rules.reminderDays}
+                                onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, rules: {...settings.notifications.rules, reminderDays: parseInt(e.target.value || '0')}}}) }
+                            />
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{t('days_before')}</span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            {(['telegram','email'] as NotificationChannel[]).map(ch => {
+                                const channelEnabled = (settings.notifications as any)[ch]?.enabled;
+                                const selected = settings.notifications.rules.channels?.renewalReminder?.includes(ch);
+                                return (
+                                  <label key={ch} className={`flex items-center gap-2 text-sm ${channelEnabled ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                                    <input
+                                      type="checkbox"
+                                      disabled={!channelEnabled}
+                                      checked={!!selected}
+                                      onChange={e => toggleReminderChannel(ch, e.target.checked)}
+                                      className="w-4 h-4 accent-primary-600"
+                                    />
+                                    <span>{ch === 'telegram' ? t('telegram_bot') : t('email')}</span>
+                                    {!channelEnabled && <span className="text-xs">({t('enable_notifications')})</span>}
+                                  </label>
+                                );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
-                 </section>
+                    <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-gray-800 dark:text-white font-medium">通知模板 (JSON)</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {'使用 lines 数组，支持 {{name}}, {{nextBillingDate}}, {{price}}, {{currency}}, {{paymentMethod}}'}
+                          </p>
+                        </div>
+                      </div>
+                      <textarea
+                        value={templateText}
+                        onChange={e => setTemplateText(e.target.value)}
+                        rows={10}
+                        className="w-full px-3 py-2 border rounded-lg font-mono text-sm bg-gray-50 dark:bg-slate-800 dark:border-gray-700 dark:text-white"
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={handleSaveTemplate}
+                          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                        >
+                          <Save size={16} /> 保存模板
+                        </button>
+                        <button
+                          onClick={handleTestTemplate}
+                          disabled={isTestingTelegram}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white ${isTestingTelegram ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        >
+                          {isTestingTelegram ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} 测试模板
+                        </button>
+                      </div>
+                    </div>
+                  </section>
             </div>
         )}
 

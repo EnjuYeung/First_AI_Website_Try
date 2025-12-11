@@ -9,6 +9,24 @@ export interface PersistedData {
   notifications: NotificationRecord[];
 }
 
+const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
+  {
+    lines: [
+      '🔔 续订提醒通知',
+      '',
+      '📌 订阅{{name}}即将付款',
+      '',
+      '📅 付款日期：{{nextBillingDate}}',
+      '💰 订阅金额：{{price}} {{currency}}',
+      '💳 支付方式：{{paymentMethod}}',
+      '',
+      '⚠️ 请及时续订以避免服务中断。'
+    ]
+  },
+  null,
+  2
+);
+
 const DEFAULT_SETTINGS: AppSettings = {
   language: 'zh',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
@@ -37,16 +55,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     telegram: { enabled: false, botToken: '', chatId: '' },
     email: { enabled: false, emailAddress: '' },
     rules: {
-      renewalFailed: true,
       renewalReminder: true,
-      renewalSuccess: false,
-      subscriptionChange: true,
       reminderDays: 3,
+      template: DEFAULT_REMINDER_TEMPLATE,
       channels: {
-        renewalFailed: ['telegram', 'email'],
-        renewalReminder: ['telegram', 'email'],
-        renewalSuccess: ['telegram', 'email'],
-        subscriptionChange: ['telegram', 'email'],
+        renewalReminder: ['telegram', 'email']
       }
     },
     scheduledTask: false,
@@ -80,6 +93,18 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     // @ts-ignore
     delete (parsed as any).currencyApi;
   }
+
+  const parsedRules = parsed.notifications?.rules || {};
+  const normalizedRules = {
+    renewalReminder: parsedRules.renewalReminder !== undefined ? parsedRules.renewalReminder : DEFAULT_SETTINGS.notifications.rules.renewalReminder,
+    reminderDays: parsedRules.reminderDays ?? DEFAULT_SETTINGS.notifications.rules.reminderDays,
+    template: parsedRules.template || DEFAULT_REMINDER_TEMPLATE,
+    channels: {
+      ...DEFAULT_SETTINGS.notifications.rules.channels,
+      ...(parsedRules.channels || {})
+    }
+  };
+
   return {
     ...getDefaultSettings(),
     ...parsed,
@@ -87,12 +112,7 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       ...DEFAULT_SETTINGS.notifications,
       ...parsed.notifications,
       rules: { 
-        ...DEFAULT_SETTINGS.notifications.rules, 
-        ...parsed.notifications?.rules,
-        channels: {
-          ...DEFAULT_SETTINGS.notifications.rules.channels,
-          ...(parsed.notifications?.rules?.channels || {})
-        }
+        ...normalizedRules
       }
     },
     security: {
