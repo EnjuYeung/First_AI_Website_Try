@@ -85,17 +85,6 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   const categories = settings.customCategories || [];
   const payments = settings.customPaymentMethods || [];
 
-  // Auto-Update Check
-  useEffect(() => {
-      const checkAndAutoUpdate = async () => {
-          if (shouldAutoUpdate(settings.lastRatesUpdate) && settings.aiConfig.apiKey) {
-              console.log("Auto-updating exchange rates...");
-              handleRefreshRates();
-          }
-      };
-      checkAndAutoUpdate();
-  }, []);
-
   // General Handlers
   const handleAddCategory = () => {
     if (newCategory && !settings.customCategories.includes(newCategory)) {
@@ -997,9 +986,23 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                           </div>
                           {settings.notifications.telegram.enabled && (
                               <div className="space-y-3">
-                                  <input placeholder="Bot Token" className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.botToken} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, botToken: e.target.value}}})} />
+                                  <input 
+                                    type="password"
+                                    autoComplete="new-password"
+                                    placeholder="Bot Token"
+                                    className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white"
+                                    value={settings.notifications.telegram.botToken}
+                                    onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, botToken: e.target.value}}})}
+                                  />
                                   <div className="flex gap-2">
-                                       <input placeholder="Chat ID" className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white" value={settings.notifications.telegram.chatId} onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, chatId: e.target.value}}})} />
+                                       <input 
+                                         type="password"
+                                         autoComplete="new-password"
+                                         placeholder="Chat ID"
+                                         className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white"
+                                         value={settings.notifications.telegram.chatId}
+                                         onChange={e => onUpdateSettings({...settings, notifications: {...settings.notifications, telegram: {...settings.notifications.telegram, chatId: e.target.value}}})}
+                                       />
                                        <button 
                                           onClick={handleTestTelegram}
                                           disabled={isTestingTelegram || !settings.notifications.telegram.botToken || !settings.notifications.telegram.chatId}

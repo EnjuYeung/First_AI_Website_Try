@@ -212,7 +212,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         const iterDate = new Date(startDate);
         while (iterDate <= today) {
             const key = iterDate.toLocaleString('default', { month: 'short', year: '2-digit' });
-            dataMap[key] = { name: key, total: 0, count: 0 };
+            dataMap[key] = { name: key, total: 0, count: 0, categoryCounts: {} as Record<string, number> };
             categories.forEach((c: string) => dataMap[key][c] = 0);
             iterDate.setMonth(iterDate.getMonth() + 1);
         }
@@ -226,6 +226,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     dataMap[key].count += 1;
                     const catKey = p.category as string;
                     dataMap[key][catKey] = (dataMap[key][catKey] || 0) + p.amountUsd;
+                    dataMap[key].categoryCounts[catKey] = (dataMap[key].categoryCounts[catKey] || 0) + 1;
                 }
             }
         });
@@ -330,6 +331,29 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 
   // --- Render Components ---
 
+  const renderTrendTooltip = ({ active, label, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const valid = payload.filter((p: any) => (p.value || 0) > 0);
+    if (!valid.length) return null;
+
+    return (
+      <div className="p-3 rounded-xl bg-white shadow-md border border-gray-100 text-sm text-gray-700 space-y-1">
+        <div className="font-semibold text-gray-900">{label}</div>
+        {valid.map((p: any) => {
+          const category = p.name;
+          const value = p.value as number;
+          const count = p?.payload?.categoryCounts?.[p.dataKey] || 0;
+          return (
+            <div key={category} className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+              <span className="text-gray-800">{`${category} (${count} 订阅)：$${value.toFixed(2)}`}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderTrendChart = () => (
      <ResponsiveContainer width="100%" height="100%">
         {trendType === 'line' ? (
@@ -359,12 +383,8 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} tickFormatter={(val) => `$${val}`}/>
                 <Tooltip 
-                cursor={{fill: 'transparent'}}
-                contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                formatter={(value: number, name: string, props: any) => [
-                     `$${value.toFixed(2)}`,
-                     `${name} (${props.payload.count} subs)`
-                ]}
+                  cursor={{fill: 'transparent'}}
+                  content={renderTrendTooltip}
                 />
                 <Legend />
                 {Array.from(new Set(subscriptions.map(s => s.category))).map((cat, index) => (
