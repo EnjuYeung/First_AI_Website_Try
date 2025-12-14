@@ -345,14 +345,21 @@ const formatReminderMessage = (subscription, templateStr = DEFAULT_REMINDER_TEMP
 };
 
 const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
+  const payload = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true
+  };
+
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+
   const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      reply_markup: replyMarkup
-    })
+    body: JSON.stringify(payload)
   });
 
   if (!resp.ok) {
