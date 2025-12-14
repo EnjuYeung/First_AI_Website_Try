@@ -37,10 +37,10 @@ const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
     lines: [
       '🔔 续订提醒通知',
       '',
-      '📌 订阅{{name}}即将付款',
+      '📌 订阅 {{name}} 即将续费',
       '',
       '📅 付款日期：{{nextBillingDate}}',
-      '💰 订阅金额：{{price}} {{currency}}',
+      '🔒 订阅金额：{{price}} {{currency}}',
       '💳 支付方式：{{paymentMethod}}',
       '',
       '⚠️ 请及时续订以避免服务中断。'
@@ -295,7 +295,8 @@ const renderTemplate = (templateStr, subscription) => {
             .replace(/{{\s*paymentMethod\s*}}/g, map.paymentMethod)
         : '';
     const lines = parsed.lines.map(replaceTokens).filter(Boolean);
-    return lines.join('\\n');
+    // Use real newlines so Telegram/email render line breaks correctly
+    return lines.join('\n');
   } catch (err) {
     // Fallback to default template if parsing fails
     return renderTemplate(DEFAULT_REMINDER_TEMPLATE, subscription);
@@ -350,10 +351,18 @@ const randomId = () =>
 
 const daysUntilDate = (dateString) => {
   if (!dateString) return Infinity;
-  const now = new Date();
-  const target = new Date(dateString);
-  const diff = target.getTime() - now.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+  const toStartOfDay = (d) => {
+    const clone = new Date(d);
+    clone.setHours(0, 0, 0, 0);
+    return clone;
+  };
+
+  const todayStart = toStartOfDay(new Date());
+  const targetStart = toStartOfDay(new Date(dateString));
+  const diff = targetStart.getTime() - todayStart.getTime();
+
+  // Use ceil so a target 2.2 days away counts as 3 full days remaining
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
 };
 
 const processRenewalReminders = async () => {
