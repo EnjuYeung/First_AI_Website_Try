@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut } from 'lucide-react';
+import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw } from 'lucide-react';
 import { Subscription, AppSettings, NotificationRecord } from './types';
 import { fetchAllData, saveAllData, getDefaultSettings } from './services/storageService';
 import { getT } from './services/i18n';
@@ -108,6 +108,10 @@ const App: React.FC = () => {
     } else {
         document.documentElement.classList.remove('dark');
     }
+  };
+
+  const handleSync = () => {
+    loadRemoteData();
   };
 
   const loadRemoteData = async () => {
@@ -292,6 +296,14 @@ const App: React.FC = () => {
 
          {/* Right: Controls */}
          <div className="flex items-center gap-4 text-gray-300">
+            <button
+              onClick={handleSync}
+              className="hover:text-white transition-colors disabled:opacity-50"
+              title="Sync from server"
+              disabled={isDataLoading}
+            >
+              <RefreshCcw size={18} className={isDataLoading ? 'animate-spin' : ''} />
+            </button>
             <button onClick={toggleLanguage} className="hover:text-white transition-colors" title={t('language')}><Globe size={18} /></button>
             <button onClick={toggleTheme} className="hover:text-white transition-colors" title={t('appearance')}>
                 {settings.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}

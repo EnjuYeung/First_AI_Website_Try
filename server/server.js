@@ -32,7 +32,9 @@ const ENV_ADMIN_PASS = requireEnv('ADMIN_PASS');
 const JWT_SECRET = requireEnv('JWT_SECRET');
 const PORT = process.env.PORT || 3001;
 const NOTIFY_INTERVAL_MS = Number(process.env.NOTIFY_INTERVAL_MS || 10 * 60 * 1000); // default 10 minutes
-const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
+
+// Default reminder templates (new + legacy) for layout upgrades
+const PREVIOUS_REMINDER_TEMPLATE = JSON.stringify(
   {
     lines: [
       '🔔 续订提醒通知',
@@ -50,11 +52,39 @@ const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
   2
 );
 
+const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
+  {
+    lines: [
+      '🔔 续订提醒通知',
+      '',
+      '📌 订阅 {{name}} 即将续费',
+      '',
+      '📅 付款日期：{{nextBillingDate}}',
+      '',
+      '🔒 订阅金额：{{price}} {{currency}}',
+      '💳 支付方式：{{paymentMethod}}',
+      '',
+      '⚠️ 请及时续订以避免服务中断。'
+    ]
+  },
+  null,
+  2
+);
+
 const DATA_DIR = path.join(__dirname, 'data');
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
 const DEFAULT_RULE_CHANNELS = {
   renewalReminder: ['telegram', 'email']
 };
+
+const buildInlineKeyboard = (subscriptionId) => ({
+  inline_keyboard: [
+    [
+      { text: '✅ 已续订', callback_data: `renewed|${subscriptionId}` },
+      { text: '🛑 已弃用', callback_data: `deprecated|${subscriptionId}` }
+    ]
+  ]
+});
 
 const smtpConfig = {
   host: process.env.SMTP_HOST || '',
@@ -188,10 +218,17 @@ const loadUserData = async (username) => {
     const mergedSettings = { ...defaultSettings(), ...parsed.settings };
     mergedSettings.security = { ...defaultSettings().security, ...(parsed.settings?.security || {}) };
     const parsedRules = parsed.settings?.notifications?.rules || {};
+    const parsedTemplate = parsedRules.template;
+    const normalizedTemplate =
+      !parsedTemplate ||
+      parsedTemplate === DEFAULT_REMINDER_TEMPLATE ||
+      parsedTemplate === PREVIOUS_REMINDER_TEMPLATE
+        ? DEFAULT_REMINDER_TEMPLATE
+        : parsedTemplate;
     const normalizedRules = {
       renewalReminder: parsedRules.renewalReminder !== undefined ? parsedRules.renewalReminder : defaultSettings().notifications.rules.renewalReminder,
       reminderDays: parsedRules.reminderDays ?? defaultSettings().notifications.rules.reminderDays,
-      template: parsedRules.template || DEFAULT_REMINDER_TEMPLATE,
+      template: normalizedTemplate,
       channels: {
         ...DEFAULT_RULE_CHANNELS,
         ...(parsedRules.channels || {})
@@ -307,11 +344,15 @@ const formatReminderMessage = (subscription, templateStr = DEFAULT_REMINDER_TEMP
   return renderTemplate(templateStr, subscription);
 };
 
-const sendTelegramMessage = async (botToken, chatId, text) => {
+const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
   const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text })
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      reply_markup: replyMarkup
+    })
   });
 
   if (!resp.ok) {
@@ -319,6 +360,32 @@ const sendTelegramMessage = async (botToken, chatId, text) => {
     const errMsg = data?.description || `telegram_error_${resp.status}`;
     throw new Error(errMsg);
   }
+
+  return resp.json();
+};
+
+const answerCallback = async (botToken, callbackQueryId, text) => {
+  await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text,
+      show_alert: false
+    })
+  });
+};
+
+const clearInlineKeyboard = async (botToken, chatId, messageId) => {
+  await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: { inline_keyboard: [] }
+    })
+  });
 };
 
 const sendEmailMessage = async (to, subject, text) => {
@@ -348,6 +415,16 @@ const randomId = () =>
   typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const applySubscriptionAction = (subscription, action) => {
+  if (!subscription) return { changed: false, status: null };
+  let targetStatus = subscription.status || 'active';
+  if (action === 'renewed') targetStatus = 'active';
+  if (action === 'deprecated') targetStatus = 'cancelled';
+  const changed = subscription.status !== targetStatus;
+  subscription.status = targetStatus;
+  return { changed, status: targetStatus };
+};
 
 const daysUntilDate = (dateString) => {
   if (!dateString) return Infinity;
@@ -419,7 +496,8 @@ const processRenewalReminders = async () => {
           const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
           const allowed = (ruleChannels?.renewalReminder || []).includes('telegram');
           if (!enabled || !botToken || !chatId || !allowed) return;
-          await sendTelegramMessage(botToken, chatId, message);
+          const replyMarkup = buildInlineKeyboard(sub.id || sub.name || 'unknown');
+          await sendTelegramMessage(botToken, chatId, message, replyMarkup);
         } else if (channel === 'email') {
           const { enabled, emailAddress } = settings.notifications?.email || {};
           const allowed = (ruleChannels?.renewalReminder || []).includes('email');
@@ -481,6 +559,78 @@ const startReminderScheduler = () => {
 };
 
 // --- Routes ---
+// Telegram webhook to capture inline button actions
+app.post('/api/telegram/webhook/:token', async (req, res) => {
+  const incomingToken = req.params.token;
+  const update = req.body || {};
+  const callback = update.callback_query;
+
+  try {
+    const user = credentials.username;
+    const data = await loadUserData(user);
+    const telegramCfg = data.settings?.notifications?.telegram || {};
+
+    if (!telegramCfg.botToken || telegramCfg.botToken !== incomingToken) {
+      return res.status(403).json({ ok: false, message: 'invalid_token' });
+    }
+
+    if (!callback || !callback.data || !callback.message) {
+      return res.json({ ok: true, message: 'ignored' });
+    }
+
+    const [action, rawId] = callback.data.split('|');
+    const allowedActions = ['renewed', 'deprecated'];
+    if (!allowedActions.includes(action) || !rawId) {
+      return res.json({ ok: false, message: 'invalid_action' });
+    }
+
+    const sub =
+      (data.subscriptions || []).find((s) => s.id === rawId) ||
+      (data.subscriptions || []).find((s) => s.name === rawId);
+
+    if (!sub) {
+      await answerCallback(telegramCfg.botToken, callback.id, '找不到对应的订阅记录');
+      return res.json({ ok: false, message: 'subscription_not_found' });
+    }
+
+    const result = applySubscriptionAction(sub, action);
+
+    if (result.changed) {
+      data.notifications = data.notifications || [];
+      data.notifications.push({
+        id: randomId(),
+        subscriptionName: sub.name,
+        type: 'subscription_change',
+        channel: 'telegram',
+        status: 'success',
+        timestamp: Date.now(),
+        details: {
+          message: action === 'renewed' ? '用户在 Telegram 确认已续订' : '用户在 Telegram 标记为已弃用',
+          receiver: callback.from?.username || callback.from?.id?.toString?.() || 'unknown',
+          date: sub.nextBillingDate,
+          paymentMethod: sub.paymentMethod,
+          amount: sub.price,
+          currency: sub.currency
+        }
+      });
+
+      await saveUserData(user, data);
+    }
+
+    await answerCallback(
+      telegramCfg.botToken,
+      callback.id,
+      result.status === 'cancelled' ? '已标记为弃用/取消' : '已标记为已续订'
+    );
+    await clearInlineKeyboard(telegramCfg.botToken, callback.message.chat.id, callback.message.message_id);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Telegram callback error', err);
+    res.status(500).json({ ok: false, message: 'server_error' });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { username, password, code } = req.body || {};
   if (username !== credentials.username) return res.status(401).json({ message: 'Invalid credentials' });
