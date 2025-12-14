@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, AIConfig, COMMON_TIMEZONES, ISO_CURRENCIES, NotificationChannel } from '../types';
-import { getRatesFromAI, shouldAutoUpdate } from '../services/currencyService';
+import { AppSettings, COMMON_TIMEZONES, ISO_CURRENCIES, NotificationChannel } from '../types';
 import { getT } from '../services/i18n';
-import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Cpu, Info, Save, Mail } from 'lucide-react';
+import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Save, Mail } from 'lucide-react';
 
 interface Props {
     settings: AppSettings;
@@ -25,14 +24,14 @@ const Toast: React.FC<{ message: string, onClose: () => void }> = ({ message, on
 };
 
 const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'currency' | 'notifications' | 'security'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'api' | 'currency' | 'notifications' | 'security'>('general');
   const [newCategory, setNewCategory] = useState('');
   const [newPayment, setNewPayment] = useState('');
   const [currencySearch, setCurrencySearch] = useState('');
   const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
-  
-  // Currency State
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
+  const [exchangeApiKey, setExchangeApiKey] = useState('');
+  const [isSavingExchangeApi, setIsSavingExchangeApi] = useState(false);
 
   // Security State
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
@@ -52,16 +51,9 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
   const [templateText, setTemplateText] = useState(settings.notifications.rules.template);
 
-  // AI Config Local State (Not saved immediately)
-  const [localAiConfig, setLocalAiConfig] = useState<AIConfig>(settings.aiConfig);
-
   // Drag-and-drop state
   const [dragCatIndex, setDragCatIndex] = useState<number | null>(null);
   const [dragPayIndex, setDragPayIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-      setLocalAiConfig(settings.aiConfig);
-  }, [settings.aiConfig]);
 
   useEffect(() => {
       setTemplateText(settings.notifications.rules.template);
@@ -153,45 +145,106 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
     setDragPayIndex(null);
   };
 
-  // Currency Handlers
-  const handleRefreshRates = async () => {
-    if (!settings.aiConfig.apiKey || !settings.aiConfig.baseUrl) {
-         setAlertState({
-            isOpen: true,
-            type: 'error',
-            title: t('error_title'),
-            message: "Please configure AI settings first to use real-time rates."
-        });
-        return;
-    }
+  const authHeader = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+  });
 
-    setIsUpdatingRates(true);
-    const codesToFetch = settings.customCurrencies.map(c => c.code);
-    const newRates = await getRatesFromAI(codesToFetch, settings.aiConfig);
-    
-    if (newRates) {
-        onUpdateSettings({
-            ...settings,
-            exchangeRates: { ...settings.exchangeRates, ...newRates },
-            lastRatesUpdate: Date.now()
-        });
-        if (!shouldAutoUpdate(settings.lastRatesUpdate)) { // If manual triggering
-             setAlertState({
-                isOpen: true,
-                type: 'success',
-                title: t('success_title'),
-                message: t('connection_success')
-            });
-        }
-    } else {
-         setAlertState({
-            isOpen: true,
-            type: 'error',
-            title: t('error_title'),
-            message: t('connection_failed')
-        });
+  const bufferToBase64 = (buffer: ArrayBuffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  };
+
+  const encryptExchangeApiKey = async (plainKey: string) => {
+    const resp = await fetch('/api/exchange-rate/public-key', { headers: authHeader() });
+    const data = await resp.json();
+    if (!resp.ok || !data?.jwk) throw new Error('failed_to_get_public_key');
+    const publicKey = await crypto.subtle.importKey(
+      'jwk',
+      data.jwk,
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      false,
+      ['encrypt']
+    );
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'RSA-OAEP' },
+      publicKey,
+      new TextEncoder().encode(plainKey)
+    );
+    return bufferToBase64(encrypted);
+  };
+
+  const handleSaveExchangeApiKey = async (alsoTest: boolean) => {
+    if (!exchangeApiKey.trim()) return;
+    setIsSavingExchangeApi(true);
+    try {
+      const encryptedKey = await encryptExchangeApiKey(exchangeApiKey.trim());
+      const resp = await fetch('/api/exchange-rate/config', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ encryptedKey, test: alsoTest })
+      });
+      const json = await resp.json();
+      if (!resp.ok || json?.ok === false) throw new Error(json?.message || 'save_failed');
+
+      onUpdateSettings({
+        ...settings,
+        exchangeRateApi: json.settings.exchangeRateApi,
+        exchangeRates: json.settings.exchangeRates,
+        lastRatesUpdate: json.settings.lastRatesUpdate
+      });
+      setExchangeApiKey('');
+      setAlertState({
+        isOpen: true,
+        type: 'success',
+        title: t('success_title'),
+        message: alsoTest ? '保存并测试成功' : '保存成功'
+      });
+    } catch (err: any) {
+      setAlertState({
+        isOpen: true,
+        type: 'error',
+        title: t('error_title'),
+        message: err?.message || 'save_failed'
+      });
+    } finally {
+      setIsSavingExchangeApi(false);
     }
-    setIsUpdatingRates(false);
+  };
+
+  const handleManualUpdateRates = async () => {
+    setIsUpdatingRates(true);
+    try {
+      const resp = await fetch('/api/exchange-rate/update', {
+        method: 'POST',
+        headers: authHeader()
+      });
+      const json = await resp.json();
+      if (!resp.ok || json?.ok === false) throw new Error(json?.message || 'update_failed');
+      onUpdateSettings({
+        ...settings,
+        exchangeRateApi: json.settings.exchangeRateApi,
+        exchangeRates: json.settings.exchangeRates,
+        lastRatesUpdate: json.settings.lastRatesUpdate
+      });
+      setAlertState({
+        isOpen: true,
+        type: 'success',
+        title: t('success_title'),
+        message: '汇率已更新'
+      });
+    } catch (err: any) {
+      setAlertState({
+        isOpen: true,
+        type: 'error',
+        title: t('error_title'),
+        message: err?.message || 'update_failed'
+      });
+    } finally {
+      setIsUpdatingRates(false);
+    }
   };
 
   const filteredCurrencies = ISO_CURRENCIES.filter(c => 
@@ -199,12 +252,6 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
      c.name.toLowerCase().includes(currencySearch.toLowerCase())) &&
     !settings.customCurrencies.some(existing => existing.code === c.code)
   );
-
-  // AI Configuration Handlers
-  const handleSaveAiConfig = () => {
-      onUpdateSettings({ ...settings, aiConfig: localAiConfig });
-      setToastMessage(t('ai_saved_toast'));
-  };
 
   const buildTestReminderMessage = () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -575,7 +622,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-100 dark:border-gray-700 overflow-x-auto">
-        {['general', 'ai', 'currency', 'notifications', 'security'].map((tab) => (
+        {['general', 'api', 'currency', 'notifications', 'security'].map((tab) => (
             <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -585,7 +632,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
             >
-                {t(tab === 'ai' ? 'ai_integration' : tab as any)}
+                {t(tab as any)}
             </button>
         ))}
       </div>
@@ -742,104 +789,53 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
             </div>
         )}
 
-        {/* AI INTEGRATION TAB */}
-        {activeTab === 'ai' && (
-             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
-                 {/* Left Column: Form */}
-                 <div className="lg:col-span-8 space-y-8">
-                     <div>
-                         <div className="flex items-center gap-2 mb-2">
-                             <Cpu className="text-primary-600" size={24}/>
-                             <h3 className="text-xl font-bold text-gray-800 dark:text-white">{t('ai_title')}</h3>
-                         </div>
-                         <p className="text-sm text-gray-500 dark:text-gray-400">{t('ai_subtitle')}</p>
-                     </div>
+        {/* API TAB */}
+        {activeTab === 'api' && (
+          <div className="space-y-6 max-w-2xl">
+            <section>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">ExchangeRate-API</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                URL: https://v6.exchangerate-api.com/v6/YOUR-API-KEY/latest/USD
+              </p>
+            </section>
 
-                     <div className="space-y-6">
-                        {/* URL */}
-                         <div className="space-y-2">
-                             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('chat_url')}</label>
-                             <input 
-                                type="text"
-                                value={localAiConfig.baseUrl}
-                                onChange={e => setLocalAiConfig({...localAiConfig, baseUrl: e.target.value})}
-                                placeholder={t('chat_url_placeholder')}
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all font-mono text-sm"
-                             />
-                         </div>
+            <section className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl space-y-3">
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">API Key</label>
+              <input
+                type="password"
+                placeholder="YOUR-API-KEY"
+                value={exchangeApiKey}
+                onChange={(e) => setExchangeApiKey(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white"
+              />
 
-                         {/* API Key */}
-                         <div className="space-y-2">
-                             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('ai_api_key')}</label>
-                             <input 
-                                type="password"
-                                value={localAiConfig.apiKey}
-                                onChange={e => setLocalAiConfig({...localAiConfig, apiKey: e.target.value})}
-                                placeholder="sk-..."
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all font-mono text-sm tracking-widest"
-                             />
-                         </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSaveExchangeApiKey(false)}
+                  disabled={isSavingExchangeApi || !exchangeApiKey.trim()}
+                  className="px-4 py-2 bg-gray-100 dark:bg-slate-600 dark:text-white rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Save size={16} />
+                  <span>保存</span>
+                </button>
+                <button
+                  onClick={() => handleSaveExchangeApiKey(true)}
+                  disabled={isSavingExchangeApi || !exchangeApiKey.trim()}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSavingExchangeApi ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                  <span>保存并测试</span>
+                </button>
+              </div>
 
-                         {/* Model */}
-                         <div className="space-y-2">
-                             <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('ai_model_name')}</label>
-                             <input 
-                                type="text"
-                                value={localAiConfig.model}
-                                onChange={e => setLocalAiConfig({...localAiConfig, model: e.target.value})}
-                                placeholder="e.g. gpt-4o, deepseek-chat"
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all font-mono text-sm"
-                             />
-                         </div>
-
-                         {/* Action Buttons */}
-                         <div className="flex gap-4 pt-2">
-                             <button
-                                onClick={handleSaveAiConfig}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95"
-                             >
-                                <Save size={18} />
-                                <span>{t('ai_save')}</span>
-                             </button>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* Right Column: Tips */}
-                 <div className="lg:col-span-4">
-                     <div className="bg-gray-50 dark:bg-slate-700/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-700">
-                         <div className="flex items-center gap-2 mb-4 text-gray-800 dark:text-white font-bold">
-                             <Info size={18} />
-                             <span>{t('ai_config_desc')}</span>
-                         </div>
-                         <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
-                             <li className="flex gap-2 items-start">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
-                                 <span>{t('ai_desc_1')}</span>
-                             </li>
-                             <li className="flex gap-2 items-start">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
-                                 <span>{t('ai_desc_2')}</span>
-                             </li>
-                             <li className="flex gap-2 items-start">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
-                                 <span>{t('ai_desc_3')}</span>
-                             </li>
-                             <li className="flex gap-2 items-start">
-                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0"></div>
-                                 <span>{t('ai_desc_4')}</span>
-                             </li>
-                         </ul>
-                         
-                         <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30 rounded-xl flex items-start gap-3">
-                             <AlertTriangle size={18} className="text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
-                             <p className="text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed">
-                                 Ensure your provider supports standard OpenAI-compatible JSON responses for features like currency conversion to work correctly.
-                             </p>
-                         </div>
-                     </div>
-                 </div>
-             </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                <div>已启用：{settings.exchangeRateApi?.enabled ? '是' : '否'}</div>
+                <div>上次测试：{settings.exchangeRateApi?.lastTestedAt ? new Date(settings.exchangeRateApi.lastTestedAt).toLocaleString(currentLanguage === 'zh' ? 'zh-CN' : 'en-US') : '-'}</div>
+                <div>上次自动(0时)：{settings.exchangeRateApi?.lastRunAt0 ? new Date(settings.exchangeRateApi.lastRunAt0).toLocaleString(currentLanguage === 'zh' ? 'zh-CN' : 'en-US') : '-'}</div>
+                <div>上次自动(12时)：{settings.exchangeRateApi?.lastRunAt12 ? new Date(settings.exchangeRateApi.lastRunAt12).toLocaleString(currentLanguage === 'zh' ? 'zh-CN' : 'en-US') : '-'}</div>
+              </div>
+            </section>
+          </div>
         )}
 
         {/* CURRENCY TAB */}
@@ -854,10 +850,10 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 <RefreshCw size={18} className="text-blue-500"/>
                                 <h3 className="font-bold text-gray-800 dark:text-white text-sm">{t('realtime_rates')} ({t('base_usd')})</h3>
                             </div>
-                            <button 
-                                onClick={handleRefreshRates} 
-                                disabled={isUpdatingRates} 
-                                className="p-2 bg-white dark:bg-slate-600 text-gray-500 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-slate-500 rounded-lg transition-all shadow-sm"
+                            <button
+                                onClick={handleManualUpdateRates}
+                                disabled={isUpdatingRates}
+                                className="p-2 bg-white dark:bg-slate-600 text-gray-500 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-slate-500 rounded-lg transition-all shadow-sm disabled:opacity-50"
                                 title={t('refresh_rates')}
                             >
                                 <RefreshCw size={16} className={isUpdatingRates ? "animate-spin text-primary-600" : ""} />
@@ -885,14 +881,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
                         <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-600 pt-3">
                              <span>{t('last_updated')}: {formatLastUpdated(settings.lastRatesUpdate)}</span>
-                             {isUpdatingRates && <span className="text-primary-500 animate-pulse">Updating...</span>}
                         </div>
-                     </div>
-
-                     <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                         <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                            {t('ai_rate_info')}
-                         </p>
                      </div>
                 </div>
 

@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw } from 'lucide-react';
 import { Subscription, AppSettings, NotificationRecord } from './types';
 import { fetchAllData, saveAllData, getDefaultSettings } from './services/storageService';
 import { getT } from './services/i18n';
-import { getRatesFromAI, shouldAutoUpdate } from './services/currencyService';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
 import SubscriptionForm from './components/SubscriptionForm';
@@ -26,8 +25,6 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
-  const rateRefreshLock = useRef(false);
-  const settingsRef = useRef<AppSettings>(getDefaultSettings());
   
   // Logout Modal State
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -52,56 +49,6 @@ const App: React.FC = () => {
   useEffect(() => {
     applyTheme(settings);
   }, [settings.theme]);
-
-  // Keep a ref of latest settings for background tasks
-  useEffect(() => {
-    settingsRef.current = settings;
-  }, [settings]);
-
-  // Auto-update exchange rates daily after 12:00 using configured AI
-  useEffect(() => {
-    let cancelled = false;
-    let intervalId: number | undefined;
-
-    const maybeAutoUpdateRates = async () => {
-      if (cancelled) return;
-      const currentSettings = settingsRef.current;
-      const { aiConfig, customCurrencies, lastRatesUpdate, exchangeRates } = currentSettings;
-      if (!aiConfig.apiKey || !aiConfig.baseUrl) return;
-      if (!shouldAutoUpdate(lastRatesUpdate)) return;
-      if (rateRefreshLock.current) return;
-
-      rateRefreshLock.current = true;
-      try {
-        const codes = customCurrencies.map((c) => c.code);
-        const newRates = await getRatesFromAI(codes, aiConfig);
-        if (newRates && !cancelled) {
-          const updatedSettings = {
-            ...currentSettings,
-            exchangeRates: { ...exchangeRates, ...newRates },
-            lastRatesUpdate: Date.now(),
-          };
-          setSettings(updatedSettings);
-          settingsRef.current = updatedSettings;
-          persistData({ settings: updatedSettings });
-          console.log('Auto-updated exchange rates at 12:00 via AI.');
-        }
-      } catch (err) {
-        console.error('Auto rate update failed', err);
-      } finally {
-        rateRefreshLock.current = false;
-      }
-    };
-
-    // Run once on load, then poll every 5 minutes to catch 12:00
-    maybeAutoUpdateRates();
-    intervalId = window.setInterval(maybeAutoUpdateRates, 5 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      if (intervalId) window.clearInterval(intervalId);
-    };
-  }, []);
 
   const applyTheme = (themeSettings: AppSettings) => {
     if (themeSettings.theme === 'dark' || (themeSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -256,7 +203,7 @@ const App: React.FC = () => {
       <header className="bg-black text-white px-6 h-16 flex items-center justify-between sticky top-0 z-20 shadow-md">
          {/* Left: Branding & Nav Links */}
          <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold tracking-tight">SubManager</h1>
+            <h1 className="text-xl font-bold tracking-tight">Subm</h1>
             
             {/* Nav Links */}
             <nav className="hidden md:flex items-center gap-1 ml-4">

@@ -46,10 +46,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     'SGD': 1.34
   },
   lastRatesUpdate: 0,
-  aiConfig: {
-    baseUrl: '',
-    apiKey: '',
-    model: ''
+  exchangeRateApi: {
+    enabled: false,
+    encryptedKey: '',
+    lastTestedAt: 0,
+    lastRunAt0: 0,
+    lastRunAt12: 0,
   },
   notifications: {
     telegram: { enabled: false, botToken: '', chatId: '' },
@@ -93,6 +95,10 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     // @ts-ignore
     delete (parsed as any).currencyApi;
   }
+  if ('aiConfig' in parsed) {
+    // @ts-ignore - strip removed legacy config
+    delete (parsed as any).aiConfig;
+  }
 
   const parsedRules = parsed.notifications?.rules || {};
   const normalizedRules = {
@@ -108,6 +114,10 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
   return {
     ...getDefaultSettings(),
     ...parsed,
+    exchangeRateApi: {
+      ...DEFAULT_SETTINGS.exchangeRateApi,
+      ...(parsed as any).exchangeRateApi,
+    },
     notifications: {
       ...DEFAULT_SETTINGS.notifications,
       ...parsed.notifications,
@@ -120,8 +130,7 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       ...parsed.security
     },
     exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
-    customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
-    aiConfig: parsed.aiConfig || DEFAULT_SETTINGS.aiConfig
+    customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies
   };
 };
 

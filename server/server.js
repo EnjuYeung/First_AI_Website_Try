@@ -73,6 +73,7 @@ const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
 
 const DATA_DIR = path.join(__dirname, 'data');
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
+const EXCHANGE_RATE_KEYPAIR_FILE = path.join(DATA_DIR, 'exchange-rate-keypair.json');
 const DEFAULT_RULE_CHANNELS = {
   renewalReminder: ['telegram', 'email']
 };
@@ -102,6 +103,80 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000'
 ];
+
+// --- ExchangeRate-API helpers ---
+const readExchangeRateKeypair = async () => {
+  await ensureDataDir();
+  try {
+    const raw = await fs.readFile(EXCHANGE_RATE_KEYPAIR_FILE, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (!parsed?.publicKeyPem || !parsed?.privateKeyPem) throw new Error('invalid_keypair');
+    return parsed;
+  } catch (_err) {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+    });
+    const payload = { publicKeyPem: publicKey, privateKeyPem: privateKey };
+    await fs.writeFile(EXCHANGE_RATE_KEYPAIR_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+    return payload;
+  }
+};
+
+const getExchangeRatePublicJwk = async () => {
+  const { publicKeyPem } = await readExchangeRateKeypair();
+  const keyObj = crypto.createPublicKey(publicKeyPem);
+  return keyObj.export({ format: 'jwk' });
+};
+
+const decryptExchangeRateApiKey = async (encryptedKeyBase64) => {
+  if (!encryptedKeyBase64) throw new Error('missing_encrypted_key');
+  const { privateKeyPem } = await readExchangeRateKeypair();
+  const buf = Buffer.from(encryptedKeyBase64, 'base64');
+  const decrypted = crypto.privateDecrypt(
+    { key: privateKeyPem, oaepHash: 'sha256' },
+    buf
+  );
+  return decrypted.toString('utf-8');
+};
+
+const fetchUsdRatesFromExchangeRateApi = async (apiKey) => {
+  const url = `https://v6.exchangerate-api.com/v6/${encodeURIComponent(apiKey)}/latest/USD`;
+  const resp = await fetch(url, { method: 'GET' });
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    const msg = json?.['error-type'] || json?.message || `exchange_rate_api_http_${resp.status}`;
+    throw new Error(msg);
+  }
+  if (json?.result !== 'success' || !json?.conversion_rates) {
+    const msg = json?.['error-type'] || 'exchange_rate_api_invalid_response';
+    throw new Error(msg);
+  }
+  return json.conversion_rates;
+};
+
+const formatDateInTimeZone = (timeZone, date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+};
+
+const getTimePartsInTimeZone = (timeZone, date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return { hour: Number(map.hour), minute: Number(map.minute) };
+};
 
 app.use(
   cors({
@@ -155,10 +230,12 @@ const defaultSettings = () => ({
     SGD: 1.34
   },
   lastRatesUpdate: 0,
-  aiConfig: {
-    baseUrl: '',
-    apiKey: '',
-    model: ''
+  exchangeRateApi: {
+    enabled: false,
+    encryptedKey: '',
+    lastTestedAt: 0,
+    lastRunAt0: 0,
+    lastRunAt12: 0
   },
   notifications: {
     telegram: { enabled: false, botToken: '', chatId: '' },
@@ -217,6 +294,14 @@ const loadUserData = async (username) => {
     const parsed = JSON.parse(buf);
     const mergedSettings = { ...defaultSettings(), ...parsed.settings };
     mergedSettings.security = { ...defaultSettings().security, ...(parsed.settings?.security || {}) };
+    // AI config is removed; strip legacy values if present
+    if ('aiConfig' in mergedSettings) {
+      delete mergedSettings.aiConfig;
+    }
+    mergedSettings.exchangeRateApi = {
+      ...defaultSettings().exchangeRateApi,
+      ...(parsed.settings?.exchangeRateApi || {})
+    };
     const parsedRules = parsed.settings?.notifications?.rules || {};
     const parsedTemplate = parsedRules.template;
     const normalizedTemplate =
@@ -255,12 +340,21 @@ const loadUserData = async (username) => {
 
 const saveUserData = async (username, data) => {
   await ensureDataDir();
+  // AI config is removed; strip legacy values if present
+  const settings = { ...(data.settings || {}) };
+  if ('aiConfig' in settings) {
+    delete settings.aiConfig;
+  }
+  settings.exchangeRateApi = {
+    ...defaultSettings().exchangeRateApi,
+    ...(data.settings?.exchangeRateApi || {})
+  };
   const payload = {
     subscriptions: data.subscriptions || [],
     notifications: data.notifications || [],
     settings: { 
       ...defaultSettings(), 
-      ...data.settings,
+      ...settings,
       security: { ...defaultSettings().security, ...(data.settings?.security || {}) },
       notifications: {
         ...defaultSettings().notifications,
@@ -564,6 +658,46 @@ const processRenewalReminders = async () => {
   }
 };
 
+const updateExchangeRatesForUser = async (username, slotHour = null) => {
+  const data = await loadUserData(username);
+  const settings = data.settings || defaultSettings();
+  const cfg = settings.exchangeRateApi || defaultSettings().exchangeRateApi;
+
+  if (!cfg.enabled || !cfg.encryptedKey) {
+    return { updated: false, reason: 'exchange_rate_api_not_enabled' };
+  }
+
+  const apiKey = await decryptExchangeRateApiKey(cfg.encryptedKey);
+  const conversionRates = await fetchUsdRatesFromExchangeRateApi(apiKey);
+
+  const desired = (settings.customCurrencies || []).map((c) => c.code).filter(Boolean);
+  const nextRates = { ...(settings.exchangeRates || {}) };
+  nextRates.USD = 1;
+
+  for (const code of desired) {
+    if (code === 'USD') continue;
+    const rate = conversionRates[code];
+    if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
+      nextRates[code] = rate;
+    }
+  }
+
+  const now = Date.now();
+  settings.exchangeRates = nextRates;
+  settings.lastRatesUpdate = now;
+  settings.exchangeRateApi = {
+    ...defaultSettings().exchangeRateApi,
+    ...cfg,
+    ...(slotHour === 0 ? { lastRunAt0: now } : {}),
+    ...(slotHour === 12 ? { lastRunAt12: now } : {})
+  };
+
+  data.settings = settings;
+  await saveUserData(username, data);
+
+  return { updated: true, lastRatesUpdate: now, exchangeRates: nextRates, exchangeRateApi: settings.exchangeRateApi };
+};
+
 let reminderTimer = null;
 let reminderRunning = false;
 
@@ -691,6 +825,107 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, username });
 });
 
+// --- ExchangeRate-API config ---
+app.get('/api/exchange-rate/public-key', authMiddleware, async (_req, res) => {
+  try {
+    const jwk = await getExchangeRatePublicJwk();
+    res.json({ jwk });
+  } catch (err) {
+    console.error('Failed to provide exchange rate public key', err);
+    res.status(500).json({ message: 'failed_to_get_public_key' });
+  }
+});
+
+app.post('/api/exchange-rate/config', authMiddleware, async (req, res) => {
+  try {
+    const { encryptedKey, test } = req.body || {};
+    const username = req.user.username;
+    const data = await loadUserData(username);
+    const settings = data.settings || defaultSettings();
+
+    settings.exchangeRateApi = {
+      ...defaultSettings().exchangeRateApi,
+      ...(settings.exchangeRateApi || {}),
+      ...(typeof encryptedKey === 'string' ? { encryptedKey } : {}),
+      enabled: false
+    };
+
+    data.settings = settings;
+    await saveUserData(username, data);
+
+    let testResult = null;
+    if (test) {
+      const keyToUse = settings.exchangeRateApi.encryptedKey;
+      const apiKey = await decryptExchangeRateApiKey(keyToUse);
+      await fetchUsdRatesFromExchangeRateApi(apiKey);
+
+      settings.exchangeRateApi.enabled = true;
+      settings.exchangeRateApi.lastTestedAt = Date.now();
+      data.settings = settings;
+      await saveUserData(username, data);
+
+      const updated = await updateExchangeRatesForUser(username, null);
+      testResult = { ok: true };
+      return res.json({
+        ok: true,
+        test: testResult,
+        settings: {
+          exchangeRateApi: updated.exchangeRateApi,
+          exchangeRates: updated.exchangeRates,
+          lastRatesUpdate: updated.lastRatesUpdate
+        }
+      });
+    }
+
+    res.json({
+      ok: true,
+      settings: {
+        exchangeRateApi: settings.exchangeRateApi,
+        exchangeRates: settings.exchangeRates,
+        lastRatesUpdate: settings.lastRatesUpdate
+      }
+    });
+  } catch (err) {
+    console.error('Exchange rate config error', err);
+    res.status(400).json({ ok: false, message: err?.message || 'exchange_rate_config_failed' });
+  }
+});
+
+app.post('/api/exchange-rate/test', authMiddleware, async (req, res) => {
+  try {
+    const { encryptedKey } = req.body || {};
+    const username = req.user.username;
+    const data = await loadUserData(username);
+    const settings = data.settings || defaultSettings();
+    const keyToUse = typeof encryptedKey === 'string' ? encryptedKey : settings.exchangeRateApi?.encryptedKey;
+    const apiKey = await decryptExchangeRateApiKey(keyToUse);
+    await fetchUsdRatesFromExchangeRateApi(apiKey);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, message: err?.message || 'exchange_rate_test_failed' });
+  }
+});
+
+app.post('/api/exchange-rate/update', authMiddleware, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const updated = await updateExchangeRatesForUser(username, null);
+    if (!updated.updated) {
+      return res.status(400).json({ ok: false, message: updated.reason || 'not_updated' });
+    }
+    res.json({
+      ok: true,
+      settings: {
+        exchangeRateApi: updated.exchangeRateApi,
+        exchangeRates: updated.exchangeRates,
+        lastRatesUpdate: updated.lastRatesUpdate
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err?.message || 'exchange_rate_update_failed' });
+  }
+});
+
 app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ username: req.user.username });
 });
@@ -785,3 +1020,47 @@ app.listen(PORT, () => {
 
 // Start background reminder checks
 startReminderScheduler();
+
+// --- Exchange rate scheduler (00:00 & 12:00) ---
+let rateTimer = null;
+let rateRunning = false;
+
+const startExchangeRateScheduler = () => {
+  if (rateTimer) return;
+
+  const tick = async () => {
+    if (rateRunning) return;
+    rateRunning = true;
+    try {
+      const username = credentials.username;
+      const data = await loadUserData(username);
+      const settings = data.settings || defaultSettings();
+      const tz = settings.timezone || 'Asia/Shanghai';
+      const today = formatDateInTimeZone(tz);
+      const { hour, minute } = getTimePartsInTimeZone(tz);
+
+      const cfg = settings.exchangeRateApi || defaultSettings().exchangeRateApi;
+      if (!cfg.enabled || !cfg.encryptedKey || !cfg.lastTestedAt) return;
+
+      const ran0 = cfg.lastRunAt0 ? formatDateInTimeZone(tz, new Date(cfg.lastRunAt0)) : '';
+      const ran12 = cfg.lastRunAt12 ? formatDateInTimeZone(tz, new Date(cfg.lastRunAt12)) : '';
+
+      // run once after the slot time has passed, even if tick isn't exactly at :00
+      if ((hour > 0 || (hour === 0 && minute >= 0)) && ran0 !== today) {
+        await updateExchangeRatesForUser(username, 0);
+      }
+      if ((hour > 12 || (hour === 12 && minute >= 0)) && ran12 !== today) {
+        await updateExchangeRatesForUser(username, 12);
+      }
+    } catch (err) {
+      console.error('Exchange rate tick failed', err);
+    } finally {
+      rateRunning = false;
+    }
+  };
+
+  tick();
+  rateTimer = setInterval(tick, 5 * 60 * 1000);
+};
+
+startExchangeRateScheduler();

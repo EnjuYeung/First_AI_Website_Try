@@ -120,10 +120,12 @@ export interface ExchangeRates {
   [key: string]: number; // e.g., 'CNY': 7.23
 }
 
-export interface AIConfig {
-  baseUrl: string;
-  apiKey: string;
-  model: string;
+export interface ExchangeRateApiSettings {
+  enabled: boolean;
+  encryptedKey: string; // RSA-OAEP encrypted, base64
+  lastTestedAt: number; // epoch ms
+  lastRunAt0: number; // epoch ms
+  lastRunAt12: number; // epoch ms
 }
 
 export interface AppSettings {
@@ -135,7 +137,7 @@ export interface AppSettings {
   customCurrencies: CurrencyConfig[];
   exchangeRates: ExchangeRates; // Store rates locally
   lastRatesUpdate: number; // Timestamp of last update
-  aiConfig: AIConfig; // New AI Configuration
+  exchangeRateApi: ExchangeRateApiSettings;
   notifications: {
     telegram: {
       enabled: boolean;
