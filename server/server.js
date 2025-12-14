@@ -356,7 +356,13 @@ const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
   };
 
   if (replyMarkup) {
-    payload.reply_markup = JSON.stringify(replyMarkup);
+    // Ensure Telegram receives an object, even if caller passed a stringified markup
+    try {
+      payload.reply_markup =
+        typeof replyMarkup === 'string' ? JSON.parse(replyMarkup) : replyMarkup;
+    } catch (_err) {
+      payload.reply_markup = replyMarkup;
+    }
   }
 
   const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
