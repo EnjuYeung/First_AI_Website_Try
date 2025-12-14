@@ -344,6 +344,9 @@ const formatReminderMessage = (subscription, templateStr = DEFAULT_REMINDER_TEMP
   return renderTemplate(templateStr, subscription);
 };
 
+const scrubToken = (token) =>
+  token ? `${token.slice(0, 6)}...${token.slice(-4)}` : 'undefined';
+
 const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
   const payload = {
     chat_id: chatId,
@@ -353,7 +356,6 @@ const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
   };
 
   if (replyMarkup) {
-    // Telegram accepts JSON string; stringify to avoid serialization issues on some deployments
     payload.reply_markup = JSON.stringify(replyMarkup);
   }
 
@@ -363,13 +365,26 @@ const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
     body: JSON.stringify(payload)
   });
 
-  if (!resp.ok) {
-    const data = await resp.json().catch(() => ({}));
-    const errMsg = data?.description || `telegram_error_${resp.status}`;
+  const json = await resp.json().catch(() => ({}));
+
+  // Debug log to inspect inline keyboard delivery
+  console.log('telegram sendMessage', {
+    ok: json?.ok,
+    description: json?.description,
+    chatId,
+    hasMarkup: !!replyMarkup,
+    markupType: typeof payload.reply_markup,
+    replyMarkup: payload.reply_markup,
+    resultMarkup: json?.result?.reply_markup,
+    bot: scrubToken(botToken)
+  });
+
+  if (!resp.ok || json?.ok === false) {
+    const errMsg = json?.description || `telegram_error_${resp.status}`;
     throw new Error(errMsg);
   }
 
-  return resp.json();
+  return json;
 };
 
 const answerCallback = async (botToken, callbackQueryId, text) => {
