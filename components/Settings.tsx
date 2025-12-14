@@ -200,7 +200,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         isOpen: true,
         type: 'success',
         title: t('success_title'),
-        message: alsoTest ? '保存并测试成功' : '保存成功'
+        message: alsoTest ? t('connection_success') : t('saved')
       });
     } catch (err: any) {
       setAlertState({
@@ -233,7 +233,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         isOpen: true,
         type: 'success',
         title: t('success_title'),
-        message: '汇率已更新'
+        message: t('rates_updated')
       });
     } catch (err: any) {
       setAlertState({
@@ -800,7 +800,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
             </section>
 
             <section className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl space-y-3">
-              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">API Key</label>
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('api_key')}</label>
               <input
                 type="password"
                 placeholder="YOUR-API-KEY"
@@ -816,7 +816,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                   className="px-4 py-2 bg-gray-100 dark:bg-slate-600 dark:text-white rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
                 >
                   <Save size={16} />
-                  <span>保存</span>
+                  <span>{t('save')}</span>
                 </button>
                 <button
                   onClick={() => handleSaveExchangeApiKey(true)}
@@ -824,7 +824,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSavingExchangeApi ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                  <span>保存并测试</span>
+                  <span>{t('save_and_test')}</span>
                 </button>
               </div>
 

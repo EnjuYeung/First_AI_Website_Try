@@ -468,16 +468,18 @@ const sendTelegramMessage = async (botToken, chatId, text, replyMarkup) => {
   const json = await resp.json().catch(() => ({}));
 
   // Debug log to inspect inline keyboard delivery
-  console.log('telegram sendMessage', {
-    ok: json?.ok,
-    description: json?.description,
-    chatId,
-    hasMarkup: !!replyMarkup,
-    markupType: typeof payload.reply_markup,
-    replyMarkup: payload.reply_markup,
-    resultMarkup: json?.result?.reply_markup,
-    bot: scrubToken(botToken)
-  });
+  if (process.env.DEBUG_TELEGRAM === '1') {
+    console.log('telegram sendMessage', {
+      ok: json?.ok,
+      description: json?.description,
+      chatId,
+      hasMarkup: !!replyMarkup,
+      markupType: typeof payload.reply_markup,
+      replyMarkup: payload.reply_markup,
+      resultMarkup: json?.result?.reply_markup,
+      bot: scrubToken(botToken)
+    });
+  }
 
   if (!resp.ok || json?.ok === false) {
     const errMsg = json?.description || `telegram_error_${resp.status}`;
@@ -853,7 +855,6 @@ app.post('/api/exchange-rate/config', authMiddleware, async (req, res) => {
     data.settings = settings;
     await saveUserData(username, data);
 
-    let testResult = null;
     if (test) {
       const keyToUse = settings.exchangeRateApi.encryptedKey;
       const apiKey = await decryptExchangeRateApiKey(keyToUse);
@@ -865,10 +866,8 @@ app.post('/api/exchange-rate/config', authMiddleware, async (req, res) => {
       await saveUserData(username, data);
 
       const updated = await updateExchangeRatesForUser(username, null);
-      testResult = { ok: true };
       return res.json({
         ok: true,
-        test: testResult,
         settings: {
           exchangeRateApi: updated.exchangeRateApi,
           exchangeRates: updated.exchangeRates,
@@ -888,21 +887,6 @@ app.post('/api/exchange-rate/config', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Exchange rate config error', err);
     res.status(400).json({ ok: false, message: err?.message || 'exchange_rate_config_failed' });
-  }
-});
-
-app.post('/api/exchange-rate/test', authMiddleware, async (req, res) => {
-  try {
-    const { encryptedKey } = req.body || {};
-    const username = req.user.username;
-    const data = await loadUserData(username);
-    const settings = data.settings || defaultSettings();
-    const keyToUse = typeof encryptedKey === 'string' ? encryptedKey : settings.exchangeRateApi?.encryptedKey;
-    const apiKey = await decryptExchangeRateApiKey(keyToUse);
-    await fetchUsdRatesFromExchangeRateApi(apiKey);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ ok: false, message: err?.message || 'exchange_rate_test_failed' });
   }
 });
 
