@@ -2,8 +2,10 @@
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 import { Subscription, Frequency, AppSettings } from '../types';
-import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, CreditCard, PieChart as PieChartIcon } from 'lucide-react';
+import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, CreditCard } from 'lucide-react';
 import { getT } from '../services/i18n';
+import { CategoryGlyph } from './ui/glyphs';
+import { displayCategoryLabel } from '../services/displayLabels';
 
 interface Props {
   subscriptions: Subscription[];
@@ -128,7 +130,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         const usd = toUSD(sub.price, sub.currency);
         if (date <= today) {
             yearlyPaid += usd;
-            yearlyPaidByCategory[sub.category] = (yearlyPaidByCategory[sub.category] || 0) + usd;
+            {
+              const cat = displayCategoryLabel(sub.category, lang);
+              yearlyPaidByCategory[cat] = (yearlyPaidByCategory[cat] || 0) + usd;
+            }
         } else if (sub.status !== 'cancelled') {
             yearlyPending += usd;
         }
@@ -161,7 +166,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         last12MSubTotal[sub.id].value += toUSD(sub.price, sub.currency);
 
         // Category Total
-        last12MCategoryTotal[sub.category] = (last12MCategoryTotal[sub.category] || 0) + toUSD(sub.price, sub.currency);
+        {
+          const cat = displayCategoryLabel(sub.category, lang);
+          last12MCategoryTotal[cat] = (last12MCategoryTotal[cat] || 0) + toUSD(sub.price, sub.currency);
+        }
       });
     });
 
@@ -200,7 +208,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     let totalMonthlyBudget = 0;
     subscriptions.filter(s => s.status === 'active').forEach(sub => {
         const cost = getStandardMonthlyCost(sub);
-        categoryDataMap[sub.category] = (categoryDataMap[sub.category] || 0) + cost;
+        {
+          const cat = displayCategoryLabel(sub.category, lang);
+          categoryDataMap[cat] = (categoryDataMap[cat] || 0) + cost;
+        }
         totalMonthlyBudget += cost;
     });
     
@@ -239,7 +250,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       categoryColorMap,
       totalMonthlyBudget
     };
-  }, [subscriptions, settings.exchangeRates]);
+  }, [subscriptions, settings.exchangeRates, lang]);
 
 
   const formatDate = (date: Date) => {
@@ -296,7 +307,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Monthly Card */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
+        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
              <DollarSign size={80} className="text-primary-500" />
           </div>
@@ -315,7 +326,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         </div>
 
         {/* Yearly Card */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
+        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
              <TrendingUp size={80} className="text-blue-500" />
           </div>
@@ -334,7 +345,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         </div>
 
         {/* Status Card */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
+        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
              <Activity size={80} className="text-green-500" />
           </div>
@@ -356,7 +367,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
        {/* Stats Cards Row 2: Highlights (Moved from Statistics) */}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            {/* Highest Sub */}
-           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+	           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <div>
                      <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('highest_sub')}</p>
                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.highestSub.name}>
@@ -371,27 +382,25 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                 </div>
            </div>
 
-           {/* Top Category */}
-           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <div>
-                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('top_category')}</p>
-                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.topCategory.name}>
-                        {dashboardData.topCategory.name}
-                     </h3>
-                     <p className="text-xs text-gray-400 mt-1">
-                        ${dashboardData.topCategory.value.toFixed(2)} / 12mo
-                     </p>
-                </div>
-                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-xl">
-                    <PieChartIcon size={24}/>
-                </div>
-           </div>
+	           {/* Top Category */}
+	           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+	                <div>
+	                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('top_category')}</p>
+	                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.topCategory.name}>
+	                        {dashboardData.topCategory.name}
+	                     </h3>
+	                     <p className="text-xs text-gray-400 mt-1">
+	                        ${dashboardData.topCategory.value.toFixed(2)} / 12mo
+	                     </p>
+	                </div>
+	                <CategoryGlyph category={dashboardData.topCategory.name} containerSize={44} size={22} />
+	           </div>
        </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Spend */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
+	        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('monthly_spend_category')}</h3>
           {subscriptions.length > 0 ? (
             <div className="h-full flex items-center gap-6">
@@ -442,7 +451,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         </div>
 
         {/* Yearly Breakdown Bar Chart */}
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 overflow-hidden">
+	        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 overflow-hidden">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('yearly_expenditure_breakdown')}</h3>
           {dashboardData.yearlyBreakdownData.length > 0 ? (
             <div className="h-full overflow-y-auto relative" style={{ maxHeight: 6 * 52 + 80 }}>
@@ -468,7 +477,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-gray-400">
-              No paid data this year
+              {t('no_paid_data_year')}
             </div>
           )}
         </div>
@@ -478,7 +487,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Recent Payments */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+	        <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
             <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-700/30">
                 <div className="flex items-center gap-2">
                     <CheckCircle className="text-green-500" size={18}/>
@@ -500,7 +509,12 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                             {dashboardData.recentPayments.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.sub.name}</td>
-                                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400">{item.sub.category}</td>
+	                                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400">
+	                                      <div className="flex items-center gap-2">
+	                                        <CategoryGlyph category={item.sub.category} containerSize={18} size={12} />
+	                                        <span className="truncate">{displayCategoryLabel(item.sub.category, lang)}</span>
+	                                      </div>
+	                                    </td>
                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
                                         {item.sub.currency === 'USD' ? '$' : item.sub.currency} {item.cost.toFixed(2)}
                                     </td>
@@ -510,13 +524,13 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                         </tbody>
                     </table>
                 ) : (
-                    <div className="p-8 text-center text-gray-400 text-sm">No recent payments</div>
+                    <div className="p-8 text-center text-gray-400 text-sm">{t('no_recent_payments')}</div>
                 )}
             </div>
         </div>
 
         {/* Upcoming Renewals */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+	        <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
             <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-700/30">
                 <div className="flex items-center gap-2">
                     <Clock className="text-orange-500" size={18}/>
@@ -540,7 +554,12 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                                 return (
                                 <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.sub.name}</td>
-                                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400">{item.sub.category}</td>
+	                                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400">
+	                                      <div className="flex items-center gap-2">
+	                                        <CategoryGlyph category={item.sub.category} containerSize={18} size={12} />
+	                                        <span className="truncate">{displayCategoryLabel(item.sub.category, lang)}</span>
+	                                      </div>
+	                                    </td>
                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
                                         {item.sub.currency === 'USD' ? '$' : item.sub.currency} {item.cost.toFixed(2)}
                                     </td>
@@ -561,7 +580,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                         </tbody>
                     </table>
                 ) : (
-                    <div className="p-8 text-center text-gray-400 text-sm">No upcoming renewals in 7 days</div>
+                    <div className="p-8 text-center text-gray-400 text-sm">{t('no_upcoming_renewals')}</div>
                 )}
             </div>
         </div>

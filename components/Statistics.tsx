@@ -7,6 +7,8 @@ import {
 import { Subscription, Frequency, AppSettings } from '../types';
 import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { getT } from '../services/i18n';
+import { CategoryGlyph } from './ui/glyphs';
+import { displayCategoryLabel } from '../services/displayLabels';
 
 interface Props {
   subscriptions: Subscription[];
@@ -58,7 +60,12 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
                   <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{rec.subName}</td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.formattedDate}</td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.category}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <CategoryGlyph category={rec.category} containerSize={18} size={12} />
+                          <span className="truncate">{rec.category}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                           {rec.currency ? `${rec.currency} ${rec.amount.toFixed(2)}` : `$${rec.amount.toFixed(2)}`}
                       </td>
@@ -79,8 +86,8 @@ const ModalWithPagination: React.FC<{ title: string, records: PaymentRecord[], o
   const paginated = records.slice((page-1)*pageSize, page*pageSize);
 
   return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
+          <div className="mac-surface rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden animate-pop-in flex flex-col max-h-[90vh]">
               <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-700">
                   <div>
                       <h2 className="text-xl font-bold text-gray-800 dark:text-white">{t('payment_details')}</h2>
@@ -95,7 +102,7 @@ const ModalWithPagination: React.FC<{ title: string, records: PaymentRecord[], o
                    <HistoryTableList records={paginated} t={t} />
               </div>
 
-              <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-slate-800">
+              <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between mac-surface-soft">
                   <span className="text-sm text-gray-500">
                       {t('show_10_records').replace('{total}', records.length.toString())}
                   </span>
@@ -161,17 +168,17 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         if (isNaN(currentDate.getTime())) return events;
 
         while (currentDate <= today) {
-            events.push({
-                subId: sub.id,
-                subName: sub.name,
-                category: sub.category,
-                date: new Date(currentDate),
-                formattedDate: currentDate.toISOString().split('T')[0],
-                amount: sub.price,
-                amountUsd: convertToUSD(sub.price, sub.currency),
-                currency: sub.currency,
-                status: sub.status || 'active'
-            });
+	            events.push({
+	                subId: sub.id,
+	                subName: sub.name,
+	                category: displayCategoryLabel(sub.category, lang),
+	                date: new Date(currentDate),
+	                formattedDate: currentDate.toISOString().split('T')[0],
+	                amount: sub.price,
+	                amountUsd: convertToUSD(sub.price, sub.currency),
+	                currency: sub.currency,
+	                status: sub.status || 'active'
+	            });
 
              switch (sub.frequency) {
                 case Frequency.MONTHLY: currentDate.setMonth(currentDate.getMonth() + 1); break;
@@ -184,9 +191,9 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         return events;
     };
 
-    const allPayments = useMemo(() => {
-        return subscriptions.flatMap(sub => getAllBillingEvents(sub)).sort((a, b) => b.date.getTime() - a.date.getTime());
-    }, [subscriptions, settings.exchangeRates]);
+	    const allPayments = useMemo(() => {
+	        return subscriptions.flatMap(sub => getAllBillingEvents(sub)).sort((a, b) => b.date.getTime() - a.date.getTime());
+	    }, [subscriptions, settings.exchangeRates, lang]);
 
     // --- Data Processing ---
 
@@ -194,10 +201,10 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const lifetimeSpend = useMemo(() => allPayments.reduce((acc, curr) => acc + curr.amountUsd, 0), [allPayments]);
 
     // 2. Trend Data (Line/Bar)
-    const trendData = useMemo(() => {
-        const today = new Date();
-        const dataMap: Record<string, any> = {};
-        const categories: string[] = Array.from(new Set(subscriptions.map(s => s.category)));
+	    const trendData = useMemo(() => {
+	        const today = new Date();
+	        const dataMap: Record<string, any> = {};
+	        const categories: string[] = Array.from(new Set(subscriptions.map(s => displayCategoryLabel(s.category, lang))));
 
         // Determine Start Date based on Range
         let startDate = new Date(today);
@@ -337,20 +344,21 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     if (!valid.length) return null;
 
     return (
-      <div className="p-3 rounded-xl bg-white shadow-md border border-gray-100 text-sm text-gray-700 space-y-1">
-        <div className="font-semibold text-gray-900">{label}</div>
-        {valid.map((p: any) => {
-          const category = p.name;
-          const value = p.value as number;
-          const count = p?.payload?.categoryCounts?.[p.dataKey] || 0;
-          return (
-            <div key={category} className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-              <span className="text-gray-800">{`${category} (${count} 订阅)：$${value.toFixed(2)}`}</span>
-            </div>
-          );
-        })}
-      </div>
+	      <div className="p-3 rounded-xl mac-surface-soft shadow-md border border-gray-100 text-sm text-gray-700 space-y-1">
+	        <div className="font-semibold text-gray-900">{label}</div>
+	        {valid.map((p: any) => {
+	          const category = p.name;
+	          const value = p.value as number;
+	          const count = p?.payload?.categoryCounts?.[p.dataKey] || 0;
+	          return (
+	            <div key={category} className="flex items-center gap-2">
+	              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+	              <CategoryGlyph category={category} containerSize={18} size={12} />
+	              <span className="text-gray-800">{`${category} (${count} 订阅)：$${value.toFixed(2)}`}</span>
+	            </div>
+	          );
+	        })}
+	      </div>
     );
   };
 
@@ -387,7 +395,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                   content={renderTrendTooltip}
                 />
                 <Legend />
-                {Array.from(new Set(subscriptions.map(s => s.category))).map((cat, index) => (
+                {Array.from(new Set(subscriptions.map(s => displayCategoryLabel(s.category, lang)))).map((cat, index) => (
                     <Bar key={cat} dataKey={cat} stackId="a" fill={COLORS[index % COLORS.length]} radius={[0,0,0,0]} />
                 ))}
             </BarChart>
@@ -500,7 +508,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       {/* 1. Lifetime Spend (Clickable Card) */}
       <div 
         onClick={() => setShowLifetimeModal(true)}
-        className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all group flex items-center justify-between"
+        className="mac-surface p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all group flex items-center justify-between"
       >
         <div>
              <div className="flex items-center space-x-3 mb-2">
@@ -518,7 +526,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       </div>
 
       {/* 2. Spending Trend */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-[500px] flex flex-col relative">
+      <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-[500px] flex flex-col relative">
          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 pr-10">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('spending_trend')}</h3>
             
@@ -554,7 +562,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* Payment Distribution */}
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col relative">
+          <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col relative">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 pr-10">{t('payment_distribution')}</h3>
             <div className="flex-1 w-full min-h-0">
                 {renderDistributionChart()}
@@ -562,7 +570,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           </div>
 
           {/* Category Pie Chart */}
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col relative">
+          <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col relative">
              <div className="flex justify-between items-center mb-4 pr-10">
                  <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('category_balance')}</h3>
                  <select 
@@ -583,7 +591,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       </div>
 
       {/* 4. Detailed History Section (Cards) */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                <div>
                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('payment_details')}</h3>
@@ -633,7 +641,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 
                       <button 
                         onClick={() => setDetailModalGroup(group)}
-                        className="mt-auto w-full py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 dark:hover:bg-slate-700 transition-all shadow-sm"
+                        className="mt-auto w-full py-2 mac-surface-soft border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-200 dark:hover:bg-slate-700 transition-all shadow-sm"
                       >
                           {t('view_details')}
                       </button>

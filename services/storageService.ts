@@ -111,6 +111,18 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     }
   };
 
+  const mergeStringList = (existing: any, defaults: string[]) => {
+    const list = Array.isArray(existing) ? existing.filter((v) => typeof v === 'string' && v.trim().length > 0) : [];
+    const seen = new Set(list);
+    defaults.forEach((item) => {
+      if (!seen.has(item)) {
+        list.push(item);
+        seen.add(item);
+      }
+    });
+    return list;
+  };
+
   return {
     ...getDefaultSettings(),
     ...parsed,
@@ -130,7 +142,9 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       ...parsed.security
     },
     exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
-    customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies
+    customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
+    customCategories: mergeStringList((parsed as any).customCategories, DEFAULT_SETTINGS.customCategories),
+    customPaymentMethods: mergeStringList((parsed as any).customPaymentMethods, DEFAULT_SETTINGS.customPaymentMethods)
   };
 };
 

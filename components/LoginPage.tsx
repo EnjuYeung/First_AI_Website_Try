@@ -64,17 +64,17 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
       <div className="absolute top-6 right-6 z-20">
          <button 
             onClick={toggleLanguage}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-600 dark:text-gray-300"
+            className="flex items-center gap-2 px-4 py-2 mac-surface rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-600 dark:text-gray-300"
          >
              <Globe size={16} />
              <span>{lang === 'en' ? 'English' : '中文'}</span>
          </button>
       </div>
 
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden relative z-10 animate-fade-in">
+      <div className="w-full max-w-md mac-surface rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden relative z-10 animate-pop-in">
         
         {/* Header */}
-        <div className="bg-white dark:bg-slate-800 p-8 pb-6 text-center">
+        <div className="mac-surface-soft p-8 pb-6 text-center">
             <div className="w-16 h-16 bg-primary-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg shadow-primary-500/30">
                 <span className="text-3xl font-bold text-white">S</span>
             </div>

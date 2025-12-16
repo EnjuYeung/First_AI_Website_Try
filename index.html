@@ -6,38 +6,70 @@
     <title>subm</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         darkMode: 'class', // Enable class-based dark mode
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['-apple-system','BlinkMacSystemFont','SF Pro Text','SF Pro Display','system-ui','Inter','sans-serif'],
             },
             colors: {
               primary: {
-                50: '#f5f3ff',
-                100: '#ede9fe',
-                200: '#ddd6fe',
-                300: '#c4b5fd',
-                400: '#a78bfa',
-                500: '#8b5cf6',
-                600: '#7c3aed',
-                700: '#6d28d9',
-                800: '#5b21b6',
-                900: '#4c1d95',
+                50: '#eff6ff',
+                100: '#dbeafe',
+                200: '#bfdbfe',
+                300: '#93c5fd',
+                400: '#60a5fa',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+                800: '#1e40af',
+                900: '#1e3a8a',
               }
-            }
+            },
+            boxShadow: {
+              'mac': '0 14px 40px rgba(0, 0, 0, 0.10)',
+              'mac-sm': '0 8px 22px rgba(0, 0, 0, 0.08)',
+            },
           }
         }
       }
     </script>
     <style>
       body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, Inter, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        background:
+          radial-gradient(1200px 700px at 20% 10%, rgba(0, 122, 255, 0.12), transparent 55%),
+          radial-gradient(900px 600px at 85% 20%, rgba(175, 82, 222, 0.12), transparent 60%),
+          radial-gradient(1000px 700px at 50% 110%, rgba(52, 199, 89, 0.10), transparent 55%),
+          linear-gradient(180deg, #f6f7fb 0%, #eef1f8 100%);
       }
+      .dark body {
+        background:
+          radial-gradient(1200px 700px at 20% 10%, rgba(10, 132, 255, 0.18), transparent 55%),
+          radial-gradient(900px 600px at 85% 20%, rgba(191, 90, 242, 0.16), transparent 60%),
+          radial-gradient(1000px 700px at 50% 110%, rgba(48, 209, 88, 0.12), transparent 55%),
+          linear-gradient(180deg, #0b1220 0%, #070a12 100%);
+      }
+      :root { --mac-accent: 0, 122, 255; }
+      .dark { --mac-accent: 10, 132, 255; }
+      ::selection { background: rgba(var(--mac-accent), 0.22); }
+      input, select, textarea { accent-color: rgb(var(--mac-accent)); }
+
+      /* macOS-like scrollbars (WebKit/Blink) */
+      *::-webkit-scrollbar { width: 10px; height: 10px; }
+      *::-webkit-scrollbar-thumb {
+        background: rgba(15, 23, 42, 0.22);
+        border-radius: 999px;
+        border: 3px solid transparent;
+        background-clip: content-box;
+      }
+      .dark *::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); background-clip: content-box; }
+      *::-webkit-scrollbar-corner { background: transparent; }
       /* Remove default focus outline on Recharts elements to avoid blue border */
       .recharts-wrapper:focus,
       .recharts-wrapper *:focus,
@@ -53,6 +85,49 @@
       .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+      }
+
+      /* Glassy macOS-like surfaces */
+      .mac-surface {
+        background: rgba(255, 255, 255, 0.72) !important;
+        border: 1px solid rgba(15, 23, 42, 0.10) !important;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.10) !important;
+        backdrop-filter: blur(22px) saturate(180%);
+        -webkit-backdrop-filter: blur(22px) saturate(180%);
+      }
+      .dark .mac-surface {
+        background: rgba(2, 6, 23, 0.55) !important;
+        border: 1px solid rgba(255, 255, 255, 0.10) !important;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45) !important;
+      }
+      .mac-surface-soft {
+        background: rgba(255, 255, 255, 0.55) !important;
+        border: 1px solid rgba(15, 23, 42, 0.08) !important;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08) !important;
+        backdrop-filter: blur(18px) saturate(160%);
+        -webkit-backdrop-filter: blur(18px) saturate(160%);
+      }
+      .dark .mac-surface-soft {
+        background: rgba(2, 6, 23, 0.40) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      }
+
+      @keyframes macFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes macPopIn {
+        from { opacity: 0; transform: scale(0.985); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fade-in { animation: macFadeIn 240ms cubic-bezier(.2,.8,.2,1) both; }
+      .animate-pop-in { animation: macPopIn 200ms cubic-bezier(.2,.9,.2,1) both; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .animate-fade-in,
+        .animate-pop-in {
+          animation: none !important;
+        }
       }
     </style>
     <script>

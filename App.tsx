@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw } from 'lucide-react';
+import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw, WalletCards } from 'lucide-react';
 import { Subscription, AppSettings, NotificationRecord } from './types';
 import { fetchAllData, saveAllData, getDefaultSettings } from './services/storageService';
 import { getT } from './services/i18n';
@@ -197,47 +197,52 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-colors duration-200">
+    <div className="min-h-screen bg-transparent flex flex-col transition-colors duration-200">
       
       {/* Top Navigation Bar */}
-      <header className="bg-black text-white px-6 h-16 flex items-center justify-between sticky top-0 z-20 shadow-md">
+      <header className="px-4 sm:px-6 h-16 flex items-center justify-between sticky top-0 z-20 bg-white/70 dark:bg-slate-950/50 backdrop-blur-xl border-b border-white/30 dark:border-white/10 shadow-mac-sm">
          {/* Left: Branding & Nav Links */}
          <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold tracking-tight">Subm</h1>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-primary-600/90 to-indigo-500/90 text-white shadow-mac-sm ring-1 ring-white/30">
+                <WalletCards size={18} />
+              </div>
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-gray-900 dark:text-white">Subm</h1>
+            </div>
             
             {/* Nav Links */}
             <nav className="hidden md:flex items-center gap-1 ml-4">
                 <button 
                   onClick={() => setActiveTab('dashboard')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'dashboard' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
                 >
                    <Home size={18} />
                    <span>{t('dashboard')}</span>
                 </button>
                  <button 
                   onClick={() => setActiveTab('list')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'list' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'list' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
                 >
                    <CreditCard size={18} />
                    <span>{t('subscriptions')}</span>
                 </button>
                  <button 
                   onClick={() => setActiveTab('analytics')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'analytics' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
                 >
                    <BarChart2 size={18} />
                    <span>{t('analytics')}</span>
                 </button>
                  <button 
                   onClick={() => setActiveTab('notifications')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'notifications' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'notifications' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
                 >
                    <BellRing size={18} />
                    <span>{t('notifications_history')}</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('settings')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'settings' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
                 >
                    <SettingsIcon size={18} />
                    <span>{t('settings')}</span>
@@ -246,26 +251,26 @@ const App: React.FC = () => {
          </div>
 
          {/* Right: Controls */}
-         <div className="flex items-center gap-4 text-gray-300">
+         <div className="flex items-center gap-2 text-gray-600 dark:text-gray-200">
             <button
               onClick={handleSync}
-              className="hover:text-white transition-colors disabled:opacity-50"
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
               title="Sync from server"
               disabled={isDataLoading}
             >
               <RefreshCcw size={18} className={isDataLoading ? 'animate-spin' : ''} />
             </button>
-            <button onClick={toggleLanguage} className="hover:text-white transition-colors" title={t('language')}><Globe size={18} /></button>
-            <button onClick={toggleTheme} className="hover:text-white transition-colors" title={t('appearance')}>
+            <button onClick={toggleLanguage} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('language')}><Globe size={18} /></button>
+            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('appearance')}>
                 {settings.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button onClick={handleLogoutClick} className="hover:text-white transition-colors" title={t('logout')}><LogOut size={18} /></button>
+            <button onClick={handleLogoutClick} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('logout')}><LogOut size={18} /></button>
          </div>
       </header>
 
 
       {/* Main Content */}
-      <main className="flex-1 p-6 lg:p-10 overflow-x-hidden max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-5 sm:p-6 lg:p-10 overflow-x-hidden max-w-7xl mx-auto w-full">
         {/* Header Section for Page Content */}
         <div className="flex justify-between items-center mb-8">
             {/* Optional Breadcrumb or Page Title if strictly needed, otherwise implied by tabs */}
@@ -276,7 +281,7 @@ const App: React.FC = () => {
           {activeTab !== 'settings' && activeTab !== 'notifications' && (
             <button
                 onClick={openAddModal}
-                className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl shadow-md transition-transform active:scale-95"
+                className="flex items-center space-x-2 bg-primary-600/90 hover:bg-primary-600 text-white px-5 py-2.5 rounded-2xl shadow-mac-sm transition-transform active:scale-[0.98] backdrop-blur-md"
             >
                 <Plus size={20} />
                 <span className="hidden sm:inline">{t('add_new')}</span>
@@ -322,8 +327,8 @@ const App: React.FC = () => {
 
       {/* Logout Confirmation Modal */}
       {isLogoutModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
+              <div className="mac-surface rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center animate-pop-in">
                   <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
                       <LogOut size={32} />
                   </div>

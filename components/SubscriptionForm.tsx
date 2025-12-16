@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, RefreshCw, Bell } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
+import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
+import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
   isOpen: boolean;
@@ -153,8 +155,8 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto my-8 animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
+      <div className="mac-surface rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto my-8 animate-pop-in">
         <div className="flex justify-between items-center p-8 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
             {initialData ? t('edit_subscription') : t('add_subscription')}
@@ -179,7 +181,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </div>
 
           {/* 价格/币种/周期/分类 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm">
+          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('price')}</label>
@@ -218,14 +220,17 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('categories')}</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <CategoryGlyph category={String(formData.category || '')} containerSize={18} size={12} />
+                  <span>{t('categories')}</span>
+                </label>
                 <select
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   value={formData.category}
                   onChange={e => setFormData({...formData, category: e.target.value})}
                 >
                   {settings.customCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat}>{displayCategoryLabel(cat, lang)}</option>
                   ))}
                 </select>
               </div>
@@ -233,22 +238,23 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </div>
 
           {/* 支付方式 / 状态 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm">
+          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {lang === 'zh' ? '支付方式' : t('payment_methods')}
-                </label>
-                <select
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-sm"
-                    value={formData.paymentMethod}
-                    onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
-                >
-                    {settings.customPaymentMethods.map(pm => (
-                    <option key={pm} value={pm}>{pm}</option>
-                    ))}
-                </select>
-              </div>
+	              <div className="flex flex-col gap-1">
+	                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+	                  <PaymentGlyph method={String(formData.paymentMethod || 'Credit Card')} containerSize={18} size={12} />
+	                  <span>{lang === 'zh' ? '支付方式' : t('payment_methods')}</span>
+	                </label>
+	                <select
+	                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+	                    value={formData.paymentMethod}
+	                    onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
+	                >
+	                    {settings.customPaymentMethods.map(pm => (
+	                    <option key={pm} value={pm}>{displayPaymentMethodLabel(pm, lang)}</option>
+	                    ))}
+	                </select>
+	              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('status')}</label>
                 <select
@@ -268,7 +274,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </div>
 
           {/* 起始日期 / 下个账单日 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm">
+          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('start_date')}</label>
@@ -295,7 +301,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </div>
 
           {/* Notes */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-slate-800 shadow-sm">
+          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('notes')}</label>
             <textarea
               className="w-full min-h-[100px] px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"

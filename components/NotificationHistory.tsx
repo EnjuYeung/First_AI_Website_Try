@@ -2,7 +2,9 @@
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
 import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
-import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, CreditCard, Calendar, AlertTriangle, Lightbulb, Mail, Send } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, Calendar, AlertTriangle, Lightbulb, Mail, Send } from 'lucide-react';
+import { PaymentGlyph } from './ui/glyphs';
+import { displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
   lang: 'en' | 'zh';
@@ -95,7 +97,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
           { label: t('notif_failed'), value: stats.failed, icon: <XCircle size={18} />, color: 'text-red-600 dark:text-red-400', subColor: 'text-red-600/70' },
           { label: t('notif_success_rate'), value: `${stats.rate}%`, icon: <BarChart3 size={18} />, color: 'text-blue-600 dark:text-blue-400', subColor: 'text-blue-600/70' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between h-28 relative overflow-hidden">
+          <div key={i} className="mac-surface p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between h-28 relative overflow-hidden">
              <div className="flex justify-between items-start z-10">
                 <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{stat.label}</span>
                 <div className={`p-1.5 rounded-lg bg-gray-50 dark:bg-slate-700 ${stat.subColor}`}>{stat.icon}</div>
@@ -106,7 +108,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
+      <div className="mac-surface p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
           <div className="flex items-center gap-2 mb-1">
              <Search size={18} className="text-gray-400" />
              <h3 className="font-bold text-gray-800 dark:text-white text-sm">{t('notifications_history')}</h3>
@@ -165,7 +167,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
                  return (
                      <div 
                         key={notif.id} 
-                        className={`bg-white dark:bg-slate-800 border rounded-2xl overflow-hidden transition-all ${
+                        className={`mac-surface border rounded-2xl overflow-hidden transition-all ${
                             isExpanded 
                             ? 'border-primary-500 ring-1 ring-primary-500 shadow-md' 
                             : 'border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -232,10 +234,10 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
 
                                          {notif.details.paymentMethod && (
                                              <div className="flex items-center gap-3">
-                                                <CreditCard className="text-purple-500" size={18} />
+                                                <PaymentGlyph method={notif.details.paymentMethod} containerSize={18} size={12} />
                                                 <div>
                                                     <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_payment')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{notif.details.paymentMethod}</div>
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{displayPaymentMethodLabel(notif.details.paymentMethod, lang)}</div>
                                                 </div>
                                             </div>
                                          )}

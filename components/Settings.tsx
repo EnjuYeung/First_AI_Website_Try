@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { AppSettings, COMMON_TIMEZONES, ISO_CURRENCIES, NotificationChannel } from '../types';
 import { getT } from '../services/i18n';
 import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Save, Mail } from 'lucide-react';
+import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
+import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
     settings: AppSettings;
@@ -616,7 +618,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[600px] overflow-hidden relative">
+    <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[600px] overflow-hidden relative">
       {/* Toast */}
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
@@ -725,7 +727,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                     <div className="flex gap-2 mb-3">
                         <input 
                             type="text" 
-                            placeholder="Add new category" 
+                            placeholder={currentLanguage === 'zh' ? '新增分类' : 'Add new category'} 
                             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
                             value={newCategory}
                             onChange={e => setNewCategory(e.target.value)}
@@ -741,12 +743,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={() => handleCategoryDrop(idx)}
                                 onDragEnd={() => setDragCatIndex(null)}
-                                className={`px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
+                                className={`px-3 py-1 bg-gray-100/70 dark:bg-slate-700/60 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
                                     dragCatIndex === idx ? 'ring-2 ring-primary-400' : ''
                                 }`}
                                 title={currentLanguage === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
                             >
-                                {cat}
+                                <CategoryGlyph category={cat} containerSize={18} size={12} />
+                                {displayCategoryLabel(cat, currentLanguage)}
                                 <button onClick={() => onUpdateSettings({...settings, customCategories: categories.filter(c => c !== cat)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
@@ -759,7 +762,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                     <div className="flex gap-2 mb-3">
                         <input 
                             type="text" 
-                            placeholder="Add payment method" 
+                            placeholder={currentLanguage === 'zh' ? '新增支付方式' : 'Add payment method'} 
                             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
                             value={newPayment}
                             onChange={e => setNewPayment(e.target.value)}
@@ -775,12 +778,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={() => handlePaymentDrop(idx)}
                                 onDragEnd={() => setDragPayIndex(null)}
-                                className={`px-3 py-1 bg-gray-100 dark:bg-slate-700 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
+                                className={`px-3 py-1 bg-gray-100/70 dark:bg-slate-700/60 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
                                     dragPayIndex === idx ? 'ring-2 ring-primary-400' : ''
                                 }`}
                                 title={currentLanguage === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
                             >
-                                {pm}
+                                <PaymentGlyph method={pm} containerSize={18} size={12} />
+                                {displayPaymentMethodLabel(pm, currentLanguage)}
                                 <button onClick={() => onUpdateSettings({...settings, customPaymentMethods: payments.filter(p => p !== pm)})} className="text-gray-400 hover:text-red-500"><XIcon size={12}/></button>
                             </span>
                         ))}
@@ -862,7 +866,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                         
                         <div className="space-y-3 mb-4 max-h-[400px] overflow-y-auto pr-1">
                             {settings.customCurrencies.filter(c => c.code !== 'USD').map(c => (
-                                <div key={c.code} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-gray-600">
+                                <div key={c.code} className="flex items-center justify-between p-3 mac-surface-soft rounded-lg border border-gray-100 dark:border-gray-600">
                                     <div className="flex flex-col">
                                         <span className="text-sm font-bold text-gray-800 dark:text-white">{c.code}</span>
                                         <span className="text-xs text-gray-400 dark:text-gray-500">{c.name}</span>
@@ -887,7 +891,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
                 {/* Right Col: Currency Management */}
                 <div className="xl:col-span-7 space-y-6">
-                     <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm h-full flex flex-col">
+                     <div className="mac-surface rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm h-full flex flex-col">
                          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('manage_currencies')}</h3>
                          
                          {/* Search Add */}
@@ -907,7 +911,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
                             
                             {/* Dropdown Results */}
                             {showCurrencyDropdown && currencySearch && (
-                                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-800 border border-gray-100 dark:border-gray-600 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-fade-in">
+                                <div className="absolute z-10 w-full mt-2 mac-surface border border-gray-100 dark:border-gray-600 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-fade-in">
                                     {filteredCurrencies.length > 0 ? filteredCurrencies.map(c => (
                                         <button 
                                             key={c.code}
@@ -1173,8 +1177,8 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
       {/* Alert Modal */}
       {alertState && alertState.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-sm w-full p-6 border border-gray-100 dark:border-gray-700 transform scale-100 transition-all">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
+             <div className="mac-surface rounded-2xl shadow-xl max-w-sm w-full p-6 border border-gray-100 dark:border-gray-700 transform scale-100 transition-all animate-pop-in">
                 <div className="flex flex-col items-center text-center space-y-4">
                     <div className={`p-3 rounded-full ${alertState.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
                         {alertState.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}

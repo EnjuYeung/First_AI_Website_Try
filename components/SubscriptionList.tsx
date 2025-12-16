@@ -1,8 +1,10 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Subscription, Frequency } from '../types';
-import { Edit2, Trash2, ExternalLink, CreditCard, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Check, X, Copy, LayoutGrid, List } from 'lucide-react';
+import { Edit2, Trash2, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Check, X, Copy, LayoutGrid, List } from 'lucide-react';
 import { getT } from '../services/i18n';
+import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
+import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
   subscriptions: Subscription[];
@@ -16,7 +18,7 @@ interface Props {
 // --- MultiSelect Component ---
 interface FilterMultiSelectProps {
   label: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; icon?: React.ReactNode }[];
   selectedValues: string[];
   onChange: (values: string[]) => void;
   t: (key: any) => string;
@@ -55,7 +57,7 @@ const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({ label, options, s
       </button>
 
       {isOpen && (
-        <div className="absolute z-20 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
+        <div className="absolute z-20 mt-2 w-56 mac-surface rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
           <div className="p-2 max-h-60 overflow-y-auto space-y-1">
              {options.map((opt) => (
                 <div 
@@ -63,6 +65,7 @@ const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({ label, options, s
                   onClick={() => toggleOption(opt.value)}
                   className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg cursor-pointer text-sm text-gray-700 dark:text-gray-200"
                 >
+                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
                   <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedValues.includes(opt.value) ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 dark:border-gray-500'}`}>
                     {selectedValues.includes(opt.value) && <Check size={10} strokeWidth={3} />}
                   </div>
@@ -111,17 +114,25 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   
   const categoriesOptionList = useMemo(() => {
     const cats = new Set(subscriptions.map(s => s.category));
-    return Array.from(cats).map(c => ({ value: c, label: c }));
-  }, [subscriptions]);
+    return Array.from(cats).map(c => ({
+      value: c,
+      label: displayCategoryLabel(c, lang),
+      icon: <CategoryGlyph category={c} containerSize={18} size={12} />,
+    }));
+  }, [subscriptions, lang]);
 
   const frequenciesOptionList = useMemo(() => {
-    return Object.values(Frequency).map(f => ({ value: f, label: f }));
-  }, []);
+    return Object.values(Frequency).map(f => ({ value: f, label: displayFrequencyLabel(f, lang) }));
+  }, [lang]);
 
   const paymentMethodsOptionList = useMemo(() => {
      const methods = new Set(subscriptions.map(s => s.paymentMethod || 'Credit Card'));
-     return Array.from(methods).map(m => ({ value: m, label: m }));
-  }, [subscriptions]);
+     return Array.from(methods).map(m => ({
+       value: m,
+       label: displayPaymentMethodLabel(m, lang),
+       icon: <PaymentGlyph method={m} containerSize={18} size={12} />,
+     }));
+  }, [subscriptions, lang]);
 
   const priceRangeOptionList = useMemo(() => {
     return [
@@ -294,7 +305,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
   if (subscriptions.length === 0 && !searchTerm) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-10 text-center border border-dashed border-gray-300 dark:border-gray-600">
+      <div className="mac-surface rounded-2xl p-10 text-center border border-dashed border-gray-300 dark:border-gray-600">
         <p className="text-gray-500 dark:text-gray-400">{t('manage_text')}</p>
       </div>
     );
@@ -303,7 +314,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   return (
     <div className="space-y-4">
       {/* Search and Filters Toolbar */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
+      <div className="mac-surface p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
         
         {/* Search */}
         <div className="relative w-full xl:w-64">
@@ -406,7 +417,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
       {/* Content Area */}
       {viewMode === 'list' ? (
           // LIST VIEW
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left align-middle">
                 <thead>
@@ -538,7 +549,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {sub.category || '-'}
+                        <div className="flex items-center gap-2">
+                          <CategoryGlyph category={sub.category || '-'} containerSize={20} size={12} />
+                          <span className="truncate">{displayCategoryLabel(sub.category || '-', lang)}</span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                           {renderStatusBadge(sub.status)}
@@ -552,15 +566,15 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                             sub.frequency === Frequency.YEARLY ? 'bg-purple-100 text-purple-800' :
                             'bg-orange-100 text-orange-800'
                           }`}>
-                          {sub.frequency}
+                          {displayFrequencyLabel(sub.frequency, lang)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          <div className="flex items-center space-x-1">
-                              <CreditCard size={14} className="text-gray-400"/>
-                              <span>{sub.paymentMethod || 'Credit Card'}</span>
-                          </div>
-                      </td>
+		                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+		                          <div className="flex items-center gap-2">
+		                              <PaymentGlyph method={sub.paymentMethod || 'Credit Card'} containerSize={20} size={12} />
+		                              <span className="truncate">{displayPaymentMethodLabel(sub.paymentMethod || 'Credit Card', lang)}</span>
+		                          </div>
+		                      </td>
                       <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {renderDateBadge(sub.nextBillingDate)}
                       </td>
@@ -608,7 +622,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
              {filteredSubscriptions.map(sub => (
                  <div 
                     key={sub.id}
-                    className={`bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border transition-all relative group ${
+	                    className={`mac-surface rounded-2xl p-5 shadow-sm border transition-all relative group ${
                         selectedIds.has(sub.id) 
                         ? 'border-primary-500 ring-1 ring-primary-500' 
                         : 'border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-primary-200 dark:hover:border-gray-600'
@@ -665,8 +679,15 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                          )}
                          
                          <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate w-full px-2">{sub.name}</h3>
-                         <div className="mb-3 flex items-center justify-center gap-2">
-                             <p className="text-xs text-gray-500 dark:text-gray-400">{sub.category}</p>
+                         <div className="mb-3 flex flex-col items-center justify-center gap-2">
+                             <div className="flex items-center justify-center gap-2">
+                               <CategoryGlyph category={sub.category} containerSize={18} size={12} />
+                               <p className="text-xs text-gray-500 dark:text-gray-400">{displayCategoryLabel(sub.category, lang)}</p>
+                             </div>
+                             <div className="flex items-center justify-center gap-2">
+                               <PaymentGlyph method={sub.paymentMethod || 'Credit Card'} containerSize={18} size={12} />
+                               <p className="text-xs text-gray-500 dark:text-gray-400">{displayPaymentMethodLabel(sub.paymentMethod || 'Credit Card', lang)}</p>
+                             </div>
                              {sub.status === 'cancelled' && (
                                  <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full font-medium">
                                      {t('cancelled')}
@@ -678,8 +699,8 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                             <span className={`text-2xl font-bold mr-1 ${sub.status === 'cancelled' ? 'text-gray-400 dark:text-gray-500 decoration-slate-400' : 'text-gray-900 dark:text-white'}`}>
                                 {currencySymbol(sub.currency)}{sub.price}
                             </span>
-                            <span className="text-xs text-gray-500">
-                                / {sub.frequency === Frequency.MONTHLY ? 'mo' : sub.frequency === Frequency.YEARLY ? 'yr' : 'cycle'}
+                             <span className="text-xs text-gray-500">
+                                / {lang === 'zh' ? (sub.frequency === Frequency.MONTHLY ? '月' : sub.frequency === Frequency.YEARLY ? '年' : '周期') : (sub.frequency === Frequency.MONTHLY ? 'mo' : sub.frequency === Frequency.YEARLY ? 'yr' : 'cycle')}
                             </span>
                          </div>
                          
@@ -693,10 +714,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                  </div>
              ))}
              {filteredSubscriptions.length === 0 && (
-                <div className="col-span-full py-12 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-200">
-                   No subscriptions found matching your criteria.
-                </div>
-             )}
+                <div className="col-span-full py-12 text-center text-gray-500 dark:text-gray-400 mac-surface rounded-2xl border border-dashed border-gray-200">
+	                   {t('no_subscriptions')}
+	                </div>
+	             )}
           </div>
       )}
     </div>
