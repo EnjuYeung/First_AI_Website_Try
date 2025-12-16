@@ -10,8 +10,11 @@ import {
   CircleDashed,
   Cloud,
   CreditCard,
+  Gamepad2,
   GraduationCap,
+  HeartPulse,
   MessageCircle,
+  Music,
   PlugZap,
   Popcorn,
   QrCode,
@@ -54,6 +57,14 @@ function normalize(value: string) {
 function resolveCategory(category: string): { icon: LucideIcon; tone: Tone } {
   const v = normalize(category);
 
+  if (v.includes('music') || v.includes('音乐')) {
+    return { icon: Music, tone: TONES.indigo };
+  }
+
+  if (v.includes('game') || v.includes('游戏')) {
+    return { icon: Gamepad2, tone: TONES.orange };
+  }
+
   if (
     v === 'ai' ||
     v.startsWith('ai ') ||
@@ -92,13 +103,10 @@ function resolveCategory(category: string): { icon: LucideIcon; tone: Tone } {
   if (
     v.includes('entertain') ||
     v.includes('movie') ||
-    v.includes('music') ||
-    v.includes('game') ||
     v.includes('video') ||
     v.includes('娱乐') ||
     v.includes('影视') ||
-    v.includes('音乐') ||
-    v.includes('游戏')
+    v.includes('综艺')
   ) {
     return { icon: Popcorn, tone: TONES.pink };
   }
@@ -134,14 +142,16 @@ function resolveCategory(category: string): { icon: LucideIcon; tone: Tone } {
   if (
     v.includes('life') ||
     v.includes('lifestyle') ||
-    v.includes('health') ||
     v.includes('fitness') ||
     v.includes('生活') ||
-    v.includes('健康') ||
     v.includes('运动') ||
     v.includes('健身')
   ) {
     return { icon: Sparkles, tone: TONES.purple };
+  }
+
+  if (v.includes('health') || v.includes('健康') || v.includes('医疗') || v.includes('医')) {
+    return { icon: HeartPulse, tone: TONES.green };
   }
 
   if (v.includes('educ') || v.includes('course') || v.includes('school') || v.includes('学习') || v.includes('教育') || v.includes('课程')) {
