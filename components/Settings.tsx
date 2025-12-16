@@ -4,7 +4,7 @@ import { AppSettings, COMMON_TIMEZONES, ISO_CURRENCIES, NotificationChannel } fr
 import { getT } from '../services/i18n';
 import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Save, Mail } from 'lucide-react';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
-import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { canonicalCategoryKey, canonicalPaymentMethodKey, displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
     settings: AppSettings;
@@ -81,15 +81,19 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
   // General Handlers
   const handleAddCategory = () => {
-    if (newCategory && !settings.customCategories.includes(newCategory)) {
-      onUpdateSettings({ ...settings, customCategories: [...settings.customCategories, newCategory] });
+    const canon = canonicalCategoryKey(newCategory);
+    const exists = settings.customCategories.some((c) => canonicalCategoryKey(c).toLowerCase() === canon.toLowerCase());
+    if (canon && !exists) {
+      onUpdateSettings({ ...settings, customCategories: [...settings.customCategories, canon] });
       setNewCategory('');
     }
   };
 
   const handleAddPayment = () => {
-    if (newPayment && !settings.customPaymentMethods.includes(newPayment)) {
-        onUpdateSettings({...settings, customPaymentMethods: [...settings.customPaymentMethods, newPayment]});
+    const canon = canonicalPaymentMethodKey(newPayment);
+    const exists = settings.customPaymentMethods.some((p) => canonicalPaymentMethodKey(p).toLowerCase() === canon.toLowerCase());
+    if (canon && !exists) {
+        onUpdateSettings({...settings, customPaymentMethods: [...settings.customPaymentMethods, canon]});
         setNewPayment('');
     }
   };

@@ -1,5 +1,6 @@
 
 import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, NotificationRecord } from '../types';
+import { canonicalCategoryKey, canonicalPaymentMethodKey } from './displayLabels';
 
 const API_BASE = '/api';
 
@@ -89,6 +90,16 @@ const authHeaders = () => {
   return headers;
 };
 
+const normalizeSubscription = (sub: any): Subscription => {
+  const category = canonicalCategoryKey(sub?.category || 'Other') || 'Other';
+  const paymentMethod = canonicalPaymentMethodKey(sub?.paymentMethod || 'Credit Card') || 'Credit Card';
+  return {
+    ...sub,
+    category,
+    paymentMethod,
+  } as Subscription;
+};
+
 const mergeSettings = (incoming?: AppSettings): AppSettings => {
   const parsed = incoming || {};
   if ('currencyApi' in parsed) {
@@ -111,15 +122,29 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     }
   };
 
-  const mergeStringList = (existing: any, defaults: string[]) => {
-    const list = Array.isArray(existing) ? existing.filter((v) => typeof v === 'string' && v.trim().length > 0) : [];
-    const seen = new Set(list);
-    defaults.forEach((item) => {
-      if (!seen.has(item)) {
-        list.push(item);
-        seen.add(item);
-      }
+  const mergeStringList = (existing: any, defaults: string[], canonicalize: (v: string) => string) => {
+    const raw = Array.isArray(existing) ? existing : [];
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    raw.forEach((v) => {
+      if (typeof v !== 'string') return;
+      const canon = canonicalize(v);
+      if (!canon) return;
+      const key = canon.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      list.push(canon);
     });
+
+    defaults.forEach((item) => {
+      const canon = canonicalize(item);
+      const key = canon.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      list.push(canon);
+    });
+
     return list;
   };
 
@@ -143,8 +168,8 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     },
     exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
     customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
-    customCategories: mergeStringList((parsed as any).customCategories, DEFAULT_SETTINGS.customCategories),
-    customPaymentMethods: mergeStringList((parsed as any).customPaymentMethods, DEFAULT_SETTINGS.customPaymentMethods)
+    customCategories: mergeStringList((parsed as any).customCategories, DEFAULT_SETTINGS.customCategories, canonicalCategoryKey),
+    customPaymentMethods: mergeStringList((parsed as any).customPaymentMethods, DEFAULT_SETTINGS.customPaymentMethods, canonicalPaymentMethodKey)
   };
 };
 
@@ -157,7 +182,7 @@ export const fetchAllData = async (): Promise<PersistedData> => {
     if (!resp.ok) throw new Error('failed_to_fetch');
     const data = await resp.json();
     return {
-      subscriptions: data.subscriptions || [],
+      subscriptions: (data.subscriptions || []).map(normalizeSubscription),
       notifications: data.notifications || [],
       settings: mergeSettings(data.settings)
     };
