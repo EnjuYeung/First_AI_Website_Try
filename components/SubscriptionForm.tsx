@@ -47,7 +47,34 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   });
 
   const [iconLoadError, setIconLoadError] = useState(false);
+  const [iconUploadError, setIconUploadError] = useState<string | null>(null);
   const iconUrl = String(formData.iconUrl || '').trim();
+
+  const handleIconFile = async (file: File | null) => {
+    if (!file) return;
+    setIconLoadError(false);
+    setIconUploadError(null);
+
+    // Keep payload sizes reasonable for persistence.
+    const maxBytes = 1 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setIconUploadError(t('upload_icon_too_large'));
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('read_failed'));
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.readAsDataURL(file);
+      });
+
+      setFormData((prev) => ({ ...prev, iconUrl: dataUrl }));
+    } catch (_err) {
+      setIconUploadError(t('upload_icon_failed'));
+    }
+  };
 
   // Helper to calculate next billing date
   const calculateNextDate = useCallback((startStr: string, freq: Frequency) => {
@@ -106,6 +133,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
             notificationsEnabled: initialData.notificationsEnabled !== undefined ? initialData.notificationsEnabled : true
         });
         setIconLoadError(false);
+        setIconUploadError(null);
       } else {
         // Default Initialization for New Subscription
         const today = new Date().toISOString().split('T')[0];
@@ -127,6 +155,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           notificationsEnabled: true
         });
         setIconLoadError(false);
+        setIconUploadError(null);
       }
     }
   }, [isOpen, initialData, settings.customCategories, settings.customPaymentMethods, calculateNextDate]);
@@ -194,14 +223,14 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
             <div className="flex items-start gap-4">
               <div className="w-16 h-16 rounded-2xl bg-white/70 dark:bg-slate-900/40 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
 	                {iconUrl && !iconLoadError ? (
-	                  <img
-	                    src={iconUrl}
-	                    alt={String(formData.name || 'icon')}
-	                    className="w-full h-full object-contain rounded-2xl"
-	                    loading="lazy"
-	                    referrerPolicy="no-referrer"
-	                    onError={() => setIconLoadError(true)}
-	                  />
+                  <img
+                    src={iconUrl}
+                    alt={String(formData.name || 'icon')}
+                    className="w-full h-full object-contain"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={() => setIconLoadError(true)}
+                  />
                 ) : (
                   <span className="text-xl font-bold text-primary-600">
                     {String(formData.name || 'S').charAt(0).toUpperCase()}
@@ -225,6 +254,22 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                   }}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">{t('icon_url_tip')}</p>
+                {iconUploadError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{iconUploadError}</p>
+                )}
+
+                <div className="flex items-center gap-3 pt-1">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100/70 dark:bg-slate-700/60 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      className="hidden"
+                      onChange={(e) => handleIconFile(e.target.files?.[0] || null)}
+                    />
+                    <span>{t('upload_from_device')}</span>
+                  </label>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{t('upload_icon_hint')}</span>
+                </div>
               </div>
 
               {iconUrl && (

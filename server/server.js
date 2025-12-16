@@ -189,7 +189,8 @@ app.use(
   })
 );
 
-app.use(express.json());
+// Allow larger payloads because subscriptions can embed uploaded icon data URLs.
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '10mb' }));
 
 // --- Defaults for user data ---
 const defaultSettings = () => ({
