@@ -27,6 +27,7 @@ type Translator = (key: any) => string;
 interface PaymentRecord {
     subId: string;
     subName: string;
+    iconUrl?: string;
     category: string;
     date: Date;
     formattedDate: string;
@@ -58,7 +59,24 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {records.map((rec, idx) => (
                   <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{rec.subName}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {rec.iconUrl ? (
+                            <img
+                              src={rec.iconUrl}
+                              alt={rec.subName}
+                              className="w-5 h-5 object-contain flex-shrink-0"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className="w-5 h-5 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {String(rec.subName || 'S').charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="truncate">{rec.subName}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{rec.formattedDate}</td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-2">
@@ -156,9 +174,9 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     // --- Helper Functions ---
 
     // Generate billing events for a subscription up to today
-    const getAllBillingEvents = (sub: Subscription): PaymentRecord[] => {
-        const events: PaymentRecord[] = [];
-        if (!sub.startDate) return events;
+	    const getAllBillingEvents = (sub: Subscription): PaymentRecord[] => {
+	        const events: PaymentRecord[] = [];
+	        if (!sub.startDate) return events;
         
         let currentDate = new Date(sub.startDate);
         currentDate.setHours(0, 0, 0, 0);
@@ -171,6 +189,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	            events.push({
 	                subId: sub.id,
 	                subName: sub.name,
+                  iconUrl: sub.iconUrl,
 	                category: displayCategoryLabel(sub.category, lang),
 	                date: new Date(currentDate),
 	                formattedDate: currentDate.toISOString().split('T')[0],
@@ -438,8 +457,8 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     </ResponsiveContainer>
   );
 
-  const renderCategoryChart = () => (
-    <div className="h-full flex items-center gap-6">
+	  const renderCategoryChart = () => (
+	    <div className="h-full flex items-center gap-6">
       <div className="flex-1 h-full min-h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
@@ -458,29 +477,40 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
               </Pie>
-              <Tooltip 
-                      formatter={(value: number, name: string, props: any) => [
-                          `$${value.toFixed(2)} (${t('sub_count')}: ${props.payload.count})`, 
-                          `${name}`
-                      ]}
-                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-              />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="w-48 space-y-2">
-        {categoryPieData.map((entry, index) => (
-          <div key={entry.name} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span className="truncate" title={entry.name}>{entry.name}</span>
-              </div>
-              <span className="text-xs text-gray-400">{entry.percentage.toFixed(0)}%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+	              <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const data = payload[0]?.payload;
+                    if (!data) return null;
+                    return (
+                      <div className="mac-surface-soft rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
+                          <div className="font-semibold text-gray-900 truncate">{String(data.name)}</div>
+                        </div>
+                        <div className="text-gray-600 mt-1">{`${data.percentage.toFixed(0)}% · $${Number(data.value || 0).toFixed(2)}`}</div>
+                        <div className="text-gray-600">{`${t('sub_count')}: ${data.count}`}</div>
+                      </div>
+                    );
+                  }}
+                />
+	          </PieChart>
+	        </ResponsiveContainer>
+	      </div>
+	      <div className="w-48 space-y-2">
+	        {categoryPieData.map((entry, index) => (
+	          <div key={entry.name} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
+	              <div className="flex items-center gap-2 min-w-0">
+	                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <CategoryGlyph category={entry.name} containerSize={18} size={12} />
+	                <span className="truncate" title={entry.name}>{entry.name}</span>
+	              </div>
+	              <span className="text-xs text-gray-400">{entry.percentage.toFixed(0)}%</span>
+	          </div>
+	        ))}
+	      </div>
+	    </div>
+	  );
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">

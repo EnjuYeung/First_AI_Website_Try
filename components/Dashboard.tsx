@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 import { Subscription, Frequency, AppSettings } from '../types';
-import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, CreditCard } from 'lucide-react';
+import { DollarSign, TrendingUp, Activity, CheckCircle, Clock } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
@@ -174,11 +174,11 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     });
 
     // Determine Highest Sub (by single billing amount, converted to USD)
-    let highestSub = { name: 'None', value: 0, currency: 'USD' };
+    let highestSub: { name: string; value: number; currency: string; iconUrl?: string } = { name: 'None', value: 0, currency: 'USD' };
     subscriptions.forEach(sub => {
         const usd = toUSD(sub.price, sub.currency);
         if (usd > highestSub.value) {
-            highestSub = { name: sub.name, value: usd, currency: 'USD' };
+            highestSub = { name: sub.name, value: usd, currency: 'USD', iconUrl: sub.iconUrl };
         }
     });
 
@@ -292,9 +292,45 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const data = payload[0]?.payload;
     if (!data) return null;
     return (
-      <div className="bg-white rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
-        {`${data.name} (${data.percentage ?? 0}%)：$${Number(data.value || 0).toFixed(1)}`}
+      <div className="mac-surface-soft rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+        <div className="flex items-center gap-2">
+          <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
+          <div className="font-semibold text-gray-900 truncate">{String(data.name)}</div>
+        </div>
+        <div className="text-gray-600 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(1)}`}</div>
       </div>
+    );
+  };
+
+  const renderCategorySpendTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0]?.payload;
+    if (!data) return null;
+    return (
+      <div className="mac-surface-soft rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+        <div className="flex items-center gap-2">
+          <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
+          <div className="font-semibold text-gray-900 truncate">{String(data.name)}</div>
+        </div>
+        <div className="text-gray-600 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(2)}`}</div>
+      </div>
+    );
+  };
+
+  const CategoryAxisTick = ({ x, y, payload }: any) => {
+    const value = String(payload?.value ?? '');
+    const width = 140;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <foreignObject x={-width} y={-12} width={width} height={24}>
+          <div xmlns="http://www.w3.org/1999/xhtml" className="flex items-center justify-end gap-2 pr-1">
+            <CategoryGlyph category={value} containerSize={18} size={12} />
+            <span className="text-xs text-gray-400 truncate max-w-[104px]" title={value}>
+              {value}
+            </span>
+          </div>
+        </foreignObject>
+      </g>
     );
   };
 
@@ -366,21 +402,33 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 
        {/* Stats Cards Row 2: Highlights (Moved from Statistics) */}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           {/* Highest Sub */}
-	           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <div>
-                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('highest_sub')}</p>
-                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.highestSub.name}>
-                        {dashboardData.highestSub.name}
-                     </h3>
-                     <p className="text-xs text-gray-400 mt-1">
-                        ${dashboardData.highestSub.value.toFixed(2)} / 12mo
-                     </p>
-                </div>
-                <div className="p-3 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-xl">
-                    <CreditCard size={24}/>
-                </div>
-           </div>
+	           {/* Highest Sub */}
+		           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+	                <div>
+	                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('highest_sub')}</p>
+	                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.highestSub.name}>
+	                        {dashboardData.highestSub.name}
+	                     </h3>
+	                     <p className="text-xs text-gray-400 mt-1">
+	                        ${dashboardData.highestSub.value.toFixed(2)} / 12mo
+	                     </p>
+	                </div>
+                  {dashboardData.highestSub.iconUrl ? (
+                    <div className="w-11 h-11 flex items-center justify-center">
+                      <img
+                        src={dashboardData.highestSub.iconUrl}
+                        alt={dashboardData.highestSub.name}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-11 h-11 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-lg">
+                      {String(dashboardData.highestSub.name || 'S').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+	           </div>
 
 	           {/* Top Category */}
 	           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
@@ -423,32 +471,32 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: number, name: string, props: any) => [`$${value}`, `${name} (${props.payload.percentage}%)`]}
-                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                    />
-                  </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className="w-48 space-y-2">
-                {dashboardData.categoryData.map((entry, index) => (
-                  <div key={entry.name} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                      <span className="truncate" title={entry.name}>{entry.name}</span>
-                    </div>
-                    <span className="text-xs text-gray-400">{entry.percentage}%</span>
-                  </div>
-                ))}
-              </div>
+	                    <Tooltip 
+	                      content={renderCategorySpendTooltip}
+	                    />
+	                  </PieChart>
+	                  </ResponsiveContainer>
+	                </div>
+	              </div>
+	              <div className="w-48 space-y-2">
+	                {dashboardData.categoryData.map((entry, index) => (
+	                  <div key={entry.name} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
+	                    <div className="flex items-center gap-2 min-w-0">
+	                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <CategoryGlyph category={entry.name} containerSize={18} size={12} />
+	                      <span className="truncate" title={entry.name}>{entry.name}</span>
+	                    </div>
+	                    <span className="text-xs text-gray-400">{entry.percentage}%</span>
+	                  </div>
+	                ))}
+	              </div>
             </div>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              No data available
-            </div>
-          )}
-        </div>
+	          ) : (
+	            <div className="h-full flex items-center justify-center text-gray-400">
+	              {t('no_data_available')}
+	            </div>
+	          )}
+	        </div>
 
         {/* Yearly Breakdown Bar Chart */}
 	        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 overflow-hidden">
@@ -460,7 +508,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                   <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 24, left: 10, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" hide domain={[0, 'dataMax']} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12, fill: '#9ca3af'}} />
+	                    <YAxis dataKey="name" type="category" width={150} tick={<CategoryAxisTick />} />
                     <Tooltip 
                       cursor={{fill: 'transparent'}}
                       content={renderYearlyTooltip}
@@ -508,7 +556,24 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                             {dashboardData.recentPayments.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.sub.name}</td>
+	                                    <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {item.sub.iconUrl ? (
+                                            <img
+                                              src={item.sub.iconUrl}
+                                              alt={item.sub.name}
+                                              className="w-5 h-5 object-contain flex-shrink-0"
+                                              loading="lazy"
+                                              referrerPolicy="no-referrer"
+                                            />
+                                          ) : (
+                                            <span className="w-5 h-5 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                              {String(item.sub.name || 'S').charAt(0).toUpperCase()}
+                                            </span>
+                                          )}
+                                          <span className="truncate">{item.sub.name}</span>
+                                        </div>
+                                      </td>
 	                                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400">
 	                                      <div className="flex items-center gap-2">
 	                                        <CategoryGlyph category={item.sub.category} containerSize={18} size={12} />
@@ -553,7 +618,24 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                                 const days = getDaysRemaining(item.date);
                                 return (
                                 <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.sub.name}</td>
+	                                    <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {item.sub.iconUrl ? (
+                                            <img
+                                              src={item.sub.iconUrl}
+                                              alt={item.sub.name}
+                                              className="w-5 h-5 object-contain flex-shrink-0"
+                                              loading="lazy"
+                                              referrerPolicy="no-referrer"
+                                            />
+                                          ) : (
+                                            <span className="w-5 h-5 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                              {String(item.sub.name || 'S').charAt(0).toUpperCase()}
+                                            </span>
+                                          )}
+                                          <span className="truncate">{item.sub.name}</span>
+                                        </div>
+                                      </td>
 	                                    <td className="px-5 py-3 text-gray-500 dark:text-gray-400">
 	                                      <div className="flex items-center gap-2">
 	                                        <CategoryGlyph category={item.sub.category} containerSize={18} size={12} />

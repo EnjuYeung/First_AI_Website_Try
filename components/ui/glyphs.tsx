@@ -130,6 +130,7 @@ function resolveCategory(category: string): { icon: LucideIcon; tone: Tone } {
     v.includes('gas') ||
     v.includes('internet') ||
     v.includes('utility') ||
+    v.includes('公用事业') ||
     v.includes('水') ||
     v.includes('电') ||
     v.includes('燃气') ||
