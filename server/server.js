@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import speakeasy from 'speakeasy';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -72,6 +73,7 @@ const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
 );
 
 const DATA_DIR = path.join(__dirname, 'data');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
 const EXCHANGE_RATE_KEYPAIR_FILE = path.join(DATA_DIR, 'exchange-rate-keypair.json');
 const DEFAULT_RULE_CHANNELS = {
@@ -189,8 +191,18 @@ app.use(
   })
 );
 
-// Allow larger payloads because subscriptions can embed uploaded icon data URLs.
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '10mb' }));
+// Allow slightly larger payloads (legacy icon data URLs may exist in stored subscriptions).
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '2mb' }));
+
+// Publicly serve uploaded icons by opaque filename (proxied under /api by nginx).
+app.use(
+  '/api/uploads',
+  express.static(UPLOADS_DIR, {
+    fallthrough: false,
+    maxAge: '365d',
+    immutable: true
+  })
+);
 
 // --- Defaults for user data ---
 const defaultSettings = () => ({
@@ -266,7 +278,33 @@ const defaultUserData = () => ({
 // --- Helpers: file IO ---
 const ensureDataDir = async () => {
   await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(UPLOADS_DIR, { recursive: true });
 };
+
+const MAX_ICON_BYTES = Number(process.env.MAX_ICON_BYTES || 1024 * 1024);
+const allowedIconMimeTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']);
+const iconExtFromMime = (mime) => {
+  if (mime === 'image/png') return '.png';
+  if (mime === 'image/jpeg') return '.jpg';
+  if (mime === 'image/webp') return '.webp';
+  if (mime === 'image/svg+xml') return '.svg';
+  return '';
+};
+
+const iconUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = iconExtFromMime(file.mimetype) || path.extname(file.originalname || '') || '';
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    }
+  }),
+  limits: { fileSize: MAX_ICON_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedIconMimeTypes.has(file.mimetype)) return cb(new Error('unsupported_file_type'));
+    cb(null, true);
+  }
+});
 
 const loadCredentials = async () => {
   await ensureDataDir();
@@ -918,6 +956,21 @@ app.get('/api/me', authMiddleware, (req, res) => {
 app.get('/api/data', authMiddleware, async (req, res) => {
   const data = await loadUserData(req.user.username);
   res.json(data);
+});
+
+app.post('/api/icons', authMiddleware, async (req, res) => {
+  await ensureDataDir();
+  iconUpload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ ok: false, message: 'icon_too_large' });
+      }
+      return res.status(400).json({ ok: false, message: err?.message || 'upload_failed' });
+    }
+    const file = req.file;
+    if (!file?.filename) return res.status(400).json({ ok: false, message: 'missing_file' });
+    return res.json({ ok: true, url: `/api/uploads/${file.filename}` });
+  });
 });
 
 app.put('/api/data', authMiddleware, async (req, res) => {

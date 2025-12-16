@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, RefreshCw, Bell } from 'lucide-react';
+import { X, RefreshCw, Bell, Loader2 } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { uploadIconFile } from '../services/storageService';
 
 interface Props {
   isOpen: boolean;
@@ -48,6 +49,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
   const [iconLoadError, setIconLoadError] = useState(false);
   const [iconUploadError, setIconUploadError] = useState<string | null>(null);
+  const [isIconUploading, setIsIconUploading] = useState(false);
   const iconUrl = String(formData.iconUrl || '').trim();
 
   const handleIconFile = async (file: File | null) => {
@@ -63,16 +65,20 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     }
 
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('read_failed'));
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.readAsDataURL(file);
-      });
-
-      setFormData((prev) => ({ ...prev, iconUrl: dataUrl }));
-    } catch (_err) {
-      setIconUploadError(t('upload_icon_failed'));
+      setIsIconUploading(true);
+      const uploadedUrl = await uploadIconFile(file);
+      setFormData((prev) => ({ ...prev, iconUrl: uploadedUrl }));
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (msg.includes('icon_too_large') || msg.includes('LIMIT_FILE_SIZE')) {
+        setIconUploadError(t('upload_icon_too_large'));
+      } else if (msg.includes('unsupported_file_type')) {
+        setIconUploadError(t('upload_icon_unsupported'));
+      } else {
+        setIconUploadError(t('upload_icon_failed'));
+      }
+    } finally {
+      setIsIconUploading(false);
     }
   };
 
@@ -250,6 +256,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                   value={String(formData.iconUrl || '')}
                   onChange={(e) => {
                     setIconLoadError(false);
+                    setIconUploadError(null);
                     setFormData({ ...formData, iconUrl: e.target.value });
                   }}
                 />
@@ -264,9 +271,17 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                       type="file"
                       accept="image/png,image/jpeg,image/svg+xml,image/webp"
                       className="hidden"
+                      disabled={isIconUploading}
                       onChange={(e) => handleIconFile(e.target.files?.[0] || null)}
                     />
-                    <span>{t('upload_from_device')}</span>
+                    {isIconUploading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>{t('uploading')}</span>
+                      </>
+                    ) : (
+                      <span>{t('upload_from_device')}</span>
+                    )}
                   </label>
                   <span className="text-xs text-gray-500 dark:text-gray-400">{t('upload_icon_hint')}</span>
                 </div>
@@ -440,7 +455,8 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
           <button
             type="submit"
-            className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 mt-2"
+            disabled={isIconUploading}
+            className="w-full py-4 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-600/60 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 mt-2"
           >
             {initialData ? t('save') : t('add_new')}
           </button>

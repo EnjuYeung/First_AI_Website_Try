@@ -90,6 +90,36 @@ const authHeaders = () => {
   return headers;
 };
 
+const authHeaderOnly = () => {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
+
+export const uploadIconFile = async (file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+  const resp = await fetch(`${API_BASE}/icons`, {
+    method: 'POST',
+    headers: authHeaderOnly(),
+    body: form
+  });
+  if (!resp.ok) {
+    let message = 'upload_failed';
+    try {
+      const parsed = await resp.json();
+      message = parsed?.message || message;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+  const data = await resp.json();
+  if (!data?.ok || !data?.url) throw new Error('upload_failed');
+  return String(data.url);
+};
+
 const normalizeSubscription = (sub: any): Subscription => {
   const category = canonicalCategoryKey(sub?.category || 'Other') || 'Other';
   const paymentMethod = canonicalPaymentMethodKey(sub?.paymentMethod || 'Credit Card') || 'Credit Card';
