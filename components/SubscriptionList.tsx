@@ -526,11 +526,11 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
                           {sub.iconUrl ? (
-                              <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-600 border border-gray-200 dark:border-gray-600 overflow-hidden flex-shrink-0">
-                                   <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain" />
+                              <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                                   <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain" loading="lazy" referrerPolicy="no-referrer" />
                               </div>
                           ) : (
-                              <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                              <div className="w-10 h-10 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-lg flex-shrink-0">
                               {sub.name.charAt(0).toUpperCase()}
                               </div>
                           )}
@@ -608,7 +608,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                   {filteredSubscriptions.length === 0 && (
                     <tr>
                        <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                          No subscriptions found matching your criteria.
+                          {t('no_subscriptions')}
                        </td>
                     </tr>
                   )}
@@ -663,8 +663,8 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                      {/* Card Content */}
                      <div className="flex flex-col items-center text-center mt-2">
                          {sub.iconUrl ? (
-                             <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-slate-700 p-1 mb-3 relative">
-                                 <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain rounded-xl" />
+                             <div className="w-14 h-14 mb-3 relative flex items-center justify-center">
+                                 <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain" loading="lazy" referrerPolicy="no-referrer" />
                                  {sub.status === 'cancelled' && (
                                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
                                  )}

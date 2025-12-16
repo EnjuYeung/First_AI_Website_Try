@@ -41,9 +41,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     status: 'active',
     startDate: new Date().toISOString().split('T')[0],
     nextBillingDate: '',
+    iconUrl: '',
     notes: '',
     notificationsEnabled: true
   });
+
+  const [iconLoadError, setIconLoadError] = useState(false);
+  const iconUrl = String(formData.iconUrl || '').trim();
 
   // Helper to calculate next billing date
   const calculateNextDate = useCallback((startStr: string, freq: Frequency) => {
@@ -98,8 +102,10 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         setFormData({
             ...initialData,
             status: initialData.status || 'active',
+            iconUrl: initialData.iconUrl || '',
             notificationsEnabled: initialData.notificationsEnabled !== undefined ? initialData.notificationsEnabled : true
         });
+        setIconLoadError(false);
       } else {
         // Default Initialization for New Subscription
         const today = new Date().toISOString().split('T')[0];
@@ -116,9 +122,11 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           status: 'active',
           startDate: today,
           nextBillingDate: initialNextBill, // Set calculated value immediately
+          iconUrl: '',
           notes: '',
           notificationsEnabled: true
         });
+        setIconLoadError(false);
       }
     }
   }, [isOpen, initialData, settings.customCategories, settings.customPaymentMethods, calculateNextDate]);
@@ -149,7 +157,8 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     onSave({
       id: initialData?.id || generateId(),
       ...formData as Subscription,
-      price: Number(formData.price)
+      price: Number(formData.price),
+      iconUrl: iconUrl.length > 0 ? iconUrl : undefined
     });
     onClose();
   };
@@ -178,6 +187,60 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
+          </div>
+
+          {/* 图标设置（在线链接） */}
+          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-white/70 dark:bg-slate-900/40 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
+	                {iconUrl && !iconLoadError ? (
+	                  <img
+	                    src={iconUrl}
+	                    alt={String(formData.name || 'icon')}
+	                    className="w-full h-full object-contain rounded-2xl"
+	                    loading="lazy"
+	                    referrerPolicy="no-referrer"
+	                    onError={() => setIconLoadError(true)}
+	                  />
+                ) : (
+                  <span className="text-xl font-bold text-primary-600">
+                    {String(formData.name || 'S').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {t('icon_url')}
+                </label>
+                <input
+                  type="url"
+                  inputMode="url"
+                  placeholder={t('icon_url_placeholder')}
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  value={String(formData.iconUrl || '')}
+                  onChange={(e) => {
+                    setIconLoadError(false);
+                    setFormData({ ...formData, iconUrl: e.target.value });
+                  }}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('icon_url_tip')}</p>
+              </div>
+
+              {iconUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIconLoadError(false);
+                    setFormData({ ...formData, iconUrl: '' });
+                  }}
+                  className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-200 bg-gray-100/70 dark:bg-slate-700/60 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors"
+                  title={t('clear_icon')}
+                >
+                  {t('clear_icon')}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* 价格/币种/周期/分类 */}
