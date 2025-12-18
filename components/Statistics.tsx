@@ -9,6 +9,7 @@ import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Calendar } from 'l
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
+import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
 
 interface Props {
   subscriptions: Subscription[];
@@ -178,8 +179,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	        const events: PaymentRecord[] = [];
 	        if (!sub.startDate) return events;
         
-        let currentDate = new Date(sub.startDate);
-        currentDate.setHours(0, 0, 0, 0);
+        let currentDate = parseLocalYMD(sub.startDate);
         const today = new Date();
         today.setHours(0,0,0,0);
 
@@ -192,7 +192,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                   iconUrl: sub.iconUrl,
 	                category: displayCategoryLabel(sub.category, lang),
 	                date: new Date(currentDate),
-	                formattedDate: currentDate.toISOString().split('T')[0],
+	                formattedDate: formatLocalYMD(currentDate),
 	                amount: sub.price,
 	                amountUsd: convertToUSD(sub.price, sub.currency),
 	                currency: sub.currency,
@@ -297,7 +297,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         const days = Array(31).fill(0).map((_, i) => ({ day: i + 1, amount: 0, count: 0 }));
         
         subscriptions.filter(s => s.status === 'active').forEach(sub => {
-             const day = new Date(sub.startDate).getDate();
+             const day = parseLocalYMD(sub.startDate).getDate();
              if (day >= 1 && day <= 31) {
                  days[day - 1].amount += convertToUSD(sub.price, sub.currency);
                  days[day - 1].count += 1;

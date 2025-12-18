@@ -6,6 +6,7 @@ import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 import { uploadIconFile } from '../services/storageService';
+import { getTodayLocalYMD } from '../services/dateUtils';
 
 interface Props {
   isOpen: boolean;
@@ -40,7 +41,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     category: 'Other',
     paymentMethod: 'Credit Card',
     status: 'active',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: getTodayLocalYMD(),
     nextBillingDate: '',
     iconUrl: '',
     notes: '',
@@ -142,7 +143,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         setIconUploadError(null);
       } else {
         // Default Initialization for New Subscription
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocalYMD();
         const defaultFreq = Frequency.MONTHLY;
         const initialNextBill = calculateNextDate(today, defaultFreq);
 

@@ -5,6 +5,7 @@ import { Edit2, Trash2, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, C
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { parseLocalYMD } from '../services/dateUtils';
 
 interface Props {
   subscriptions: Subscription[];
@@ -222,8 +223,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
         // Date comparison
         if (sortConfig.key === 'nextBillingDate') {
-          aValue = new Date(a.nextBillingDate).getTime();
-          bValue = new Date(b.nextBillingDate).getTime();
+          const aTime = parseLocalYMD(a.nextBillingDate).getTime();
+          const bTime = parseLocalYMD(b.nextBillingDate).getTime();
+          aValue = Number.isFinite(aTime) ? aTime : 0;
+          bValue = Number.isFinite(bTime) ? bTime : 0;
         }
 
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -260,10 +263,11 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
 
 
   const getDaysRemaining = (dateStr: string) => {
+    if (!dateStr) return Infinity;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const target = new Date(dateStr);
-    target.setHours(0, 0, 0, 0);
+    const target = parseLocalYMD(dateStr);
+    if (Number.isNaN(target.getTime())) return Infinity;
     
     const diffTime = target.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

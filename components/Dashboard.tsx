@@ -6,6 +6,7 @@ import { DollarSign, TrendingUp, Activity, CheckCircle, Clock } from 'lucide-rea
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
+import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
 
 interface Props {
   subscriptions: Subscription[];
@@ -36,8 +37,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const events: Date[] = [];
     if (!sub.startDate) return events;
 
-    let currentDate = new Date(sub.startDate);
-    currentDate.setHours(0, 0, 0, 0);
+    let currentDate = parseLocalYMD(sub.startDate);
     
     // Safety check to prevent infinite loops if start date is invalid
     if (isNaN(currentDate.getTime())) return events;
@@ -148,8 +148,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       // 5. Upcoming Renewals (Next 7 Days)
       if (sub.status !== 'cancelled') {
           if (sub.nextBillingDate) {
-              const nextDate = new Date(sub.nextBillingDate);
-              nextDate.setHours(0,0,0,0);
+              const nextDate = parseLocalYMD(sub.nextBillingDate);
               if (nextDate > today && nextDate <= next7DaysEnd) {
                   upcomingRenewals.push({ sub, date: nextDate, cost: sub.price });
               }
@@ -254,7 +253,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 
 
   const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    return formatLocalYMD(date);
   };
 
   const getDaysRemaining = (date: Date) => {

@@ -5,6 +5,7 @@ import { getT } from '../services/i18n';
 import { Plus, Moon, Sun, Monitor, RefreshCw, Send, Loader2, Globe, Clock, Search, CheckCircle, X as XIcon, AlertTriangle, Save, Mail } from 'lucide-react';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { canonicalCategoryKey, canonicalPaymentMethodKey, displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { getTodayLocalYMD } from '../services/dateUtils';
 
 interface Props {
     settings: AppSettings;
@@ -260,7 +261,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   );
 
   const buildTestReminderMessage = () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayLocalYMD();
     return renderTemplateMessage({
       name: '测试订阅',
       nextBillingDate: today,

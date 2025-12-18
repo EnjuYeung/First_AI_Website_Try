@@ -592,6 +592,16 @@ const applySubscriptionAction = (subscription, action) => {
 
 const daysUntilDate = (dateString) => {
   if (!dateString) return Infinity;
+  const parseLocalYMD = (value) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+    if (!match) return new Date(value);
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const d = new Date(year, month - 1, day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
   const toStartOfDay = (d) => {
     const clone = new Date(d);
     clone.setHours(0, 0, 0, 0);
@@ -599,7 +609,7 @@ const daysUntilDate = (dateString) => {
   };
 
   const todayStart = toStartOfDay(new Date());
-  const targetStart = toStartOfDay(new Date(dateString));
+  const targetStart = toStartOfDay(parseLocalYMD(dateString));
   const diff = targetStart.getTime() - todayStart.getTime();
 
   // Use ceil so a target 2.2 days away counts as 3 full days remaining
