@@ -2,16 +2,18 @@
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
 import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
-import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, Calendar, AlertTriangle, Lightbulb, Mail, Send } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, Calendar, AlertTriangle, Lightbulb, Mail, Send, Trash2 } from 'lucide-react';
 import { PaymentGlyph } from './ui/glyphs';
 import { displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
   lang: 'en' | 'zh';
   notifications: NotificationRecord[];
+  onDeleteNotification: (id: string) => void;
+  onClearNotifications: () => void;
 }
 
-const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
+const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNotification, onClearNotifications }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Filters
@@ -53,6 +55,19 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!window.confirm(t('confirm_delete_notification'))) return;
+    onDeleteNotification(id);
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const handleClearAll = () => {
+    if (sortedNotifications.length === 0) return;
+    if (!window.confirm(t('confirm_clear_notifications'))) return;
+    onClearNotifications();
+    setExpandedId(null);
   };
 
   // --- Render Helpers ---
@@ -109,9 +124,19 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
 
       {/* Filter Bar */}
       <div className="mac-surface p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-             <Search size={18} className="text-gray-400" />
-             <h3 className="font-bold text-gray-800 dark:text-white text-sm">{t('notifications_history')}</h3>
+          <div className="flex items-center justify-between gap-3 mb-1">
+             <div className="flex items-center gap-2">
+                <Search size={18} className="text-gray-400" />
+                <h3 className="font-bold text-gray-800 dark:text-white text-sm">{t('notifications_history')}</h3>
+             </div>
+             {sortedNotifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  {t('notif_clear')}
+                </button>
+             )}
           </div>
           
           <div className="flex flex-col xl:flex-row gap-4">
@@ -194,11 +219,21 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications }) => {
                                  </div>
                              </div>
 
-                             <div className="flex items-center gap-6">
+                             <div className="flex items-center gap-3">
                                   <div className="text-right hidden sm:block">
                                       <div className="text-sm font-bold text-gray-900 dark:text-white">{t('service')}: {notif.subscriptionName}</div>
                                       <div className="text-xs text-gray-400 mt-0.5">{formatTime(notif.timestamp)}</div>
                                   </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(notif.id);
+                                    }}
+                                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                    title={t('notif_delete')}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
                                   <ChevronDown size={20} className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                              </div>
                          </div>

@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const { 
     subscriptions, settings, notifications, isDataLoading, 
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription, 
-    batchDeleteSubscriptions, duplicateSubscription 
+    batchDeleteSubscriptions, duplicateSubscription, deleteNotification, clearNotifications 
   } = useAppData(isAuthenticated, logout);
   
   useTheme(settings.theme);
@@ -158,7 +158,12 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'notifications' && (
-            <NotificationHistory lang={settings.language} notifications={notifications} />
+            <NotificationHistory
+              lang={settings.language}
+              notifications={notifications}
+              onDeleteNotification={deleteNotification}
+              onClearNotifications={clearNotifications}
+            />
           )}
           
           {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={updateSettings} />}

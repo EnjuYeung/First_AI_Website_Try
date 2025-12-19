@@ -48,7 +48,7 @@ const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({ label, options, s
   };
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative z-40" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center justify-between gap-2 px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors ${selectedValues.length > 0 ? 'text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
@@ -58,7 +58,7 @@ const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({ label, options, s
       </button>
 
       {isOpen && (
-        <div className="absolute z-20 mt-2 w-56 mac-surface rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
+        <div className="absolute z-50 mt-2 w-56 mac-surface rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
           <div className="p-2 max-h-60 overflow-y-auto space-y-1">
              {options.map((opt) => (
                 <div 
@@ -318,7 +318,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   return (
     <div className="space-y-4">
       {/* Search and Filters Toolbar */}
-      <div className="mac-surface p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
+      <div className="mac-surface p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between relative z-30 overflow-visible">
         
         {/* Search */}
         <div className="relative w-full xl:w-64">
@@ -421,7 +421,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
       {/* Content Area */}
       {viewMode === 'list' ? (
           // LIST VIEW
-          <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden relative z-0">
             <div className="overflow-x-auto">
               <table className="w-full text-left align-middle">
                 <thead>

@@ -107,6 +107,17 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
     void persistData({ subscriptions: updated });
   };
 
+  const deleteNotification = (id: string) => {
+    const updated = notifications.filter(n => n.id !== id);
+    setNotifications(updated);
+    void persistData({ notifications: updated });
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+    void persistData({ notifications: [] });
+  };
+
   return {
     subscriptions,
     settings,
@@ -117,6 +128,8 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
     saveSubscription,
     deleteSubscription,
     batchDeleteSubscriptions,
-    duplicateSubscription
+    duplicateSubscription,
+    deleteNotification,
+    clearNotifications
   };
 };
