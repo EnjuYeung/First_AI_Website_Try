@@ -6,34 +6,7 @@ export enum Frequency {
   YEARLY = 'Yearly',
 }
 
-// Default categories as constants, but type is string to allow custom
-export const DEFAULT_CATEGORIES = [
-  'Entertainment',
-  'Software',
-  'Utilities',
-  'Lifestyle',
-  'Education',
-  'AI',
-  'Cloud Services',
-  'Reading',
-  'Streaming',
-  'Productivity',
-  'Insurance',
-  'Other'
-];
-
-// Default payment methods as constants, but type is string
-export const DEFAULT_PAYMENT_METHODS = [
-  'Credit Card',
-  'Debit Card',
-  'Apple Pay',
-  'Google Pay',
-  'WeChat Pay',
-  'Alipay',
-  'Crypto',
-  'PayPal',
-  'Other'
-];
+export { DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS } from './shared/constants.js';
 
 export const COMMON_TIMEZONES = [
   'UTC',

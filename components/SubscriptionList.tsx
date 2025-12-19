@@ -114,7 +114,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   // --- Extract Filter Options ---
   
   const categoriesOptionList = useMemo(() => {
-    const cats = new Set(subscriptions.map(s => s.category));
+    const cats = new Set<string>(subscriptions.map((s) => s.category));
     return Array.from(cats).map(c => ({
       value: c,
       label: displayCategoryLabel(c, lang),
@@ -127,7 +127,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   }, [lang]);
 
   const paymentMethodsOptionList = useMemo(() => {
-     const methods = new Set(subscriptions.map(s => s.paymentMethod || 'Credit Card'));
+     const methods = new Set<string>(subscriptions.map((s) => s.paymentMethod || 'Credit Card'));
      return Array.from(methods).map(m => ({
        value: m,
        label: displayPaymentMethodLabel(m, lang),

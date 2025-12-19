@@ -1,6 +1,8 @@
 
 import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, NotificationRecord } from '../types';
 import { canonicalCategoryKey, canonicalPaymentMethodKey } from './displayLabels';
+import { authHeaderOnly, authJsonHeaders, apiFetch, apiFetchJson, UnauthorizedError } from './apiClient';
+import { DEFAULT_REMINDER_TEMPLATE_STRING, normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
 
 const API_BASE = '/api';
 
@@ -9,24 +11,6 @@ export interface PersistedData {
   settings: AppSettings;
   notifications: NotificationRecord[];
 }
-
-const DEFAULT_REMINDER_TEMPLATE = JSON.stringify(
-  {
-    lines: [
-      '🔔 续订提醒通知',
-      '',
-      '📌 订阅{{name}}即将付款',
-      '',
-      '📅 付款日期：{{nextBillingDate}}',
-      '💰 订阅金额：{{price}} {{currency}}',
-      '💳 支付方式：{{paymentMethod}}',
-      '',
-      '⚠️ 请及时续订以避免服务中断。'
-    ]
-  },
-  null,
-  2
-);
 
 const DEFAULT_SETTINGS: AppSettings = {
   language: 'zh',
@@ -60,7 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     rules: {
       renewalReminder: true,
       reminderDays: 3,
-      template: DEFAULT_REMINDER_TEMPLATE,
+      template: DEFAULT_REMINDER_TEMPLATE_STRING,
       channels: {
         renewalReminder: ['telegram', 'email']
       }
@@ -83,24 +67,10 @@ const defaultData = (): PersistedData => ({
 
 export const getDefaultSettings = (): AppSettings => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
-const authHeaders = () => {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-};
-
-const authHeaderOnly = () => {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-};
-
 export const uploadIconFile = async (file: File): Promise<string> => {
   const form = new FormData();
   form.append('file', file);
-  const resp = await fetch(`${API_BASE}/icons`, {
+  const resp = await apiFetch(`${API_BASE}/icons`, {
     method: 'POST',
     headers: authHeaderOnly(),
     body: form
@@ -131,7 +101,7 @@ const normalizeSubscription = (sub: any): Subscription => {
 };
 
 const mergeSettings = (incoming?: AppSettings): AppSettings => {
-  const parsed = incoming || {};
+  const parsed: Partial<AppSettings> = incoming || {};
   if ('currencyApi' in parsed) {
     // @ts-ignore
     delete (parsed as any).currencyApi;
@@ -141,11 +111,15 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     delete (parsed as any).aiConfig;
   }
 
-  const parsedRules = parsed.notifications?.rules || {};
+  const parsedRules: Partial<AppSettings['notifications']['rules']> = parsed.notifications?.rules || {};
+  const normalizedTemplate =
+    !parsedRules.template || parsedRules.template === DEFAULT_REMINDER_TEMPLATE_STRING
+      ? DEFAULT_REMINDER_TEMPLATE_STRING
+      : normalizeReminderTemplateString(parsedRules.template);
   const normalizedRules = {
     renewalReminder: parsedRules.renewalReminder !== undefined ? parsedRules.renewalReminder : DEFAULT_SETTINGS.notifications.rules.renewalReminder,
     reminderDays: parsedRules.reminderDays ?? DEFAULT_SETTINGS.notifications.rules.reminderDays,
-    template: parsedRules.template || DEFAULT_REMINDER_TEMPLATE,
+    template: normalizedTemplate,
     channels: {
       ...DEFAULT_SETTINGS.notifications.rules.channels,
       ...(parsedRules.channels || {})
@@ -187,14 +161,14 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     },
     notifications: {
       ...DEFAULT_SETTINGS.notifications,
-      ...parsed.notifications,
+      ...(parsed.notifications || {}),
       rules: { 
         ...normalizedRules
       }
     },
     security: {
       ...DEFAULT_SETTINGS.security,
-      ...parsed.security
+      ...(parsed.security || {})
     },
     exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
     customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
@@ -205,19 +179,14 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
 
 export const fetchAllData = async (): Promise<PersistedData> => {
   try {
-    const resp = await fetch(`${API_BASE}/data`, {
-      headers: authHeaders()
-    });
-    if (resp.status === 401) throw new Error('unauthorized');
-    if (!resp.ok) throw new Error('failed_to_fetch');
-    const data = await resp.json();
+    const data = await apiFetchJson<any>(`${API_BASE}/data`, { headers: authJsonHeaders() });
     return {
       subscriptions: (data.subscriptions || []).map(normalizeSubscription),
       notifications: data.notifications || [],
       settings: mergeSettings(data.settings)
     };
   } catch (error: any) {
-    if (error?.message === 'unauthorized') {
+    if (error instanceof UnauthorizedError) {
       throw error;
     }
     console.error('Failed to fetch data from server', error);
@@ -227,12 +196,13 @@ export const fetchAllData = async (): Promise<PersistedData> => {
 
 export const saveAllData = async (data: PersistedData): Promise<void> => {
   try {
-    await fetch(`${API_BASE}/data`, {
+    await apiFetch(`${API_BASE}/data`, {
       method: 'PUT',
-      headers: authHeaders(),
+      headers: authJsonHeaders(),
       body: JSON.stringify(data)
     });
   } catch (error) {
+    if (error instanceof UnauthorizedError) throw error;
     console.error('Failed to save data to server', error);
   }
 };

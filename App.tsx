@@ -1,8 +1,6 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw, WalletCards } from 'lucide-react';
-import { Subscription, AppSettings, NotificationRecord } from './types';
-import { fetchAllData, saveAllData, getDefaultSettings } from './services/storageService';
+import { Subscription } from './types';
 import { getT } from './services/i18n';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
@@ -12,141 +10,37 @@ import Statistics from './components/Statistics';
 import NotificationHistory from './components/NotificationHistory';
 import LoginPage from './components/LoginPage';
 
-const App: React.FC = () => {
-  // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isDataLoading, setIsDataLoading] = useState(false);
+// Custom Hooks
+import { useAuth } from './hooks/useAuth';
+import { useAppData } from './hooks/useAppData';
+import { useTheme } from './hooks/useTheme';
 
-  // App State
+const App: React.FC = () => {
+  const { isAuthenticated, isLoadingAuth, login, logout } = useAuth();
+  const { 
+    subscriptions, settings, notifications, isDataLoading, 
+    loadRemoteData, updateSettings, saveSubscription, deleteSubscription, 
+    batchDeleteSubscriptions, duplicateSubscription 
+  } = useAppData(isAuthenticated, logout);
+  
+  useTheme(settings.theme);
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>('dashboard');
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
-  
-  // Logout Modal State
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
-  // Helper for translations
   const t = getT(settings.language);
 
-  useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-        setIsAuthenticated(true);
-    }
-    setIsLoadingAuth(false);
-
-    if (token) {
-        loadRemoteData();
-    }
-  }, []);
-
-  // Apply theme whenever settings change
-  useEffect(() => {
-    applyTheme(settings);
-  }, [settings.theme]);
-
-  const applyTheme = (themeSettings: AppSettings) => {
-    if (themeSettings.theme === 'dark' || (themeSettings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-  };
-
-  const handleSync = () => {
-    loadRemoteData();
-  };
-
-  const loadRemoteData = async () => {
-    setIsDataLoading(true);
-    try {
-      const data = await fetchAllData();
-      setSubscriptions(data.subscriptions);
-      setSettings(data.settings);
-      setNotifications(data.notifications || []);
-      applyTheme(data.settings);
-    } catch (err) {
-      console.error('Failed to load data', err);
-    } finally {
-      setIsDataLoading(false);
-    }
-  };
-
-  const persistData = (partial?: { subscriptions?: Subscription[]; settings?: AppSettings; notifications?: NotificationRecord[] }) => {
-    const payload = {
-      subscriptions: partial?.subscriptions ?? subscriptions,
-      settings: partial?.settings ?? settings,
-      notifications: partial?.notifications ?? notifications
-    };
-    saveAllData(payload);
-  };
-
-  // Update settings handler
-  const handleUpdateSettings = (newSettings: AppSettings) => {
-    setSettings(newSettings);
-    applyTheme(newSettings);
-    persistData({ settings: newSettings });
-  };
-
-  const handleSaveSubscription = (sub: Subscription) => {
-    let updated: Subscription[];
-    if (editingSub) {
-      updated = subscriptions.map(s => s.id === sub.id ? sub : s);
-    } else {
-      updated = [...subscriptions, sub];
-    }
-    setSubscriptions(updated);
-    persistData({ subscriptions: updated });
-    setEditingSub(null);
-  };
-
-  const handleDeleteSubscription = (id: string) => {
-    if (window.confirm(t('confirm_delete'))) {
-      const updated = subscriptions.filter(s => s.id !== id);
-      setSubscriptions(updated);
-      persistData({ subscriptions: updated });
-    }
-  };
-
-  const handleBatchDelete = (ids: string[]) => {
-    const message = t('confirm_batch_delete').replace('{count}', ids.length.toString());
-    if (window.confirm(message)) {
-      const updated = subscriptions.filter(s => !ids.includes(s.id));
-      setSubscriptions(updated);
-      persistData({ subscriptions: updated });
-    }
-  };
-
-  const handleDuplicateSubscription = (sub: Subscription) => {
-    const newId = typeof crypto !== 'undefined' && crypto.randomUUID 
-      ? crypto.randomUUID() 
-      : Date.now().toString(36) + Math.random().toString(36).substring(2);
-    
-    const prefix = t('copy_prefix');
-    const suffix = t('copy_suffix');
-
-    const newName = `${prefix}${sub.name}${suffix}`;
-
-    const newSub: Subscription = {
-      ...sub,
-      id: newId,
-      name: newName,
-      // Keep other fields same
-    };
-
-    const updated = [...subscriptions, newSub];
-    setSubscriptions(updated);
-    persistData({ subscriptions: updated });
-  };
-
+  // Handlers
   const handleEditSubscription = (sub: Subscription) => {
     setEditingSub(sub);
     setIsModalOpen(true);
+  };
+
+  const handleSaveWrapper = (sub: Subscription) => {
+    saveSubscription(sub, !!editingSub);
+    setEditingSub(null);
   };
 
   const openAddModal = () => {
@@ -154,42 +48,27 @@ const App: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Toggle Language Helper
   const toggleLanguage = () => {
-      handleUpdateSettings({ ...settings, language: settings.language === 'en' ? 'zh' : 'en' });
+      updateSettings({ ...settings, language: settings.language === 'en' ? 'zh' : 'en' });
   };
 
-  // Toggle Theme Helper
   const toggleTheme = () => {
       const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
-      handleUpdateSettings({ ...settings, theme: newTheme });
+      updateSettings({ ...settings, theme: newTheme });
   };
-
-  const handleLogin = (token: string) => {
-      localStorage.setItem('auth_token', token);
-      setIsAuthenticated(true);
-      loadRemoteData();
-  };
-
-  const handleLogoutClick = () => {
-      setIsLogoutModalOpen(true);
-  };
-
+  
   const handleLogoutConfirm = () => {
-      localStorage.removeItem('auth_token');
-      setIsAuthenticated(false);
+      logout();
       setIsLogoutModalOpen(false);
-      setActiveTab('dashboard'); // Reset tab
+      setActiveTab('dashboard');
   };
 
-  if (isLoadingAuth) {
-      return null; // Or a loading spinner
-  }
+  if (isLoadingAuth) return null;
 
   if (!isAuthenticated) {
       return (
           <LoginPage 
-            onLogin={handleLogin} 
+            onLogin={login} 
             lang={settings.language}
             toggleLanguage={toggleLanguage}
           />
@@ -198,10 +77,8 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col transition-colors duration-200">
-      
-      {/* Top Navigation Bar */}
+      {/* Header */}
       <header className="px-4 sm:px-6 h-16 flex items-center justify-between sticky top-0 z-20 bg-white/70 dark:bg-slate-950/50 backdrop-blur-xl border-b border-white/30 dark:border-white/10 shadow-mac-sm">
-         {/* Left: Branding & Nav Links */}
          <div className="flex items-center gap-8">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-primary-600/90 to-indigo-500/90 text-white shadow-mac-sm ring-1 ring-white/30">
@@ -210,50 +87,29 @@ const App: React.FC = () => {
               <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-gray-900 dark:text-white">Subm</h1>
             </div>
             
-            {/* Nav Links */}
             <nav className="hidden md:flex items-center gap-1 ml-4">
-                <button 
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'dashboard' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                >
-                   <Home size={18} />
-                   <span>{t('dashboard')}</span>
-                </button>
-                 <button 
-                  onClick={() => setActiveTab('list')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'list' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                >
-                   <CreditCard size={18} />
-                   <span>{t('subscriptions')}</span>
-                </button>
-                 <button 
-                  onClick={() => setActiveTab('analytics')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'analytics' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                >
-                   <BarChart2 size={18} />
-                   <span>{t('analytics')}</span>
-                </button>
-                 <button 
-                  onClick={() => setActiveTab('notifications')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'notifications' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                >
-                   <BellRing size={18} />
-                   <span>{t('notifications_history')}</span>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('settings')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === 'settings' ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                >
-                   <SettingsIcon size={18} />
-                   <span>{t('settings')}</span>
-                </button>
+                {[
+                  { id: 'dashboard', icon: Home, label: t('dashboard') },
+                  { id: 'list', icon: CreditCard, label: t('subscriptions') },
+                  { id: 'analytics', icon: BarChart2, label: t('analytics') },
+                  { id: 'notifications', icon: BellRing, label: t('notifications_history') },
+                  { id: 'settings', icon: SettingsIcon, label: t('settings') }
+                ].map(tab => (
+                  <button 
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === tab.id ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
+                  >
+                     <tab.icon size={18} />
+                     <span>{tab.label}</span>
+                  </button>
+                ))}
             </nav>
          </div>
 
-         {/* Right: Controls */}
          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-200">
             <button
-              onClick={handleSync}
+              onClick={loadRemoteData}
               className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
               title="Sync from server"
               disabled={isDataLoading}
@@ -264,20 +120,14 @@ const App: React.FC = () => {
             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('appearance')}>
                 {settings.theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button onClick={handleLogoutClick} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('logout')}><LogOut size={18} /></button>
+            <button onClick={() => setIsLogoutModalOpen(true)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('logout')}><LogOut size={18} /></button>
          </div>
       </header>
 
-
       {/* Main Content */}
       <main className="flex-1 p-5 sm:p-6 lg:p-10 overflow-x-hidden max-w-7xl mx-auto w-full">
-        {/* Header Section for Page Content */}
         <div className="flex justify-between items-center mb-8">
-            {/* Optional Breadcrumb or Page Title if strictly needed, otherwise implied by tabs */}
-             <div>
-                 {/* Empty div to keep layout if add button is on right */}
-             </div>
-          
+             <div></div>
           {activeTab !== 'settings' && activeTab !== 'notifications' && (
             <button
                 onClick={openAddModal}
@@ -296,9 +146,9 @@ const App: React.FC = () => {
             <SubscriptionList 
               subscriptions={subscriptions} 
               onEdit={handleEditSubscription}
-              onDelete={handleDeleteSubscription}
-              onDuplicate={handleDuplicateSubscription}
-              onBatchDelete={handleBatchDelete}
+              onDelete={deleteSubscription}
+              onDuplicate={duplicateSubscription}
+              onBatchDelete={batchDeleteSubscriptions}
               lang={settings.language}
             />
           )}
@@ -311,21 +161,19 @@ const App: React.FC = () => {
             <NotificationHistory lang={settings.language} notifications={notifications} />
           )}
           
-          {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={handleUpdateSettings} />}
+          {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={updateSettings} />}
         </div>
       </main>
 
-      {/* Subscription Form Modal */}
       <SubscriptionForm 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveSubscription}
+        onSave={handleSaveWrapper}
         initialData={editingSub}
         settings={settings}
         lang={settings.language}
       />
 
-      {/* Logout Confirmation Modal */}
       {isLogoutModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
               <div className="mac-surface rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center animate-pop-in">
@@ -333,9 +181,7 @@ const App: React.FC = () => {
                       <LogOut size={32} />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('logout')}</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-6">
-                      {t('confirm_logout')}
-                  </p>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">{t('confirm_logout')}</p>
                   <div className="flex gap-3">
                       <button 
                           onClick={() => setIsLogoutModalOpen(false)}

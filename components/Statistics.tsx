@@ -623,10 +623,18 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
       {/* 4. Detailed History Section (Cards) */}
       <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-               <div>
-                   <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('payment_details')}</h3>
-                   <p className="text-sm text-gray-500">{t(`history_3_${historyMode}s`)}</p>
-               </div>
+	               <div>
+	                   <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('payment_details')}</h3>
+	                   <p className="text-sm text-gray-500">
+	                     {t(
+	                       historyMode === 'month'
+	                         ? 'history_3_months'
+	                         : historyMode === 'quarter'
+	                           ? 'history_3_quarters'
+	                           : 'history_3_years'
+	                     )}
+	                   </p>
+	               </div>
                
                <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
                    {(['month', 'quarter', 'year'] as const).map(mode => (

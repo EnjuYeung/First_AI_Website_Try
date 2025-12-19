@@ -41,7 +41,6 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
         }
 
         const data = await resp.json();
-        localStorage.setItem('auth_token', data.token);
         onLogin(data.token);
     } catch (err) {
         console.error('Login error:', err);

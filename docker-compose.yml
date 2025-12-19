@@ -1,26 +1,57 @@
-version: "3.9"
+version: "3.8"
 
 services:
   web:
+    container_name: ai-website-web
     build: .
+    restart: always
     ports:
       - "3001:80" # host 3001 -> container 80 (frontend)
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - appnet
+    # Optional: Basic resource limits to prevent OOM
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
 
   backend:
+    container_name: ai-website-backend
     build:
       context: ./server
+    restart: always
     env_file:
       - ./server/.env
     volumes:
       - backend-data:/app/data
     ports:
-      - "3003:3001" # host 3003 -> backend container 3001
+      # Exposing backend port to host is useful for debugging but should be limited/removed in strict production.
+      # Internal communication happens via 'appnet' network on port 3001.
+      - "3003:3001" 
     networks:
       - appnet
+    healthcheck:
+      # Using wget because the base image is likely Alpine (which has wget but often not curl)
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
 
 networks:
   appnet:
