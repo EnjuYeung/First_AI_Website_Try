@@ -46,6 +46,30 @@ const atomicWriteJson = async (filePath, data) => {
   await fs.rename(tmpPath, filePath);
 };
 
+const pendingWrites = new Map();
+
+const waitForPendingWrite = async (key) => {
+  const pending = pendingWrites.get(key);
+  if (!pending) return;
+  try {
+    await pending;
+  } catch {
+    // ignore write failure for waiters
+  }
+};
+
+const queueWrite = async (key, writeFn) => {
+  const previous = pendingWrites.get(key) || Promise.resolve();
+  const next = previous.then(writeFn, writeFn);
+  pendingWrites.set(
+    key,
+    next.finally(() => {
+      if (pendingWrites.get(key) === next) pendingWrites.delete(key);
+    })
+  );
+  return next;
+};
+
 export const ensureDataDir = async () => {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
@@ -100,6 +124,7 @@ const mergeSettings = (incoming) => {
 export const createStorage = ({ adminUser, adminPass }) => {
   const loadCredentials = async () => {
     await ensureDataDir();
+    await waitForPendingWrite(CREDENTIALS_FILE);
     try {
       return await readJson(CREDENTIALS_FILE);
     } catch {
@@ -112,13 +137,15 @@ export const createStorage = ({ adminUser, adminPass }) => {
 
   const saveCredentials = async (creds) => {
     await ensureDataDir();
-    await atomicWriteJson(CREDENTIALS_FILE, creds);
+    await queueWrite(CREDENTIALS_FILE, () => atomicWriteJson(CREDENTIALS_FILE, creds));
   };
 
   const loadUserData = async (username) => {
     await ensureDataDir();
+    const filePath = userDataPath(username);
+    await waitForPendingWrite(filePath);
     try {
-      const parsed = await readJson(userDataPath(username));
+      const parsed = await readJson(filePath);
       const settings = mergeSettings(parsed.settings);
       return {
         subscriptions: parsed.subscriptions || [],
@@ -140,7 +167,8 @@ export const createStorage = ({ adminUser, adminPass }) => {
       notifications: data.notifications || [],
       settings,
     };
-    await atomicWriteJson(userDataPath(username), payload);
+    const filePath = userDataPath(username);
+    await queueWrite(filePath, () => atomicWriteJson(filePath, payload));
   };
 
   return {

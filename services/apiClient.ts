@@ -2,48 +2,15 @@ export class UnauthorizedError extends Error {
   name = 'UnauthorizedError';
 }
 
-const AUTH_TOKEN_KEY = 'auth_token';
-
-const canUseLocalStorage = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined';
-
-const notifyAuthChanged = () => {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('auth:changed'));
-};
-
-export const getAuthToken = (): string | null => {
-  if (!canUseLocalStorage()) return null;
-  return localStorage.getItem(AUTH_TOKEN_KEY);
-};
-
-export const setAuthToken = (token: string) => {
-  if (!canUseLocalStorage()) return;
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
-  notifyAuthChanged();
-};
-
-export const clearAuthToken = () => {
-  if (!canUseLocalStorage()) return;
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  notifyAuthChanged();
-};
-
-export const authHeaderOnly = (): Record<string, string> => {
-  const token = getAuthToken();
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-};
+export const authHeaderOnly = (): Record<string, string> => ({});
 
 export const authJsonHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
-  ...authHeaderOnly(),
 });
 
 export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const resp = await fetch(input, init);
+  const resp = await fetch(input, { credentials: 'include', ...init });
   if (resp.status === 401) {
-    clearAuthToken();
     throw new UnauthorizedError('unauthorized');
   }
   return resp;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetchJson, authHeaderOnly, clearAuthToken, getAuthToken, setAuthToken, UnauthorizedError } from '../services/apiClient';
+import { apiFetchJson, UnauthorizedError } from '../services/apiClient';
 
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -8,27 +8,16 @@ export const useAuth = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const syncFromStorage = () => {
-      if (cancelled) return;
-      setIsAuthenticated(!!getAuthToken());
-    };
-
     const init = async () => {
-      const token = getAuthToken();
-      if (!token) {
-        syncFromStorage();
-        setIsLoadingAuth(false);
-        return;
-      }
-
       try {
-        await apiFetchJson('/api/me', { headers: authHeaderOnly() });
-        syncFromStorage();
+        await apiFetchJson('/api/me');
+        if (!cancelled) setIsAuthenticated(true);
       } catch (err) {
         if (err instanceof UnauthorizedError) {
-          clearAuthToken();
+          if (!cancelled) setIsAuthenticated(false);
+        } else if (!cancelled) {
+          setIsAuthenticated(false);
         }
-        syncFromStorage();
       } finally {
         if (!cancelled) setIsLoadingAuth(false);
       }
@@ -36,23 +25,23 @@ export const useAuth = () => {
 
     init();
 
-    window.addEventListener('auth:changed', syncFromStorage as EventListener);
-    window.addEventListener('storage', syncFromStorage);
     return () => {
       cancelled = true;
-      window.removeEventListener('auth:changed', syncFromStorage as EventListener);
-      window.removeEventListener('storage', syncFromStorage);
     };
   }, []);
 
-  const login = useCallback((token: string) => {
-    setAuthToken(token);
+  const login = useCallback(() => {
     setIsAuthenticated(true);
   }, []);
 
-  const logout = useCallback(() => {
-    clearAuthToken();
-    setIsAuthenticated(false);
+  const logout = useCallback(async () => {
+    try {
+      await apiFetchJson('/api/logout', { method: 'POST' });
+    } catch {
+      // ignore logout failures
+    } finally {
+      setIsAuthenticated(false);
+    }
   }, []);
 
   return { isAuthenticated, isLoadingAuth, login, logout };

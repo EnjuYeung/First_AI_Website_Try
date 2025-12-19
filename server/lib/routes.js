@@ -19,6 +19,18 @@ const randomId = (crypto) =>
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+const isPlainObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const sanitizePersistedData = (payload) => {
+  const safe = isPlainObject(payload) ? payload : {};
+  return {
+    subscriptions: Array.isArray(safe.subscriptions) ? safe.subscriptions : [],
+    notifications: Array.isArray(safe.notifications) ? safe.notifications : [],
+    settings: isPlainObject(safe.settings) ? safe.settings : {},
+  };
+};
+
 export const registerRoutes = ({
   app,
   config,
@@ -140,7 +152,13 @@ export const registerRoutes = ({
     }
 
     const token = auth.signToken({ username });
-    res.json({ token, username });
+    auth.setAuthCookie(res, req, token);
+    res.json({ ok: true, username });
+  });
+
+  app.post('/api/logout', (req, res) => {
+    auth.clearAuthCookie(res, req);
+    res.json({ success: true });
   });
 
   app.get('/api/me', auth.authMiddleware, (req, res) => {
@@ -153,8 +171,8 @@ export const registerRoutes = ({
   });
 
   app.put('/api/data', auth.authMiddleware, async (req, res) => {
-    const { subscriptions = [], settings = {}, notifications = [] } = req.body || {};
-    await storage.saveUserData(req.user.username, { subscriptions, settings, notifications });
+    const payload = sanitizePersistedData(req.body);
+    await storage.saveUserData(req.user.username, payload);
     res.json({ success: true });
   });
 
@@ -325,7 +343,7 @@ export const registerRoutes = ({
     data.settings.security.pendingTwoFactorSecret = '';
 
     await storage.saveUserData(req.user.username, data);
-    res.json({ success: true, secret });
+    res.json({ success: true });
   });
 
   app.post('/api/2fa/disable', auth.authMiddleware, async (req, res) => {

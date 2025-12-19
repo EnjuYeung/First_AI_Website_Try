@@ -59,12 +59,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   }
 };
 
-const defaultData = (): PersistedData => ({
-  subscriptions: [],
-  settings: getDefaultSettings(),
-  notifications: []
-});
-
 export const getDefaultSettings = (): AppSettings => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
 export const uploadIconFile = async (file: File): Promise<string> => {
@@ -190,7 +184,7 @@ export const fetchAllData = async (): Promise<PersistedData> => {
       throw error;
     }
     console.error('Failed to fetch data from server', error);
-    return defaultData();
+    throw error;
   }
 };
 

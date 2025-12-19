@@ -385,11 +385,13 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
     setIs2faVerifying(true);
     try {
-      const data = await apiFetchJson<any>('/api/2fa/verify', {
+      await apiFetchJson<any>('/api/2fa/verify', {
         method: 'POST',
         headers: authJsonHeaders(),
         body: JSON.stringify({ code: twoFaCode }),
       });
+      const confirmedSecret =
+        settings.security.pendingTwoFactorSecret || settings.security.twoFactorSecret || '';
       setTwoFaCode('');
       setTwoFaQrUrl(null);
       setShowQr(false);
@@ -398,7 +400,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
         security: {
           ...settings.security,
           twoFactorEnabled: true,
-          twoFactorSecret: data.secret || settings.security.twoFactorSecret || '',
+          twoFactorSecret: confirmedSecret,
           pendingTwoFactorSecret: '',
         },
       });

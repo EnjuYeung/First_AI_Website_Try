@@ -4,7 +4,7 @@ import { getT } from '../services/i18n';
 import { Lock, User, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface Props {
-  onLogin: (token: string) => void;
+  onLogin: () => void;
   lang: 'en' | 'zh';
   toggleLanguage: () => void;
 }
@@ -27,6 +27,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
         const resp = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ username, password, code })
         });
 
@@ -40,8 +41,8 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
             return;
         }
 
-        const data = await resp.json();
-        onLogin(data.token);
+        await resp.json().catch(() => ({}));
+        onLogin();
     } catch (err) {
         console.error('Login error:', err);
         setError(t('connection_failed') || 'Network error');
