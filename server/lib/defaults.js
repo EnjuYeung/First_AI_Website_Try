@@ -55,4 +55,3 @@ export const defaultUserData = () => ({
   settings: defaultSettings(),
   notifications: [],
 });
-

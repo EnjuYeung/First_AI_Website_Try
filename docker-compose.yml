@@ -25,7 +25,8 @@ services:
   backend:
     container_name: ai-website-backend
     build:
-      context: ./server
+      context: .
+      dockerfile: server/Dockerfile
     restart: always
     env_file:
       - ./server/.env

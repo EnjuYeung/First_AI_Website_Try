@@ -144,4 +144,3 @@ export const createReminders = ({ config, storage, email }) => {
 
   return { startReminderScheduler, processRenewalReminders };
 };
-

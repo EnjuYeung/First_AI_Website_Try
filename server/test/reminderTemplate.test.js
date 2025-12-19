@@ -24,4 +24,3 @@ test('renderReminderTemplate replaces tokens', () => {
   assert.match(msg, /9\.99/);
   assert.match(msg, /USD/);
 });
-

@@ -353,4 +353,3 @@ export const registerRoutes = ({
   // Health check
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 };
-
