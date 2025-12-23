@@ -80,33 +80,31 @@ export const registerRoutes = ({
 
       const result = applySubscriptionAction(sub, action);
 
-      if (result.changed) {
-        data.notifications = data.notifications || [];
-        data.notifications.push({
-          id: randomId(crypto),
-          subscriptionName: sub.name,
-          type: 'subscription_change',
-          channel: 'telegram',
-          status: 'success',
-          timestamp: Date.now(),
-          details: {
-            message:
-              action === 'renewed'
-                ? '用户在 Telegram 确认已续订'
-                : '用户在 Telegram 标记为已弃用',
-            receiver:
-              callback.from?.username ||
-              callback.from?.id?.toString?.() ||
-              'unknown',
-            date: sub.nextBillingDate,
-            paymentMethod: sub.paymentMethod,
-            amount: sub.price,
-            currency: sub.currency,
-          },
-        });
+      data.notifications = data.notifications || [];
+      data.notifications.push({
+        id: randomId(crypto),
+        subscriptionName: sub.name,
+        type: 'subscription_change',
+        channel: 'telegram',
+        status: 'success',
+        timestamp: Date.now(),
+        details: {
+          message:
+            action === 'renewed'
+              ? '用户在 Telegram 确认已续订'
+              : '用户在 Telegram 标记为已弃用',
+          receiver:
+            callback.from?.username ||
+            callback.from?.id?.toString?.() ||
+            'unknown',
+          date: sub.nextBillingDate,
+          paymentMethod: sub.paymentMethod,
+          amount: sub.price,
+          currency: sub.currency,
+        },
+      });
 
-        await storage.saveUserData(user, data);
-      }
+      await storage.saveUserData(user, data);
 
       await answerCallback(
         telegramCfg.botToken,

@@ -89,7 +89,8 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
     );
   };
 
-  const getTypeLabel = () => t('notif_type_renewal_reminder');
+  const getTypeLabel = (type: NotificationRecord['type']) =>
+    type === 'subscription_change' ? t('notif_type_subscription_change') : t('notif_type_renewal_reminder');
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
@@ -187,7 +188,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
          <div className="space-y-3">
              {filteredNotifications.map(notif => {
                  const isExpanded = expandedId === notif.id;
-                 const typeLabel = getTypeLabel();
+                 const typeLabel = getTypeLabel(notif.type);
 
                  return (
                      <div 

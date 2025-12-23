@@ -144,7 +144,7 @@ export interface AppSettings {
 
 // --- Notification History Types ---
 
-export type NotificationType = 'renewal_reminder';
+export type NotificationType = 'renewal_reminder' | 'subscription_change';
 export type NotificationStatus = 'success' | 'failed';
 export type NotificationChannel = 'telegram' | 'email';
 

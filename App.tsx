@@ -145,6 +145,7 @@ const App: React.FC = () => {
           {activeTab === 'list' && (
             <SubscriptionList 
               subscriptions={subscriptions} 
+              notifications={notifications}
               onEdit={handleEditSubscription}
               onDelete={deleteSubscription}
               onDuplicate={duplicateSubscription}

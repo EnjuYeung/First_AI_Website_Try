@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Subscription, Frequency } from '../types';
+import { Subscription, Frequency, NotificationRecord } from '../types';
 import { Edit2, Trash2, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Check, X, Copy, LayoutGrid, List } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
@@ -9,6 +9,7 @@ import { parseLocalYMD } from '../services/dateUtils';
 
 interface Props {
   subscriptions: Subscription[];
+  notifications: NotificationRecord[];
   onEdit: (sub: Subscription) => void;
   onDelete: (id: string) => void;
   onDuplicate: (sub: Subscription) => void;
@@ -91,7 +92,7 @@ const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({ label, options, s
 };
 
 
-const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, onDuplicate, onBatchDelete, lang }) => {
+const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdit, onDelete, onDuplicate, onBatchDelete, lang }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // View State
@@ -110,6 +111,26 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
   const [sortConfig, setSortConfig] = useState<{ key: 'price' | 'nextBillingDate' | 'name' | 'category' | 'paymentMethod' | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
 
   const t = getT(lang);
+
+  const telegramConfirmations = useMemo(() => {
+    const byName = new Map<string, Set<string>>();
+    (notifications || []).forEach((notif) => {
+      if (notif.type !== 'subscription_change') return;
+      if (notif.channel !== 'telegram' || notif.status !== 'success') return;
+      const date = notif.details?.date;
+      if (!date || !notif.subscriptionName) return;
+      const dates = byName.get(notif.subscriptionName) || new Set<string>();
+      dates.add(date);
+      byName.set(notif.subscriptionName, dates);
+    });
+    return byName;
+  }, [notifications]);
+
+  const hasTelegramConfirmationForDate = (sub: Subscription, dateStr: string) => {
+    if (!dateStr) return false;
+    const dates = telegramConfirmations.get(sub.name);
+    return dates ? dates.has(dateStr) : false;
+  };
 
   // --- Extract Filter Options ---
   
@@ -274,16 +295,19 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
     return diffDays;
   };
 
-  const renderDateBadge = (dateStr: string) => {
+  const renderDateBadge = (dateStr: string, sub: Subscription) => {
     const days = getDaysRemaining(dateStr);
+    const isTelegramConfirmed = hasTelegramConfirmationForDate(sub, dateStr);
     let badge = null;
 
     if (days <= 3) {
-      badge = (
-        <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full whitespace-nowrap shadow-sm">
-          {days < 0 ? t('overdue') : days === 0 ? t('today') : `${days} ${t('days_left')}`}
-        </span>
-      );
+      if (!(days < 0 && isTelegramConfirmed)) {
+        badge = (
+          <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full whitespace-nowrap shadow-sm">
+            {days < 0 ? t('overdue') : days === 0 ? t('today') : `${days} ${t('days_left')}`}
+          </span>
+        );
+      }
     } else if (days <= 5) {
       badge = (
         <span className="ml-2 px-2 py-0.5 bg-yellow-400 text-gray-900 text-[10px] font-bold rounded-full whitespace-nowrap shadow-sm">
@@ -426,7 +450,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
               <table className="w-full text-left align-middle">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-slate-700 border-b border-gray-100 dark:border-gray-700">
-                    <th className="px-6 py-4 w-12">
+                    <th className="px-5 py-4 w-12">
                          <div className="flex items-center">
                             <input 
                                 type="checkbox" 
@@ -437,7 +461,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                          </div>
                     </th>
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
+                      className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('name')}
                     >
                       <div className="flex items-center gap-1">
@@ -450,7 +474,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
+                      className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('category')}
                     >
                       <div className="flex items-center gap-1">
@@ -463,10 +487,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{t('status')}</th>
+                    <th className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{t('status')}</th>
 
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
+                      className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('price')}
                     >
                       <div className="flex items-center gap-1">
@@ -479,9 +503,9 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{t('frequency')}</th>
+                    <th className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{t('frequency')}</th>
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
+                      className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('paymentMethod')}
                     >
                       <div className="flex items-center gap-1">
@@ -495,7 +519,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                     </th>
                     
                     <th 
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
+                      className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
                       onClick={() => handleSort('nextBillingDate')}
                     >
                        <div className="flex items-center gap-1">
@@ -508,7 +532,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                       </div>
                     </th>
                     
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right whitespace-nowrap">{t('actions')}</th>
+                    <th className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-left whitespace-nowrap">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -517,7 +541,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                         key={sub.id} 
                         className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${selectedIds.has(sub.id) ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''}`}
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-5 py-4">
                         <div className="flex items-center">
                             <input 
                                 type="checkbox" 
@@ -527,7 +551,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                             />
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
                           {sub.iconUrl ? (
                               <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
@@ -552,19 +576,19 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      <td className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <CategoryGlyph category={sub.category || '-'} containerSize={20} size={12} />
                           <span className="truncate">{displayCategoryLabel(sub.category || '-', lang)}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-5 py-4 whitespace-nowrap">
                           {renderStatusBadge(sub.status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <span className="font-medium text-gray-900 dark:text-white">{currencySymbol(sub.currency)}{sub.price.toFixed(2)}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             sub.frequency === Frequency.MONTHLY ? 'bg-blue-100 text-blue-800' : 
                             sub.frequency === Frequency.YEARLY ? 'bg-purple-100 text-purple-800' :
@@ -573,17 +597,17 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                           {displayFrequencyLabel(sub.frequency, lang)}
                         </span>
                       </td>
-		                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+		                      <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
 		                          <div className="flex items-center gap-2">
 		                              <PaymentGlyph method={sub.paymentMethod || 'Credit Card'} containerSize={20} size={12} />
 		                              <span className="truncate">{displayPaymentMethodLabel(sub.paymentMethod || 'Credit Card', lang)}</span>
 		                          </div>
 		                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                        {renderDateBadge(sub.nextBillingDate)}
+                      <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {renderDateBadge(sub.nextBillingDate, sub)}
                       </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end space-x-1">
+                      <td className="px-5 py-4 text-left whitespace-nowrap">
+                        <div className="flex items-center justify-start space-x-1">
                           <button 
                             onClick={(e) => { e.stopPropagation(); onEdit(sub); }}
                             className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-600 rounded-lg transition"
@@ -611,7 +635,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                   ))}
                   {filteredSubscriptions.length === 0 && (
                     <tr>
-                       <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                       <td colSpan={9} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
                           {t('no_subscriptions')}
                        </td>
                     </tr>
@@ -711,7 +735,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, onEdit, onDelete, on
                          <div className="w-full border-t border-gray-100 dark:border-gray-700 pt-3 mt-auto flex justify-between items-center text-xs">
                              <span className="text-gray-400">{t('next_bill')}</span>
                              <div className="font-medium text-gray-700 dark:text-gray-200">
-                                 {renderDateBadge(sub.nextBillingDate)}
+                                 {renderDateBadge(sub.nextBillingDate, sub)}
                              </div>
                          </div>
                      </div>
