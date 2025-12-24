@@ -363,8 +363,8 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     if (!valid.length) return null;
 
     return (
-	      <div className="p-3 rounded-xl mac-surface-soft shadow-md border border-gray-100 text-sm text-gray-700 space-y-1">
-	        <div className="font-semibold text-gray-900">{label}</div>
+	      <div className="chart-tooltip p-3 rounded-xl text-sm text-gray-700 dark:text-gray-200 space-y-1">
+	        <div className="font-semibold text-gray-900 dark:text-gray-100">{label}</div>
 	        {valid.map((p: any) => {
 	          const category = p.name;
 	          const value = p.value as number;
@@ -373,7 +373,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	            <div key={category} className="flex items-center gap-2">
 	              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
 	              <CategoryGlyph category={category} containerSize={18} size={12} />
-	              <span className="text-gray-800">{`${category} (${count} 订阅)：$${value.toFixed(2)}`}</span>
+	              <span className="text-gray-800 dark:text-gray-200">{`${category} (${count} 订阅)：$${value.toFixed(2)}`}</span>
 	            </div>
 	          );
 	        })}
@@ -444,10 +444,10 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     const amount = p.value as number;
                     const count = p.payload?.count ?? 0;
                     return (
-                        <div className="p-3 rounded-xl bg-white shadow-md border border-gray-100 text-sm text-gray-700 space-y-1">
-                            <div className="font-semibold text-gray-900">{`${label}日`}</div>
-                            <div className="text-gray-600">{`${t('sub_count')}: ${count}`}</div>
-                            <div className="text-gray-600">{`${t('total_amount')}: $${amount.toFixed(2)}`}</div>
+                        <div className="chart-tooltip p-3 rounded-xl text-sm text-gray-700 dark:text-gray-200 space-y-1">
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">{`${label}日`}</div>
+                            <div className="text-gray-600 dark:text-gray-300">{`${t('sub_count')}: ${count}`}</div>
+                            <div className="text-gray-600 dark:text-gray-300">{`${t('total_amount')}: $${amount.toFixed(2)}`}</div>
                         </div>
                     );
                 }}
@@ -483,13 +483,13 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                     const data = payload[0]?.payload;
                     if (!data) return null;
                     return (
-                      <div className="mac-surface-soft rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+                      <div className="chart-tooltip rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                         <div className="flex items-center gap-2">
                           <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
-                          <div className="font-semibold text-gray-900 truncate">{String(data.name)}</div>
+                          <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{String(data.name)}</div>
                         </div>
-                        <div className="text-gray-600 mt-1">{`${data.percentage.toFixed(0)}% · $${Number(data.value || 0).toFixed(2)}`}</div>
-                        <div className="text-gray-600">{`${t('sub_count')}: ${data.count}`}</div>
+                        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage.toFixed(0)}% · $${Number(data.value || 0).toFixed(2)}`}</div>
+                        <div className="text-gray-600 dark:text-gray-300">{`${t('sub_count')}: ${data.count}`}</div>
                       </div>
                     );
                   }}

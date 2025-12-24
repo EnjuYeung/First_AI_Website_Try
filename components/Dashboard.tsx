@@ -291,12 +291,12 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const data = payload[0]?.payload;
     if (!data) return null;
     return (
-      <div className="mac-surface-soft rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+      <div className="chart-tooltip rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
         <div className="flex items-center gap-2">
           <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
-          <div className="font-semibold text-gray-900 truncate">{String(data.name)}</div>
+          <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{String(data.name)}</div>
         </div>
-        <div className="text-gray-600 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(1)}`}</div>
+        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(1)}`}</div>
       </div>
     );
   };
@@ -306,12 +306,12 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const data = payload[0]?.payload;
     if (!data) return null;
     return (
-      <div className="mac-surface-soft rounded-xl shadow-md px-4 py-3 text-sm text-gray-900 border border-gray-100">
+      <div className="chart-tooltip rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
         <div className="flex items-center gap-2">
           <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
-          <div className="font-semibold text-gray-900 truncate">{String(data.name)}</div>
+          <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{String(data.name)}</div>
         </div>
-        <div className="text-gray-600 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(2)}`}</div>
+        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(2)}`}</div>
       </div>
     );
   };
