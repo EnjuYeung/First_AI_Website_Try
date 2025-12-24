@@ -21,11 +21,33 @@ const notificationAlreadySent = (notifications, subscription, channel) => {
   return (notifications || []).some(
     (n) =>
       n.type === 'renewal_reminder' &&
-      n.subscriptionName === subscription.name &&
+      ((n.details?.subscriptionId && subscription.id && n.details.subscriptionId === subscription.id) ||
+        n.subscriptionName === subscription.name) &&
       n.channel === channel &&
       n.status === 'success' &&
       n.details?.date === subscription.nextBillingDate
   );
+};
+
+const updateRenewalFeedback = (notifications, subscription, dateLabel, feedback, { onlyIfEmpty = false } = {}) => {
+  if (!dateLabel) return false;
+  let updated = false;
+  (notifications || []).forEach((record) => {
+    if (record.type !== 'renewal_reminder') return;
+    if (record.details?.date !== dateLabel) return;
+    const matchesId = record.details?.subscriptionId && subscription.id
+      ? record.details.subscriptionId === subscription.id
+      : record.subscriptionName === subscription.name;
+    if (!matchesId) return;
+    if (onlyIfEmpty && record.details?.renewalFeedback) return;
+    record.details = {
+      ...record.details,
+      renewalFeedback: feedback,
+      subscriptionId: record.details?.subscriptionId || subscription.id,
+    };
+    updated = true;
+  });
+  return updated;
 };
 
 export const createReminders = ({ config, storage, email }) => {
@@ -57,7 +79,18 @@ export const createReminders = ({ config, storage, email }) => {
       if (sub.status && sub.status !== 'active') continue;
 
       const days = daysUntilDate(sub.nextBillingDate);
-      if (days < 0 || days > reminderDays) continue;
+      if (days < 0) {
+        const feedbackUpdated = updateRenewalFeedback(
+          data.notifications,
+          sub,
+          sub.nextBillingDate,
+          '未确定',
+          { onlyIfEmpty: true }
+        );
+        if (feedbackUpdated) changed = true;
+        continue;
+      }
+      if (days > reminderDays) continue;
 
       const templateStr =
         settings.notifications?.rules?.template || DEFAULT_REMINDER_TEMPLATE_STRING;
@@ -77,6 +110,7 @@ export const createReminders = ({ config, storage, email }) => {
             currency: sub.currency,
             paymentMethod: sub.paymentMethod,
             message,
+            subscriptionId: sub.id,
           },
         };
 

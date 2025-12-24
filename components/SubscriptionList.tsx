@@ -112,24 +112,32 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
 
   const t = getT(lang);
 
-  const telegramConfirmations = useMemo(() => {
-    const byName = new Map<string, Set<string>>();
+  const renewalFeedbackMap = useMemo(() => {
+    const bySub = new Map<string, Map<string, { feedback: string; timestamp: number }>>();
     (notifications || []).forEach((notif) => {
-      if (notif.type !== 'subscription_change') return;
-      if (notif.channel !== 'telegram' || notif.status !== 'success') return;
+      if (notif.type !== 'renewal_reminder') return;
+      const feedback = notif.details?.renewalFeedback;
       const date = notif.details?.date;
-      if (!date || !notif.subscriptionName) return;
-      const dates = byName.get(notif.subscriptionName) || new Set<string>();
-      dates.add(date);
-      byName.set(notif.subscriptionName, dates);
+      if (!feedback || !date) return;
+      const key = notif.details?.subscriptionId || notif.subscriptionName;
+      if (!key) return;
+      const subMap = bySub.get(key) || new Map<string, { feedback: string; timestamp: number }>();
+      const timestamp = typeof notif.timestamp === 'number' ? notif.timestamp : 0;
+      const existing = subMap.get(date);
+      if (!existing || timestamp >= existing.timestamp) {
+        subMap.set(date, { feedback, timestamp });
+      }
+      bySub.set(key, subMap);
     });
-    return byName;
+    return bySub;
   }, [notifications]);
 
-  const hasTelegramConfirmationForDate = (sub: Subscription, dateStr: string) => {
-    if (!dateStr) return false;
-    const dates = telegramConfirmations.get(sub.name);
-    return dates ? dates.has(dateStr) : false;
+  const getRenewalFeedback = (sub: Subscription, dateStr: string) => {
+    if (!dateStr) return '';
+    const byId = sub.id ? renewalFeedbackMap.get(sub.id) : undefined;
+    const byName = renewalFeedbackMap.get(sub.name);
+    const entry = byId?.get(dateStr) || byName?.get(dateStr);
+    return entry?.feedback || '';
   };
 
   // --- Extract Filter Options ---
@@ -297,11 +305,12 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
 
   const renderDateBadge = (dateStr: string, sub: Subscription) => {
     const days = getDaysRemaining(dateStr);
-    const isTelegramConfirmed = hasTelegramConfirmationForDate(sub, dateStr);
+    const feedback = getRenewalFeedback(sub, dateStr);
+    const suppressBadge = feedback === '已续订' || feedback === '已弃用';
     let badge = null;
 
     if (days <= 3) {
-      if (!(days < 0 && isTelegramConfirmed)) {
+      if (!suppressBadge) {
         badge = (
           <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full whitespace-nowrap shadow-sm">
             {days < 0 ? t('overdue') : days === 0 ? t('today') : `${days} ${t('days_left')}`}

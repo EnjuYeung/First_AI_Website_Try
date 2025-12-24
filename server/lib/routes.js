@@ -14,6 +14,69 @@ const applySubscriptionAction = (subscription, action) => {
   return { changed, status: targetStatus };
 };
 
+const YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+const parseLocalYMD = (ymd) => {
+  const match = YMD_RE.exec(String(ymd || '').trim());
+  if (!match) return new Date(NaN);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const formatLocalYMD = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const addFrequencyToDate = (ymd, frequency) => {
+  const date = parseLocalYMD(ymd);
+  if (Number.isNaN(date.getTime())) return '';
+  switch (frequency) {
+    case 'Monthly':
+      date.setMonth(date.getMonth() + 1);
+      break;
+    case 'Quarterly':
+      date.setMonth(date.getMonth() + 3);
+      break;
+    case 'Semi-Annually':
+      date.setMonth(date.getMonth() + 6);
+      break;
+    case 'Yearly':
+      date.setFullYear(date.getFullYear() + 1);
+      break;
+    default:
+      return '';
+  }
+  return formatLocalYMD(date);
+};
+
+const updateRenewalFeedback = (notifications, subscription, dateLabel, feedback) => {
+  if (!dateLabel) return false;
+  let updated = false;
+  (notifications || []).forEach((record) => {
+    if (record.type !== 'renewal_reminder') return;
+    if (record.details?.date !== dateLabel) return;
+    const matchesId = record.details?.subscriptionId && subscription.id
+      ? record.details.subscriptionId === subscription.id
+      : record.subscriptionName === subscription.name;
+    if (!matchesId) return;
+    record.details = {
+      ...record.details,
+      renewalFeedback: feedback,
+      subscriptionId: record.details?.subscriptionId || subscription.id,
+    };
+    updated = true;
+  });
+  return updated;
+};
+
 const randomId = (crypto) =>
   typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
@@ -78,9 +141,20 @@ export const registerRoutes = ({
         return res.json({ ok: false, message: 'subscription_not_found' });
       }
 
+      const currentBillingDate = sub.nextBillingDate;
+      const feedbackValue = action === 'renewed' ? '已续订' : '已弃用';
       const result = applySubscriptionAction(sub, action);
 
+      if (action === 'renewed') {
+        const nextDate = addFrequencyToDate(currentBillingDate, sub.frequency);
+        if (nextDate) sub.nextBillingDate = nextDate;
+      }
+      if (action === 'deprecated') {
+        sub.nextBillingDate = '';
+      }
+
       data.notifications = data.notifications || [];
+      updateRenewalFeedback(data.notifications, sub, currentBillingDate, feedbackValue);
       data.notifications.push({
         id: randomId(crypto),
         subscriptionName: sub.name,
@@ -97,10 +171,12 @@ export const registerRoutes = ({
             callback.from?.username ||
             callback.from?.id?.toString?.() ||
             'unknown',
-          date: sub.nextBillingDate,
+          date: currentBillingDate,
           paymentMethod: sub.paymentMethod,
           amount: sub.price,
           currency: sub.currency,
+          subscriptionId: sub.id,
+          renewalFeedback: feedbackValue,
         },
       });
 
@@ -109,7 +185,7 @@ export const registerRoutes = ({
       await answerCallback(
         telegramCfg.botToken,
         callback.id,
-        result.status === 'cancelled' ? '已标记为弃用/取消' : '已标记为已续订'
+        result.status === 'cancelled' ? '已标记为已弃用' : '已标记为已续订'
       );
       await clearInlineKeyboard(
         telegramCfg.botToken,

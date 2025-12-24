@@ -165,5 +165,7 @@ export interface NotificationRecord {
     receiver?: string;
     daysUntil?: number;
     errorReason?: string;
+    subscriptionId?: string;
+    renewalFeedback?: string;
   };
 }

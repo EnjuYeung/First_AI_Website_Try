@@ -256,6 +256,18 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                                              </div>
                                          </div>
 
+                                         {notif.type === 'renewal_reminder' && notif.details.renewalFeedback && (
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-[18px] flex justify-center">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_feedback')}</div>
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{notif.details.renewalFeedback}</div>
+                                                </div>
+                                            </div>
+                                         )}
+
                                          {notif.details.amount && (
                                             <div className="flex items-center gap-3">
                                                 <div className="w-[18px] text-center text-yellow-500 font-bold">$</div>

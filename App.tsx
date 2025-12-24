@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw, WalletCards } from 'lucide-react';
 import { Subscription } from './types';
 import { getT } from './services/i18n';
@@ -25,12 +25,24 @@ const App: React.FC = () => {
   
   useTheme(settings.theme);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    const stored = window.localStorage.getItem('subm.activeTab');
+    if (stored === 'dashboard' || stored === 'list' || stored === 'analytics' || stored === 'notifications' || stored === 'settings') {
+      return stored;
+    }
+    return 'dashboard';
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const t = getT(settings.language);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('subm.activeTab', activeTab);
+  }, [activeTab]);
 
   // Handlers
   const handleEditSubscription = (sub: Subscription) => {
