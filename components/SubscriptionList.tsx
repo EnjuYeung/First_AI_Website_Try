@@ -96,7 +96,10 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
   const [searchTerm, setSearchTerm] = useState('');
   
   // View State
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    return window.innerWidth < 768 ? 'grid' : 'list';
+  });
   
   // Selection State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

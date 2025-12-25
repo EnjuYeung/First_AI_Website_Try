@@ -87,11 +87,19 @@ const App: React.FC = () => {
       );
   }
 
+  const navTabs = [
+    { id: 'dashboard', icon: Home, label: t('dashboard') },
+    { id: 'list', icon: CreditCard, label: t('subscriptions') },
+    { id: 'analytics', icon: BarChart2, label: t('analytics') },
+    { id: 'notifications', icon: BellRing, label: t('notifications_history') },
+    { id: 'settings', icon: SettingsIcon, label: t('settings') },
+  ] as const;
+
   return (
     <div className="min-h-screen bg-transparent flex flex-col transition-colors duration-200">
       {/* Header */}
       <header className="px-4 sm:px-6 h-16 flex items-center justify-between sticky top-0 z-20 bg-white/70 dark:bg-slate-950/50 backdrop-blur-xl border-b border-white/30 dark:border-white/10 shadow-mac-sm">
-         <div className="flex items-center gap-8">
+         <div className="flex items-center gap-4 sm:gap-8">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-primary-600/90 to-indigo-500/90 text-white shadow-mac-sm ring-1 ring-white/30">
                 <WalletCards size={18} />
@@ -100,13 +108,7 @@ const App: React.FC = () => {
             </div>
             
             <nav className="hidden md:flex items-center gap-1 ml-4">
-                {[
-                  { id: 'dashboard', icon: Home, label: t('dashboard') },
-                  { id: 'list', icon: CreditCard, label: t('subscriptions') },
-                  { id: 'analytics', icon: BarChart2, label: t('analytics') },
-                  { id: 'notifications', icon: BellRing, label: t('notifications_history') },
-                  { id: 'settings', icon: SettingsIcon, label: t('settings') }
-                ].map(tab => (
+                {navTabs.map(tab => (
                   <button 
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
@@ -137,7 +139,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-5 sm:p-6 lg:p-10 overflow-x-hidden max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-5 pb-24 sm:p-6 sm:pb-6 lg:p-10 lg:pb-10 overflow-x-hidden max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-center mb-8">
              <div></div>
           {activeTab !== 'settings' && activeTab !== 'notifications' && (
@@ -217,6 +219,32 @@ const App: React.FC = () => {
               </div>
           </div>
       )}
+
+      <nav className="fixed bottom-0 inset-x-0 z-30 md:hidden">
+        <div className="px-4 pb-[env(safe-area-inset-bottom)]">
+          <div className="mac-surface border border-white/40 dark:border-white/10 rounded-2xl shadow-mac-sm backdrop-blur-xl">
+            <div className="grid grid-cols-5">
+              {navTabs.map(tab => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+                      isActive
+                        ? 'text-primary-600 dark:text-primary-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                  >
+                    <tab.icon size={18} />
+                    <span className="leading-none">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </nav>
     </div>
   );
 };
