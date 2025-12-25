@@ -2,7 +2,7 @@ import express from 'express';
 import speakeasy from 'speakeasy';
 import { renderReminderTemplate, DEFAULT_REMINDER_TEMPLATE_STRING } from '../../shared/reminderTemplate.js';
 import { createIconUpload } from './iconUpload.js';
-import { sendTelegramMessage, answerCallback, clearInlineKeyboard } from './telegram.js';
+import { sendTelegramMessage, answerCallback, clearInlineKeyboard, ensureTelegramWebhook } from './telegram.js';
 
 const applySubscriptionAction = (subscription, action) => {
   if (!subscription) return { changed: false, status: null };
@@ -55,6 +55,21 @@ const addFrequencyToDate = (ymd, frequency) => {
       return '';
   }
   return formatLocalYMD(date);
+};
+
+const normalizeBaseUrl = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
+
+const resolveWebhookBaseUrl = (req, config) => {
+  if (config.publicBaseUrl) return normalizeBaseUrl(config.publicBaseUrl);
+  const host = req.get('x-forwarded-host') || req.get('host');
+  if (!host) return '';
+  const protoHeader = req.get('x-forwarded-proto');
+  const proto = protoHeader ? protoHeader.split(',')[0].trim() : req.protocol;
+  if (!proto) return '';
+  return normalizeBaseUrl(`${proto}://${host}`);
 };
 
 const updateRenewalFeedback = (notifications, subscription, dateLabel, feedback) => {
@@ -358,6 +373,14 @@ export const registerRoutes = ({
       if (!enabled || !botToken || !chatId) {
         return res.status(400).json({ ok: false, message: 'telegram_not_configured' });
       }
+
+      const webhookBaseUrl = resolveWebhookBaseUrl(req, config);
+      if (!webhookBaseUrl) {
+        return res.status(400).json({ ok: false, message: 'telegram_webhook_url_missing' });
+      }
+
+      const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook/${botToken}`;
+      await ensureTelegramWebhook({ debug: config.debugTelegram }, botToken, webhookUrl);
 
       const templateStr =
         settings.notifications?.rules?.template || DEFAULT_REMINDER_TEMPLATE_STRING;

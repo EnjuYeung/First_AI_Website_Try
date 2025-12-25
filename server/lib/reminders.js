@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { daysUntilDate } from './dates.js';
 import { renderReminderTemplate, DEFAULT_REMINDER_TEMPLATE_STRING } from '../../shared/reminderTemplate.js';
-import { sendTelegramMessage } from './telegram.js';
+import { sendTelegramMessage, ensureTelegramWebhook } from './telegram.js';
 
 const randomId = () =>
   typeof crypto.randomUUID === 'function'
@@ -16,6 +16,11 @@ const buildInlineKeyboard = (subscriptionId) => ({
     ],
   ],
 });
+
+const normalizeBaseUrl = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/\/+$/, '');
 
 const notificationAlreadySent = (notifications, subscription, channel) => {
   return (notifications || []).some(
@@ -68,6 +73,7 @@ export const createReminders = ({ config, storage, email }) => {
     const reminderRule = settings.notifications?.rules?.renewalReminder;
     const reminderDays = Number(settings.notifications?.rules?.reminderDays ?? 3);
     const ruleChannels = settings.notifications?.rules?.channels;
+    const webhookBaseUrl = normalizeBaseUrl(config.publicBaseUrl);
 
     if (!reminderRule) return;
 
@@ -122,6 +128,14 @@ export const createReminders = ({ config, storage, email }) => {
             const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
             const allowed = (ruleChannels?.renewalReminder || []).includes('telegram');
             if (!enabled || !botToken || !chatId || !allowed) return;
+            if (webhookBaseUrl) {
+              const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook/${botToken}`;
+              try {
+                await ensureTelegramWebhook({ debug: config.debugTelegram }, botToken, webhookUrl);
+              } catch (err) {
+                console.error('Failed to ensure Telegram webhook', err);
+              }
+            }
             const replyMarkup = buildInlineKeyboard(sub.id || sub.name || 'unknown');
             await sendTelegramMessage({ debug: config.debugTelegram }, botToken, chatId, message, replyMarkup);
           } else if (channel === 'email') {

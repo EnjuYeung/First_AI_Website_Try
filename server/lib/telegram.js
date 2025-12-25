@@ -1,6 +1,8 @@
 const scrubToken = (token) =>
   token ? `${token.slice(0, 6)}...${token.slice(-4)}` : 'undefined';
 
+const webhookCache = new Map();
+
 export const sendTelegramMessage = async (
   { debug },
   botToken,
@@ -52,6 +54,46 @@ export const sendTelegramMessage = async (
   return json;
 };
 
+export const setTelegramWebhook = async ({ debug }, botToken, webhookUrl) => {
+  const payload = {
+    url: webhookUrl,
+    allowed_updates: ['callback_query'],
+  };
+
+  const resp = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await resp.json().catch(() => ({}));
+
+  if (debug) {
+    console.log('telegram setWebhook', {
+      ok: json?.ok,
+      description: json?.description,
+      url: webhookUrl,
+      bot: scrubToken(botToken),
+    });
+  }
+
+  if (!resp.ok || json?.ok === false) {
+    const errMsg = json?.description || `telegram_webhook_error_${resp.status}`;
+    throw new Error(errMsg);
+  }
+
+  return json;
+};
+
+export const ensureTelegramWebhook = async ({ debug }, botToken, webhookUrl) => {
+  if (!botToken || !webhookUrl) return false;
+  const cached = webhookCache.get(botToken);
+  if (cached === webhookUrl) return false;
+  await setTelegramWebhook({ debug }, botToken, webhookUrl);
+  webhookCache.set(botToken, webhookUrl);
+  return true;
+};
+
 export const answerCallback = async (botToken, callbackQueryId, text) => {
   await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
     method: 'POST',
@@ -75,4 +117,3 @@ export const clearInlineKeyboard = async (botToken, chatId, messageId) => {
     }),
   });
 };
-

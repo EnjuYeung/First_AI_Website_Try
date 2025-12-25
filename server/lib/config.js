@@ -16,6 +16,7 @@ export const getConfig = () => {
   const notifyIntervalMs = Number(process.env.NOTIFY_INTERVAL_MS || 10 * 60 * 1000);
   const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '2mb';
   const maxIconBytes = Number(process.env.MAX_ICON_BYTES || 1024 * 1024);
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL || '';
 
   const smtp = {
     host: process.env.SMTP_HOST || '',
@@ -42,6 +43,6 @@ export const getConfig = () => {
     smtp,
     allowedOrigins,
     debugTelegram: process.env.DEBUG_TELEGRAM === '1',
+    publicBaseUrl,
   };
 };
-
