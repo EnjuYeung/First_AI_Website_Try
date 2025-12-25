@@ -4,7 +4,7 @@ import { Subscription, Frequency, NotificationRecord } from '../types';
 import { Edit2, Trash2, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Check, X, Copy, LayoutGrid, List } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
-import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { canonicalRenewalFeedback, displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 import { parseLocalYMD } from '../services/dateUtils';
 
 interface Props {
@@ -137,7 +137,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
     const byId = sub.id ? renewalFeedbackMap.get(sub.id) : undefined;
     const byName = renewalFeedbackMap.get(sub.name);
     const entry = byId?.get(dateStr) || byName?.get(dateStr);
-    return entry?.feedback || '';
+    return canonicalRenewalFeedback(entry?.feedback);
   };
 
   // --- Extract Filter Options ---
@@ -306,7 +306,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
   const renderDateBadge = (dateStr: string, sub: Subscription) => {
     const days = getDaysRemaining(dateStr);
     const feedback = getRenewalFeedback(sub, dateStr);
-    const suppressBadge = feedback === '已续订' || feedback === '已弃用';
+    const suppressBadge = feedback === 'renewed' || feedback === 'deprecated';
     let badge = null;
 
     if (days <= 3) {

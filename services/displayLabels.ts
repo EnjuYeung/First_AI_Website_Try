@@ -123,3 +123,17 @@ export function displayFrequencyLabel(freq: Frequency | string, lang: Lang): str
       return String(freq);
   }
 }
+
+export type RenewalFeedbackCode = 'pending' | 'renewed' | 'deprecated' | '';
+
+export function canonicalRenewalFeedback(value?: string): RenewalFeedbackCode {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const lower = raw.toLowerCase();
+
+  if (raw === '已续订' || lower === 'renewed') return 'renewed';
+  if (raw === '已弃用' || lower === 'deprecated') return 'deprecated';
+  if (raw === '未确定' || lower === 'pending' || lower === 'unknown') return 'pending';
+
+  return '';
+}

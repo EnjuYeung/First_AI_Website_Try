@@ -4,7 +4,7 @@ import { getT } from '../services/i18n';
 import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
 import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, Calendar, AlertTriangle, Lightbulb, Mail, Send, Trash2 } from 'lucide-react';
 import { PaymentGlyph } from './ui/glyphs';
-import { displayPaymentMethodLabel } from '../services/displayLabels';
+import { canonicalRenewalFeedback, displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
   lang: 'en' | 'zh';
@@ -102,6 +102,15 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
     });
   };
 
+  const getRenewalFeedbackLabel = (value?: string) => {
+    if (!value) return '';
+    const code = canonicalRenewalFeedback(value);
+    if (code === 'pending') return t('notif_feedback_pending');
+    if (code === 'renewed') return t('notif_feedback_renewed');
+    if (code === 'deprecated') return t('notif_feedback_deprecated');
+    return value;
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       
@@ -189,6 +198,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
              {filteredNotifications.map(notif => {
                  const isExpanded = expandedId === notif.id;
                  const typeLabel = getTypeLabel(notif.type);
+                 const feedbackLabel = getRenewalFeedbackLabel(notif.details?.renewalFeedback);
 
                  return (
                      <div 
@@ -256,14 +266,14 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                                              </div>
                                          </div>
 
-                                         {notif.type === 'renewal_reminder' && notif.details.renewalFeedback && (
+                                         {notif.type === 'renewal_reminder' && feedbackLabel && (
                                             <div className="flex items-center gap-3">
                                                 <div className="w-[18px] flex justify-center">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
                                                 </div>
                                                 <div>
                                                     <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_feedback')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{notif.details.renewalFeedback}</div>
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{feedbackLabel}</div>
                                                 </div>
                                             </div>
                                          )}

@@ -142,7 +142,7 @@ export const registerRoutes = ({
       }
 
       const currentBillingDate = sub.nextBillingDate;
-      const feedbackValue = action === 'renewed' ? '已续订' : '已弃用';
+      const feedbackValue = action === 'renewed' ? 'renewed' : 'deprecated';
       const result = applySubscriptionAction(sub, action);
 
       if (action === 'renewed') {

@@ -84,7 +84,7 @@ export const createReminders = ({ config, storage, email }) => {
           data.notifications,
           sub,
           sub.nextBillingDate,
-          '未确定',
+          'pending',
           { onlyIfEmpty: true }
         );
         if (feedbackUpdated) changed = true;
@@ -111,6 +111,7 @@ export const createReminders = ({ config, storage, email }) => {
             paymentMethod: sub.paymentMethod,
             message,
             subscriptionId: sub.id,
+            renewalFeedback: 'pending',
           },
         };
 
