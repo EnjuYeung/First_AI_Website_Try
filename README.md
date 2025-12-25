@@ -1,16 +1,17 @@
 # 一句话介绍
 
-家庭使用的轻量订阅管理工具，支持订阅记录、支出分析和TG通知功能。（其实纯AI做的，我屁都不会。）
+家庭使用的轻量订阅管理工具，支持订阅记录、支出分析和TG通知功能。
+（其实纯AI做的，我屁都不会，连这个都是AI写的。）
 
-## Run locally (dev)
+## 本地运行 (开发模式)
 
-**Prerequisites:** Node.js
+**前置要求：** Node.js
 
-1. Install dependencies: `npm install`
-2. Start frontend dev server: `npm run dev`
-3. Start backend (in `server/`): `npm install && npm start`
+1. 安装依赖：`npm install`
+2. 启动前端开发服务器：`npm run dev`
+3. 启动后端（在 `server/` 目录下）：`npm install && npm start`
 
-## Run with Docker
+## Docker-Compose（我是这么用的）
 1. **创建 `.env` 文件**
 
 2. **配置环境变量**
