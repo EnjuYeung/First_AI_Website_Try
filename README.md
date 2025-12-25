@@ -4,7 +4,7 @@
 
 <mark>纯AI实现</mark>
 
-## 部署 (Deployment)
+## 部署
 
 ### 本地运行 (开发模式)
 **前置要求：** Node.js
