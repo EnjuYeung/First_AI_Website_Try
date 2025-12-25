@@ -72,6 +72,76 @@ const resolveWebhookBaseUrl = (req, config) => {
   return normalizeBaseUrl(`${proto}://${host}`);
 };
 
+const escapeRegExp = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const parseCallbackData = (data) => {
+  const parts = String(data || '').split('|');
+  const action = parts[0] || '';
+  const rawId = parts.slice(1).join('|');
+  return { action, rawId };
+};
+
+const extractSubscriptionNameFromMessage = (templateString, messageText) => {
+  if (!messageText) return '';
+
+  const parseLines = (input) => {
+    try {
+      const parsed = JSON.parse(input || '');
+      return Array.isArray(parsed?.lines) ? parsed.lines : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const templateLines =
+    parseLines(templateString).length > 0
+      ? parseLines(templateString)
+      : parseLines(DEFAULT_REMINDER_TEMPLATE_STRING);
+  const messageLines = String(messageText).split('\n');
+
+  for (const templateLine of templateLines) {
+    if (typeof templateLine !== 'string' || !templateLine.includes('{{name}}')) continue;
+    const [prefix, ...rest] = templateLine.split('{{name}}');
+    const suffix = rest.join('{{name}}');
+    const pattern = new RegExp(`^${escapeRegExp(prefix)}(.+?)${escapeRegExp(suffix)}$`);
+    for (const messageLine of messageLines) {
+      const match = pattern.exec(messageLine);
+      if (match?.[1]) return match[1].trim();
+    }
+  }
+
+  const flatText = String(messageText).replace(/\s+/g, ' ').trim();
+  const genericPatterns = [
+    /订阅\s*(.+?)\s*即将续费/,
+    /Subscription\s*(.+?)\s*(?:is\s*)?(?:about\s+to|will)\s+renew/i,
+  ];
+  for (const pattern of genericPatterns) {
+    const match = pattern.exec(flatText);
+    if (match?.[1]) return match[1].trim();
+  }
+
+  return '';
+};
+
+const resolveSubscriptionFromCallback = ({
+  subscriptions,
+  rawId,
+  messageText,
+  templateString,
+}) => {
+  const list = Array.isArray(subscriptions) ? subscriptions : [];
+  if (rawId) {
+    const byId = list.find((s) => s.id === rawId);
+    if (byId) return byId;
+    const byName = list.find((s) => s.name === rawId);
+    if (byName) return byName;
+  }
+  const extractedName = extractSubscriptionNameFromMessage(templateString, messageText);
+  if (!extractedName) return null;
+  return list.find((s) => s.name === extractedName) || null;
+};
+
 const updateRenewalFeedback = (notifications, subscription, dateLabel, feedback) => {
   if (!dateLabel) return false;
   let updated = false;
@@ -137,19 +207,25 @@ export const registerRoutes = ({
         return res.status(403).json({ ok: false, message: 'invalid_token' });
       }
 
-      if (!callback || !callback.data || !callback.message) {
+      if (!callback || !callback.data) {
         return res.json({ ok: true, message: 'ignored' });
       }
 
-      const [action, rawId] = callback.data.split('|');
+      const { action, rawId } = parseCallbackData(callback.data);
       const allowedActions = ['renewed', 'deprecated'];
-      if (!allowedActions.includes(action) || !rawId) {
+      if (!allowedActions.includes(action)) {
+        await answerCallback(telegramCfg.botToken, callback.id, '无效操作');
         return res.json({ ok: false, message: 'invalid_action' });
       }
 
-      const sub =
-        (data.subscriptions || []).find((s) => s.id === rawId) ||
-        (data.subscriptions || []).find((s) => s.name === rawId);
+      const templateStr =
+        data.settings?.notifications?.rules?.template || DEFAULT_REMINDER_TEMPLATE_STRING;
+      const sub = resolveSubscriptionFromCallback({
+        subscriptions: data.subscriptions || [],
+        rawId,
+        messageText: callback.message?.text || '',
+        templateString: templateStr,
+      });
 
       if (!sub) {
         await answerCallback(telegramCfg.botToken, callback.id, '找不到对应的订阅记录');
@@ -202,11 +278,13 @@ export const registerRoutes = ({
         callback.id,
         result.status === 'cancelled' ? '已标记为已弃用' : '已标记为已续订'
       );
-      await clearInlineKeyboard(
-        telegramCfg.botToken,
-        callback.message.chat.id,
-        callback.message.message_id
-      );
+      if (callback.message?.chat?.id && callback.message?.message_id) {
+        await clearInlineKeyboard(
+          telegramCfg.botToken,
+          callback.message.chat.id,
+          callback.message.message_id
+        );
+      }
 
       res.json({ ok: true });
     } catch (err) {

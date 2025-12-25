@@ -121,6 +121,25 @@ const mergeSettings = (incoming) => {
   };
 };
 
+const normalizeNotifications = (incoming) => {
+  const list = Array.isArray(incoming) ? incoming : [];
+  return list.map((record) => {
+    if (!record || typeof record !== 'object') return record;
+    const details =
+      record.details && typeof record.details === 'object' ? record.details : {};
+    let nextDetails = details;
+    if (record.type === 'renewal_reminder' && !details.renewalFeedback) {
+      nextDetails = { ...details, renewalFeedback: 'pending' };
+    } else if (details !== record.details) {
+      nextDetails = { ...details };
+    }
+    if (nextDetails !== record.details) {
+      return { ...record, details: nextDetails };
+    }
+    return record;
+  });
+};
+
 export const createStorage = ({ adminUser, adminPass }) => {
   const loadCredentials = async () => {
     await ensureDataDir();
@@ -147,9 +166,10 @@ export const createStorage = ({ adminUser, adminPass }) => {
     try {
       const parsed = await readJson(filePath);
       const settings = mergeSettings(parsed.settings);
+      const notifications = normalizeNotifications(parsed.notifications || []);
       return {
         subscriptions: parsed.subscriptions || [],
-        notifications: parsed.notifications || [],
+        notifications,
         settings,
       };
     } catch {
@@ -162,9 +182,10 @@ export const createStorage = ({ adminUser, adminPass }) => {
   const saveUserData = async (username, data) => {
     await ensureDataDir();
     const settings = mergeSettings(data.settings);
+    const notifications = normalizeNotifications(data.notifications || []);
     const payload = {
       subscriptions: data.subscriptions || [],
-      notifications: data.notifications || [],
+      notifications,
       settings,
     };
     const filePath = userDataPath(username);
