@@ -246,30 +246,6 @@ export const registerRoutes = ({
 
       data.notifications = data.notifications || [];
       updateRenewalFeedback(data.notifications, sub, currentBillingDate, feedbackValue);
-      data.notifications.push({
-        id: randomId(crypto),
-        subscriptionName: sub.name,
-        type: 'subscription_change',
-        channel: 'telegram',
-        status: 'success',
-        timestamp: Date.now(),
-        details: {
-          message:
-            action === 'renewed'
-              ? '用户在 Telegram 确认已续订'
-              : '用户在 Telegram 标记为已弃用',
-          receiver:
-            callback.from?.username ||
-            callback.from?.id?.toString?.() ||
-            'unknown',
-          date: currentBillingDate,
-          paymentMethod: sub.paymentMethod,
-          amount: sub.price,
-          currency: sub.currency,
-          subscriptionId: sub.id,
-          renewalFeedback: feedbackValue,
-        },
-      });
 
       await storage.saveUserData(user, data);
 

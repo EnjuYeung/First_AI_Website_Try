@@ -4,7 +4,7 @@ import { getT } from '../services/i18n';
 import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
 import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, Calendar, AlertTriangle, Lightbulb, Mail, Send, Trash2 } from 'lucide-react';
 import { PaymentGlyph } from './ui/glyphs';
-import { canonicalRenewalFeedback, displayPaymentMethodLabel } from '../services/displayLabels';
+import { canonicalRenewalFeedback, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 
 interface Props {
   lang: 'en' | 'zh';
@@ -199,6 +199,9 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                  const isExpanded = expandedId === notif.id;
                  const typeLabel = getTypeLabel(notif.type);
                  const feedbackLabel = getRenewalFeedbackLabel(notif.details?.renewalFeedback);
+                 const frequencyLabel = notif.details?.frequency
+                   ? displayFrequencyLabel(notif.details.frequency, lang)
+                   : '/';
 
                  return (
                      <div 
@@ -290,23 +293,32 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                                             </div>
                                          )}
 
-                                         {notif.details.paymentMethod && (
-                                             <div className="flex items-center gap-3">
-                                                <PaymentGlyph method={notif.details.paymentMethod} containerSize={18} size={12} />
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_payment')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{displayPaymentMethodLabel(notif.details.paymentMethod, lang)}</div>
+                                         {(notif.details.paymentMethod || notif.details.frequency) && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {notif.details.paymentMethod ? (
+                                                  <div className="flex items-center gap-3">
+                                                      <PaymentGlyph method={notif.details.paymentMethod} containerSize={18} size={12} />
+                                                      <div>
+                                                          <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_payment')}</div>
+                                                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                              {displayPaymentMethodLabel(notif.details.paymentMethod, lang)}
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                                ) : (
+                                                  <div className="hidden md:block" />
+                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-[18px] h-[18px] rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-[10px] text-gray-600 dark:text-gray-300 font-bold">
+                                                      {lang === 'zh' ? '周期' : 'Freq'}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-400 uppercase font-bold">{t('frequency')}</div>
+                                                        <div className="text-sm font-medium text-gray-900 dark:text-white">{frequencyLabel}</div>
+                                                    </div>
                                                 </div>
                                             </div>
                                          )}
-
-                                          <div className="flex items-center gap-3">
-                                                <div className="w-[18px] h-[18px] rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-[10px] text-gray-600 dark:text-gray-300 font-bold">Plan</div>
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_plan')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">/</div>
-                                                </div>
-                                            </div>
                                      </div>
 
                                      {/* Right Column / Conditional Fields */}

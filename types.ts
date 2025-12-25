@@ -167,5 +167,6 @@ export interface NotificationRecord {
     errorReason?: string;
     subscriptionId?: string;
     renewalFeedback?: string;
+    frequency?: string;
   };
 }

@@ -121,15 +121,38 @@ const mergeSettings = (incoming) => {
   };
 };
 
-const normalizeNotifications = (incoming) => {
+const resolveSubscriptionForNotification = (subscriptions, record) => {
+  const list = Array.isArray(subscriptions) ? subscriptions : [];
+  const subId = record?.details?.subscriptionId;
+  if (subId) {
+    const byId = list.find((sub) => sub?.id === subId);
+    if (byId) return byId;
+  }
+  const name = record?.subscriptionName;
+  if (!name) return null;
+  return list.find((sub) => sub?.name === name) || null;
+};
+
+const normalizeNotifications = (incoming, subscriptions) => {
   const list = Array.isArray(incoming) ? incoming : [];
-  return list.map((record) => {
+  const filtered = list.filter((record) => record?.type !== 'subscription_change');
+  return filtered.map((record) => {
     if (!record || typeof record !== 'object') return record;
     const details =
       record.details && typeof record.details === 'object' ? record.details : {};
     let nextDetails = details;
-    if (record.type === 'renewal_reminder' && !details.renewalFeedback) {
-      nextDetails = { ...details, renewalFeedback: 'pending' };
+    if (record.type === 'renewal_reminder') {
+      if (!details.renewalFeedback) {
+        nextDetails = { ...nextDetails, renewalFeedback: 'pending' };
+      } else if (details !== record.details) {
+        nextDetails = { ...nextDetails };
+      }
+      if (!nextDetails.frequency) {
+        const sub = resolveSubscriptionForNotification(subscriptions, record);
+        if (sub?.frequency) {
+          nextDetails = { ...nextDetails, frequency: sub.frequency };
+        }
+      }
     } else if (details !== record.details) {
       nextDetails = { ...details };
     }
@@ -166,7 +189,7 @@ export const createStorage = ({ adminUser, adminPass }) => {
     try {
       const parsed = await readJson(filePath);
       const settings = mergeSettings(parsed.settings);
-      const notifications = normalizeNotifications(parsed.notifications || []);
+      const notifications = normalizeNotifications(parsed.notifications || [], parsed.subscriptions || []);
       return {
         subscriptions: parsed.subscriptions || [],
         notifications,
@@ -182,7 +205,7 @@ export const createStorage = ({ adminUser, adminPass }) => {
   const saveUserData = async (username, data) => {
     await ensureDataDir();
     const settings = mergeSettings(data.settings);
-    const notifications = normalizeNotifications(data.notifications || []);
+    const notifications = normalizeNotifications(data.notifications || [], data.subscriptions || []);
     const payload = {
       subscriptions: data.subscriptions || [],
       notifications,

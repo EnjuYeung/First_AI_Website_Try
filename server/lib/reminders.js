@@ -115,6 +115,7 @@ export const createReminders = ({ config, storage, email }) => {
             amount: sub.price,
             currency: sub.currency,
             paymentMethod: sub.paymentMethod,
+            frequency: sub.frequency,
             message,
             subscriptionId: sub.id,
             renewalFeedback: 'pending',
@@ -128,6 +129,7 @@ export const createReminders = ({ config, storage, email }) => {
             const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
             const allowed = (ruleChannels?.renewalReminder || []).includes('telegram');
             if (!enabled || !botToken || !chatId || !allowed) return;
+            recordBase.details.receiver = chatId;
             if (webhookBaseUrl) {
               const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook/${botToken}`;
               try {
