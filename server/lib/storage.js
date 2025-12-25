@@ -133,6 +133,20 @@ const resolveSubscriptionForNotification = (subscriptions, record) => {
   return list.find((sub) => sub?.name === name) || null;
 };
 
+const YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+const isPastDate = (ymd) => {
+  if (!ymd) return false;
+  const match = YMD_RE.exec(String(ymd).trim());
+  if (!match) return false;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return false;
+  date.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+};
+
 const normalizeNotifications = (incoming, subscriptions) => {
   const list = Array.isArray(incoming) ? incoming : [];
   const filtered = list.filter((record) => record?.type !== 'subscription_change');
@@ -142,19 +156,32 @@ const normalizeNotifications = (incoming, subscriptions) => {
       record.details && typeof record.details === 'object' ? record.details : {};
     let nextDetails = details;
     if (record.type === 'renewal_reminder') {
-      if (!details.renewalFeedback) {
-        nextDetails = { ...nextDetails, renewalFeedback: 'pending' };
-      } else if (details !== record.details) {
+      if (details !== record.details) {
         nextDetails = { ...nextDetails };
       }
-      if (!nextDetails.frequency) {
+      const feedback = String(details.renewalFeedback || '').trim();
+      const needsBackfill = !feedback || feedback === 'pending' || feedback === '未确定';
+      if (needsBackfill && isPastDate(details.date)) {
         const sub = resolveSubscriptionForNotification(subscriptions, record);
-        if (sub?.frequency) {
-          nextDetails = { ...nextDetails, frequency: sub.frequency };
+        if (sub?.status === 'active') {
+          nextDetails = { ...nextDetails, renewalFeedback: 'renewed' };
+        } else if (sub?.status === 'cancelled') {
+          nextDetails = { ...nextDetails, renewalFeedback: 'deprecated' };
         }
+      }
+      if (!feedback && !nextDetails.renewalFeedback) {
+        nextDetails = { ...nextDetails, renewalFeedback: 'pending' };
       }
     } else if (details !== record.details) {
       nextDetails = { ...details };
+    }
+    if (nextDetails.receiver !== undefined) {
+      const { receiver, ...rest } = nextDetails;
+      nextDetails = rest;
+    }
+    if (nextDetails.frequency !== undefined) {
+      const { frequency, ...rest } = nextDetails;
+      nextDetails = rest;
     }
     if (nextDetails !== record.details) {
       return { ...record, details: nextDetails };

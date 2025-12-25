@@ -162,11 +162,9 @@ export interface NotificationRecord {
     date?: string;
     paymentMethod?: string;
     message?: string;
-    receiver?: string;
     daysUntil?: number;
     errorReason?: string;
     subscriptionId?: string;
     renewalFeedback?: string;
-    frequency?: string;
   };
 }
