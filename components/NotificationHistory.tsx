@@ -2,9 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
 import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
-import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Clock, Calendar, AlertTriangle, Lightbulb, Mail, Send, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Calendar, AlertTriangle, Mail, Send, Trash2 } from 'lucide-react';
 import { PaymentGlyph } from './ui/glyphs';
 import { canonicalRenewalFeedback, displayPaymentMethodLabel } from '../services/displayLabels';
+import { formatCurrency, getCurrencySymbol } from '../services/currency';
 
 interface Props {
   lang: 'en' | 'zh';
@@ -279,11 +280,13 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
 
                                          {notif.details.amount && (
                                             <div className="flex items-center gap-3">
-                                                <div className="w-[18px] text-center text-yellow-500 font-bold">$</div>
+                                                <div className="w-[18px] text-center text-yellow-500 font-bold">
+                                                  {getCurrencySymbol(notif.details.currency)}
+                                                </div>
                                                 <div>
                                                     <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_amount')}</div>
                                                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                        {notif.details.amount.toFixed(2)} {notif.details.currency}
+                                                        {formatCurrency(notif.details.amount, notif.details.currency)}
                                                     </div>
                                                 </div>
                                             </div>
@@ -303,16 +306,6 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                                             </div>
                                          )}
 
-                                         {notif.type === 'renewal_reminder' && (
-                                             <div className="flex items-start gap-3">
-                                                <Lightbulb className="text-orange-500 mt-1" size={18} />
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_tips')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{t('notif_tip_ensure_funds')}</div>
-                                                </div>
-                                            </div>
-                                         )}
-
                                         {notif.status === 'failed' && notif.details.errorReason && (
                                              <div className="flex items-start gap-3">
                                                 <AlertTriangle className="text-red-500 mt-1" size={18} />
@@ -322,16 +315,6 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                                                 </div>
                                             </div>
                                          )}
-
-                                          <div className="flex items-center gap-3">
-                                              <Clock className="text-gray-400" size={18} />
-                                              <div>
-                                                  <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_sent_time')}</div>
-                                                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                      {formatTime(notif.timestamp)}
-                                                  </div>
-                                              </div>
-                                          </div>
                                      </div>
 
                                  </div>

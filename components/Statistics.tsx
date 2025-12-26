@@ -1,15 +1,16 @@
 
 import React, { useMemo, useState } from 'react';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Legend, PieChart, Pie, Cell, ComposedChart
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import { Subscription, Frequency, AppSettings } from '../types';
-import { TrendingUp, X, BarChart2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
+import { formatCurrency } from '../services/currency';
 
 interface Props {
   subscriptions: Subscription[];
@@ -20,9 +21,7 @@ interface Props {
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16', '#64748b', '#0ea5e9'];
 
 // --- Types ---
-type ChartType = 'line' | 'bar';
-type TimeRange = '12m' | '6m' | 'ytd' | 'all';
-type HistoryMode = 'month' | 'quarter' | 'year';
+type HistoryMode = 'month' | 'year';
 type Translator = (key: any) => string;
 
 interface PaymentRecord {
@@ -86,7 +85,7 @@ const HistoryTableList: React.FC<{ records: PaymentRecord[], t: Translator }> = 
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
-                          {rec.currency ? `${rec.currency} ${rec.amount.toFixed(2)}` : `$${rec.amount.toFixed(2)}`}
+                          {formatCurrency(rec.amount, rec.currency)}
                       </td>
                   </tr>
               ))}
@@ -161,15 +160,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     };
 
     // --- State ---
-    const [trendType, setTrendType] = useState<ChartType>('line');
-    const [trendRange, setTrendRange] = useState<TimeRange>('12m');
-    const [categoryRange, setCategoryRange] = useState<TimeRange>('12m');
-    
-    // Detailed History State
     const [historyMode, setHistoryMode] = useState<HistoryMode>('month');
-    
-    // Modals State
-    const [showLifetimeModal, setShowLifetimeModal] = useState(false);
     const [detailModalGroup, setDetailModalGroup] = useState<HistoryGroup | null>(null);
     
     // --- Helper Functions ---
@@ -216,23 +207,16 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 
     // --- Data Processing ---
 
-    // 1. Lifetime Spend
-    const lifetimeSpend = useMemo(() => allPayments.reduce((acc, curr) => acc + curr.amountUsd, 0), [allPayments]);
-
-    // 2. Trend Data (Line/Bar)
+    // 1. Trend Data (Bar)
 	    const trendData = useMemo(() => {
 	        const today = new Date();
 	        const dataMap: Record<string, any> = {};
 	        const categories: string[] = Array.from(new Set(subscriptions.map(s => displayCategoryLabel(s.category, lang))));
 
-        // Determine Start Date based on Range
-        let startDate = new Date(today);
-        if (trendRange === '12m') startDate.setMonth(today.getMonth() - 11);
-        else if (trendRange === '6m') startDate.setMonth(today.getMonth() - 5);
-        else if (trendRange === 'ytd') startDate = new Date(today.getFullYear(), 0, 1);
-        else if (trendRange === 'all') startDate = new Date(2020, 0, 1); // Arbitrary old date for "All"
-        
-        startDate.setDate(1); // Start of month
+        // Fixed range: last 12 months
+        const startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 11);
+        startDate.setDate(1);
 
         // Initialize buckets
         const iterDate = new Date(startDate);
@@ -258,17 +242,15 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         });
 
         return Object.values(dataMap);
-    }, [allPayments, trendRange, subscriptions]);
+    }, [allPayments, subscriptions]);
 
 
-    // 3. Category Pie Chart Data
+    // 2. Category Pie Chart Data
     const categoryPieData = useMemo(() => {
         const today = new Date();
-        let startDate = new Date(today);
-        if (categoryRange === '12m') startDate.setMonth(today.getMonth() - 11);
-        else if (categoryRange === '6m') startDate.setMonth(today.getMonth() - 5);
-        else if (categoryRange === 'ytd') startDate = new Date(today.getFullYear(), 0, 1);
-        else if (categoryRange === 'all') startDate = new Date(2000, 0, 1);
+        const startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 11);
+        startDate.setDate(1);
 
         const totals: Record<string, { value: number, count: number }> = {};
         let grandTotal = 0;
@@ -289,10 +271,10 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
             percentage: grandTotal > 0 ? (stats.value / grandTotal) * 100 : 0
         })).sort((a, b) => b.value - a.value);
 
-    }, [allPayments, categoryRange]);
+    }, [allPayments]);
 
 
-    // 4. Daily Distribution (Amount Only)
+    // 3. Daily Distribution (Amount Only)
     const distributionData = useMemo(() => {
         const days = Array(31).fill(0).map((_, i) => ({ day: i + 1, amount: 0, count: 0 }));
         
@@ -307,7 +289,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     }, [subscriptions, settings.exchangeRates]);
 
 
-    // 5. Historical Data Buckets (Month/Quarter/Year)
+    // 4. Historical Data Buckets (Month/Year)
     const historyGroups = useMemo(() => {
         const groups: HistoryGroup[] = [];
         const today = new Date();
@@ -323,22 +305,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                      p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear()
                  );
                  const days = getDaysInMonth(d.getFullYear(), d.getMonth());
-                 groups.push({ title, total: records.reduce((s, c) => s + c.amountUsd, 0), count: records.length, days, records });
-             }
-        } else if (historyMode === 'quarter') {
-             // Last 3 Quarters
-             const currMonth = today.getMonth();
-             const currQStartMonth = currMonth - (currMonth % 3);
-             
-             for (let i = 0; i < 3; i++) {
-                 const qStart = new Date(today.getFullYear(), currQStartMonth - (i * 3), 1);
-                 const qEnd = new Date(qStart.getFullYear(), qStart.getMonth() + 3, 0);
-                 
-                 const qNum = Math.floor(qStart.getMonth() / 3) + 1;
-                 const title = `Q${qNum} ${qStart.getFullYear()}`;
-                 
-                 const records = allPayments.filter(p => p.date >= qStart && p.date <= qEnd);
-                 const days = Math.floor((qEnd.getTime() - qStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                  groups.push({ title, total: records.reduce((s, c) => s + c.amountUsd, 0), count: records.length, days, records });
              }
         } else if (historyMode === 'year') {
@@ -373,7 +339,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	            <div key={category} className="flex items-center gap-2">
 	              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
 	              <CategoryGlyph category={category} containerSize={18} size={12} />
-	              <span className="text-gray-800 dark:text-gray-200">{`${category} (${count} 订阅)：$${value.toFixed(2)}`}</span>
+	              <span className="text-gray-800 dark:text-gray-200">{`${category} (${count} 订阅)：${formatCurrency(value, 'USD')}`}</span>
 	            </div>
 	          );
 	        })}
@@ -383,42 +349,24 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 
   const renderTrendChart = () => (
      <ResponsiveContainer width="100%" height="100%">
-        {trendType === 'line' ? (
-            <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} tickFormatter={(val) => `$${val}`}/>
-                <Tooltip 
-                contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                formatter={(value: number, name: string) => [
-                    `$${value.toFixed(2)}`, 
-                    t('total_amount')
-                ]}
-                />
-                <Legend />
-                <Area type="monotone" dataKey="total" stroke="#8b5cf6" fill="url(#colorTotal)" fillOpacity={0.2} strokeWidth={3} name="total" />
-                <defs>
-                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                </linearGradient>
-            </defs>
-            </AreaChart>
-        ) : (
-            <BarChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} tickFormatter={(val) => `$${val}`}/>
-                <Tooltip 
-                  cursor={{fill: 'transparent'}}
-                  content={renderTrendTooltip}
-                />
-                <Legend />
-                {Array.from(new Set(subscriptions.map(s => displayCategoryLabel(s.category, lang)))).map((cat, index) => (
-                    <Bar key={cat} dataKey={cat} stackId="a" fill={COLORS[index % COLORS.length]} radius={[0,0,0,0]} />
-                ))}
-            </BarChart>
-        )}
+        <BarChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{fill: '#9CA3AF', fontSize: 12}}
+              tickFormatter={(val) => formatCurrency(val as number, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            />
+            <Tooltip 
+              cursor={{fill: 'transparent'}}
+              content={renderTrendTooltip}
+            />
+            <Legend />
+            {Array.from(new Set(subscriptions.map(s => displayCategoryLabel(s.category, lang)))).map((cat, index) => (
+                <Bar key={cat} dataKey={cat} stackId="a" fill={COLORS[index % COLORS.length]} radius={[0,0,0,0]} />
+            ))}
+        </BarChart>
     </ResponsiveContainer>
   );
 
@@ -427,13 +375,17 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         <BarChart data={distributionData}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB"/>
             <XAxis dataKey="day" tick={{fontSize: 10, fill: '#9CA3AF'}} interval={0}/>
-            <YAxis tick={{fontSize: 10, fill: '#9CA3AF'}} allowDecimals={false} tickFormatter={(val) => `$${val}`} />
+            <YAxis
+              tick={{fontSize: 10, fill: '#9CA3AF'}}
+              allowDecimals={false}
+              tickFormatter={(val) => formatCurrency(val as number, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            />
             <Tooltip
                 cursor={{fill: 'rgba(0,0,0,0.05)'}}
                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 formatter={(value: number, _name: string, props: any) => {
                     return [
-                        `$${value.toFixed(2)}`,
+                        formatCurrency(value, 'USD'),
                         `${t('sub_count')}: ${props?.payload?.count || 0}`
                     ];
                 }}
@@ -447,7 +399,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                         <div className="chart-tooltip p-3 rounded-xl text-sm text-gray-700 dark:text-gray-200 space-y-1">
                             <div className="font-semibold text-gray-900 dark:text-gray-100">{`${label}日`}</div>
                             <div className="text-gray-600 dark:text-gray-300">{`${t('sub_count')}: ${count}`}</div>
-                            <div className="text-gray-600 dark:text-gray-300">{`${t('total_amount')}: $${amount.toFixed(2)}`}</div>
+                            <div className="text-gray-600 dark:text-gray-300">{`${t('total_amount')}: ${formatCurrency(amount, 'USD')}`}</div>
                         </div>
                     );
                 }}
@@ -488,7 +440,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                           <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
                           <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{String(data.name)}</div>
                         </div>
-                        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage.toFixed(0)}% · $${Number(data.value || 0).toFixed(2)}`}</div>
+                        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage.toFixed(0)}% · ${formatCurrency(Number(data.value || 0), 'USD')}`}</div>
                         <div className="text-gray-600 dark:text-gray-300">{`${t('sub_count')}: ${data.count}`}</div>
                       </div>
                     );
@@ -515,16 +467,6 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       
-      {/* Lifetime Modal */}
-      {showLifetimeModal && (
-          <ModalWithPagination 
-            title={t('all_time')} 
-            records={allPayments} 
-            onClose={() => setShowLifetimeModal(false)}
-            t={t} 
-          />
-      )}
-
       {/* Detail Modal for History Group */}
       {detailModalGroup && (
           <ModalWithPagination 
@@ -535,51 +477,12 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           />
       )}
 
-      {/* 1. Lifetime Spend (Clickable Card) */}
-      <div 
-        onClick={() => setShowLifetimeModal(true)}
-        className="mac-surface p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all group flex items-center justify-between"
-      >
-        <div>
-             <div className="flex items-center space-x-3 mb-2">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg group-hover:scale-110 transition-transform"><TrendingUp size={24}/></div>
-                <span className="text-lg text-gray-500 dark:text-gray-400 font-medium">{t('lifetime_spend')}</span>
-             </div>
-             <h3 className="text-4xl font-bold text-gray-900 dark:text-white mt-2">${lifetimeSpend.toLocaleString()}</h3>
-             <p className="text-sm text-gray-400 mt-2 flex items-center gap-1 group-hover:text-primary-500 transition-colors">
-                 {t('view_details')} <ChevronRight size={14}/>
-             </p>
-        </div>
-        <div className="hidden md:block opacity-10 group-hover:opacity-20 transition-opacity">
-            <BarChart2 size={120} />
-        </div>
-      </div>
-
-      {/* 2. Spending Trend */}
+      {/* Spending Trend */}
       <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-[500px] flex flex-col relative">
          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 pr-10">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('spending_trend')}</h3>
-            
-            <div className="flex flex-wrap items-center gap-3">
-                 <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
-                    <button onClick={() => setTrendType('line')} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${trendType === 'line' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {t('line_chart')}
-                    </button>
-                    <button onClick={() => setTrendType('bar')} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${trendType === 'bar' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {t('bar_chart')}
-                    </button>
-                 </div>
-
-                 <select 
-                    value={trendRange} 
-                    onChange={(e) => setTrendRange(e.target.value as TimeRange)}
-                    className="px-3 py-1.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none dark:text-white"
-                 >
-                     <option value="12m">{t('last_12_months')}</option>
-                     <option value="6m">{t('last_6_months')}</option>
-                     <option value="ytd">{t('ytd')}</option>
-                     <option value="all">{t('all_time')}</option>
-                 </select>
+            <div>
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('spending_trend')}</h3>
+              <p className="text-xs text-gray-400 mt-1">{t('last_12_months')}</p>
             </div>
          </div>
          
@@ -588,7 +491,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
          </div>
       </div>
 
-      {/* Row 3: Distribution & Category */}
+      {/* Distribution & Category */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* Payment Distribution */}
@@ -602,16 +505,10 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           {/* Category Pie Chart */}
           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 flex flex-col relative">
              <div className="flex justify-between items-center mb-4 pr-10">
-                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('category_balance')}</h3>
-                 <select 
-                    value={categoryRange} 
-                    onChange={(e) => setCategoryRange(e.target.value as TimeRange)}
-                    className="px-2 py-1 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs outline-none dark:text-white"
-                 >
-                     <option value="12m">{t('last_12_months')}</option>
-                     <option value="ytd">{t('ytd')}</option>
-                     <option value="all">{t('all_time')}</option>
-                 </select>
+                 <div>
+                   <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('category_balance')}</h3>
+                   <p className="text-xs text-gray-400 mt-1">{t('last_12_months')}</p>
+                 </div>
              </div>
              
              <div className="flex-1 w-full min-h-0 relative">
@@ -620,7 +517,7 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
          </div>
       </div>
 
-      {/* 4. Detailed History Section (Cards) */}
+      {/* Detailed History Section (Cards) */}
       <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 	               <div>
@@ -629,15 +526,13 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	                     {t(
 	                       historyMode === 'month'
 	                         ? 'history_3_months'
-	                         : historyMode === 'quarter'
-	                           ? 'history_3_quarters'
-	                           : 'history_3_years'
+	                         : 'history_3_years'
 	                     )}
 	                   </p>
 	               </div>
                
                <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
-                   {(['month', 'quarter', 'year'] as const).map(mode => (
+                   {(['month', 'year'] as const).map(mode => (
                        <button 
                          key={mode}
                          onClick={() => setHistoryMode(mode)}
@@ -660,14 +555,14 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                       <div className="space-y-4 mb-6">
                           <div>
                               <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">{t('total_amount')}</p>
-                              <p className="text-2xl font-bold text-gray-800 dark:text-white">${group.total.toFixed(2)}</p>
+                              <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCurrency(group.total, 'USD')}</p>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">{t('avg_daily')}</p>
                                     <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                                        ${(group.total / (group.days || 1)).toFixed(2)}
+                                        {formatCurrency(group.total / (group.days || 1), 'USD')}
                                     </p>
                                 </div>
                                 <div>

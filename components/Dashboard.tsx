@@ -1,20 +1,18 @@
 
 import React, { useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
 import { Subscription, Frequency, AppSettings } from '../types';
-import { DollarSign, TrendingUp, Activity, CheckCircle, Clock } from 'lucide-react';
+import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, BarChart2 } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
+import { formatCurrency } from '../services/currency';
 
 interface Props {
   subscriptions: Subscription[];
   settings: AppSettings;
   lang: 'en' | 'zh';
 }
-
-const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
 
 interface BillingEvent {
   sub: Subscription;
@@ -85,10 +83,6 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const next7DaysEnd = new Date(today);
     next7DaysEnd.setDate(today.getDate() + 7);
     
-    // Last 12 Months Range (for Top Sub/Category)
-    const last12MonthsStart = new Date(today);
-    last12MonthsStart.setFullYear(today.getFullYear() - 1);
-
     // Stats
     let monthlyPaid = 0;
     let monthlyPending = 0;
@@ -96,15 +90,11 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     let yearlyPending = 0;
     let activeCount = 0;
     let cancelledCount = 0;
+    let lifetimeSpend = 0;
 
     // Collections
     const recentPayments: BillingEvent[] = [];
     const upcomingRenewals: BillingEvent[] = [];
-    const yearlyPaidByCategory: Record<string, number> = {};
-    
-    // Maps for Top Sub/Category (Last 12 Months)
-    const last12MSubTotal: Record<string, {name: string, value: number, currency: string}> = {};
-    const last12MCategoryTotal: Record<string, number> = {};
 
     subscriptions.forEach(sub => {
       // 1. Status Counts
@@ -124,16 +114,12 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
          }
       });
 
-      // 3. Yearly Logic & Breakdown
+      // 3. Yearly Logic
       const yearEvents = getBillingEventsInRange(sub, yearStart, yearEnd);
       yearEvents.forEach(date => {
         const usd = toUSD(sub.price, sub.currency);
         if (date <= today) {
             yearlyPaid += usd;
-            {
-              const cat = displayCategoryLabel(sub.category, lang);
-              yearlyPaidByCategory[cat] = (yearlyPaidByCategory[cat] || 0) + usd;
-            }
         } else if (sub.status !== 'cancelled') {
             yearlyPending += usd;
         }
@@ -155,99 +141,27 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           }
       }
 
-      // 6. Last 12 Months Logic (For Highest Sub & Top Category)
-      const last12MEvents = getBillingEventsInRange(sub, last12MonthsStart, today);
-      last12MEvents.forEach(() => {
-        // Sub Total
-        if (!last12MSubTotal[sub.id]) {
-            last12MSubTotal[sub.id] = { name: sub.name, value: 0, currency: sub.currency };
-        }
-        last12MSubTotal[sub.id].value += toUSD(sub.price, sub.currency);
-
-        // Category Total
-        {
-          const cat = displayCategoryLabel(sub.category, lang);
-          last12MCategoryTotal[cat] = (last12MCategoryTotal[cat] || 0) + toUSD(sub.price, sub.currency);
-        }
+      // 6. Lifetime Spend (All Past Events)
+      const lifetimeEvents = getBillingEventsInRange(sub, new Date(1970, 0, 1), today);
+      lifetimeEvents.forEach(() => {
+        lifetimeSpend += toUSD(sub.price, sub.currency);
       });
-    });
-
-    // Determine Highest Sub (by single billing amount, converted to USD)
-    let highestSub: { name: string; value: number; currency: string; iconUrl?: string } = { name: 'None', value: 0, currency: 'USD' };
-    subscriptions.forEach(sub => {
-        const usd = toUSD(sub.price, sub.currency);
-        if (usd > highestSub.value) {
-            highestSub = { name: sub.name, value: usd, currency: 'USD', iconUrl: sub.iconUrl };
-        }
-    });
-
-    // Determine Top Category (Last 12M)
-    let topCategory = { name: 'None', value: 0 };
-    Object.entries(last12MCategoryTotal).forEach(([cat, val]) => {
-        if (val > topCategory.value) topCategory = { name: cat, value: val };
     });
 
     // Sorting Tables
     recentPayments.sort((a, b) => b.date.getTime() - a.date.getTime()); 
     upcomingRenewals.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // Pie Chart Data (Monthly Budget)
-    const getStandardMonthlyCost = (sub: Subscription) => {
-        const usd = toUSD(sub.price, sub.currency);
-        switch (sub.frequency) {
-            case Frequency.MONTHLY: return usd;
-            case Frequency.QUARTERLY: return usd / 3;
-            case Frequency.SEMI_ANNUALLY: return usd / 6;
-            case Frequency.YEARLY: return usd / 12;
-            default: return usd;
-        }
-    };
-    
-    const categoryDataMap: Record<string, number> = {};
-    let totalMonthlyBudget = 0;
-    subscriptions.filter(s => s.status === 'active').forEach(sub => {
-        const cost = getStandardMonthlyCost(sub);
-        {
-          const cat = displayCategoryLabel(sub.category, lang);
-          categoryDataMap[cat] = (categoryDataMap[cat] || 0) + cost;
-        }
-        totalMonthlyBudget += cost;
-    });
-    
-    const categoryData = Object.keys(categoryDataMap).map(key => ({ 
-        name: key, 
-        value: parseFloat(categoryDataMap[key].toFixed(2)),
-        percentage: totalMonthlyBudget > 0 ? Math.round((categoryDataMap[key] / totalMonthlyBudget) * 100) : 0
-    })).sort((a, b) => b.value - a.value);
-    const categoryColorMap = categoryData.reduce<Record<string, string>>((acc, cur, idx) => {
-      acc[cur.name] = COLORS[idx % COLORS.length];
-      return acc;
-    }, {});
-
-
-    // Bar Chart Data (Yearly Paid Breakdown)
-    const yearlyBreakdownData = Object.keys(yearlyPaidByCategory).map(key => ({
-        name: key,
-        value: parseFloat(yearlyPaidByCategory[key].toFixed(2)),
-        percentage: yearlyPaid > 0 ? Math.round((yearlyPaidByCategory[key] / yearlyPaid) * 100) : 0
-    })).sort((a, b) => b.value - a.value);
-
-
     return {
-      monthlyPaid: monthlyPaid.toFixed(2),
-      monthlyPending: monthlyPending.toFixed(2),
-      yearlyPaid: yearlyPaid.toFixed(2),
-      yearlyPending: yearlyPending.toFixed(2),
+      monthlyPaid,
+      monthlyPending,
+      yearlyPaid,
+      yearlyPending,
+      lifetimeSpend,
       activeCount,
       cancelledCount,
       recentPayments,
-      upcomingRenewals,
-      categoryData,
-      yearlyBreakdownData,
-      highestSub,
-      topCategory,
-      categoryColorMap,
-      totalMonthlyBudget
+      upcomingRenewals
     };
   }, [subscriptions, settings.exchangeRates, lang]);
 
@@ -267,79 +181,10 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     return diffDays;
   };
 
-  const renderYearlyLabel = (props: any) => {
-    const { x = 0, y = 0, width = 0, height = 0, value, payload } = props;
-    const text = `$${value} (${payload?.percentage ?? 0}%)`;
-    const labelX = x + width - 8; // keep inside the bar
-    const labelY = y + height / 2 + 4;
-    return (
-      <text
-        x={labelX}
-        y={labelY}
-        textAnchor="end"
-        fill="#6b7280"
-        fontSize={11}
-        fontWeight={500}
-      >
-        {text}
-      </text>
-    );
-  };
-
-  const renderYearlyTooltip = ({ payload }: any) => {
-    if (!payload || !payload.length) return null;
-    const data = payload[0]?.payload;
-    if (!data) return null;
-    return (
-      <div className="chart-tooltip rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-        <div className="flex items-center gap-2">
-          <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
-          <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{String(data.name)}</div>
-        </div>
-        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(1)}`}</div>
-      </div>
-    );
-  };
-
-  const renderCategorySpendTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const data = payload[0]?.payload;
-    if (!data) return null;
-    return (
-      <div className="chart-tooltip rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-        <div className="flex items-center gap-2">
-          <CategoryGlyph category={String(data.name)} containerSize={18} size={12} />
-          <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">{String(data.name)}</div>
-        </div>
-        <div className="text-gray-600 dark:text-gray-300 mt-1">{`${data.percentage ?? 0}% · $${Number(data.value || 0).toFixed(2)}`}</div>
-      </div>
-    );
-  };
-
-  const CategoryAxisTick = ({ x, y, payload }: any) => {
-    const value = String(payload?.value ?? '');
-    const width = 140;
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <foreignObject x={-width} y={-12} width={width} height={24}>
-          <div xmlns="http://www.w3.org/1999/xhtml" className="flex items-center justify-end gap-2 pr-1">
-            <CategoryGlyph category={value} containerSize={18} size={12} />
-            <span className="text-xs text-gray-400 truncate max-w-[104px]" title={value}>
-              {value}
-            </span>
-          </div>
-        </foreignObject>
-      </g>
-    );
-  };
-
-  const yearlyVisibleRows = Math.min(dashboardData.yearlyBreakdownData.length || 6, 6);
-  const yearlyChartHeight = Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52;
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Stats Cards Row 1: Money & Counts */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         
         {/* Monthly Card */}
         <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
@@ -348,14 +193,18 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10">{t('monthly_paid_pending')}</p>
           <div className="flex items-baseline space-x-2 mt-2 z-10">
-              <h3 className="text-3xl font-bold text-gray-900 dark:text-white">${dashboardData.monthlyPaid}</h3>
+              <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(dashboardData.monthlyPaid, 'USD')}
+              </h3>
               <span className="text-gray-400 text-lg">/</span>
-              <span className="text-xl font-semibold text-gray-400">${dashboardData.monthlyPending}</span>
+              <span className="text-xl font-semibold text-gray-400">
+                {formatCurrency(dashboardData.monthlyPending, 'USD')}
+              </span>
           </div>
           <div className="mt-4 w-full bg-gray-100 dark:bg-slate-700 h-1.5 rounded-full z-10 overflow-hidden">
              <div 
                 className="h-full bg-primary-500 rounded-full" 
-                style={{ width: `${(parseFloat(dashboardData.monthlyPaid) / (parseFloat(dashboardData.monthlyPaid) + parseFloat(dashboardData.monthlyPending) || 1)) * 100}%` }}
+                style={{ width: `${(dashboardData.monthlyPaid / (dashboardData.monthlyPaid + dashboardData.monthlyPending || 1)) * 100}%` }}
              ></div>
           </div>
         </div>
@@ -367,14 +216,18 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10">{t('yearly_paid_pending')}</p>
           <div className="flex items-baseline space-x-2 mt-2 z-10">
-              <h3 className="text-3xl font-bold text-gray-900 dark:text-white">${dashboardData.yearlyPaid}</h3>
+              <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(dashboardData.yearlyPaid, 'USD')}
+              </h3>
               <span className="text-gray-400 text-lg">/</span>
-              <span className="text-xl font-semibold text-gray-400">${dashboardData.yearlyPending}</span>
+              <span className="text-xl font-semibold text-gray-400">
+                {formatCurrency(dashboardData.yearlyPending, 'USD')}
+              </span>
           </div>
           <div className="mt-4 w-full bg-gray-100 dark:bg-slate-700 h-1.5 rounded-full z-10 overflow-hidden">
              <div 
                 className="h-full bg-blue-500 rounded-full" 
-                style={{ width: `${(parseFloat(dashboardData.yearlyPaid) / (parseFloat(dashboardData.yearlyPaid) + parseFloat(dashboardData.yearlyPending) || 1)) * 100}%` }}
+                style={{ width: `${(dashboardData.yearlyPaid / (dashboardData.yearlyPaid + dashboardData.yearlyPending || 1)) * 100}%` }}
              ></div>
           </div>
         </div>
@@ -397,136 +250,19 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
               </div>
           </div>
         </div>
-      </div>
 
-       {/* Stats Cards Row 2: Highlights (Moved from Statistics) */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-	           {/* Highest Sub */}
-		           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-	                <div>
-	                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('highest_sub')}</p>
-	                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.highestSub.name}>
-	                        {dashboardData.highestSub.name}
-	                     </h3>
-	                     <p className="text-xs text-gray-400 mt-1">
-	                        ${dashboardData.highestSub.value.toFixed(2)} / 12mo
-	                     </p>
-	                </div>
-                  {dashboardData.highestSub.iconUrl ? (
-                    <div className="w-11 h-11 flex items-center justify-center">
-                      <img
-                        src={dashboardData.highestSub.iconUrl}
-                        alt={dashboardData.highestSub.name}
-                        className="w-full h-full object-contain"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-11 h-11 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-lg">
-                      {String(dashboardData.highestSub.name || 'S').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-	           </div>
-
-	           {/* Top Category */}
-	           <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-	                <div>
-	                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-1">{t('top_category')}</p>
-	                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white truncate max-w-[200px]" title={dashboardData.topCategory.name}>
-	                        {dashboardData.topCategory.name}
-	                     </h3>
-	                     <p className="text-xs text-gray-400 mt-1">
-	                        ${dashboardData.topCategory.value.toFixed(2)} / 12mo
-	                     </p>
-	                </div>
-	                <CategoryGlyph category={dashboardData.topCategory.name} containerSize={44} size={22} />
-	           </div>
-       </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Category Spend */}
-	        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('monthly_spend_category')}</h3>
-          {subscriptions.length > 0 ? (
-            <div className="h-full flex items-center gap-6">
-              <div className="flex-1 h-full min-h-[240px]">
-                <div className="w-full h-full outline-none" tabIndex={-1}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
-                      <Pie
-                        data={dashboardData.categoryData}
-                        cx="50%"
-                        cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={false}
-                      labelLine={false}
-                    >
-                      {dashboardData.categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-	                    <Tooltip 
-	                      content={renderCategorySpendTooltip}
-	                    />
-	                  </PieChart>
-	                  </ResponsiveContainer>
-	                </div>
-	              </div>
-	              <div className="w-48 space-y-2">
-	                {dashboardData.categoryData.map((entry, index) => (
-	                  <div key={entry.name} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
-	                    <div className="flex items-center gap-2 min-w-0">
-	                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <CategoryGlyph category={entry.name} containerSize={18} size={12} />
-	                      <span className="truncate" title={entry.name}>{entry.name}</span>
-	                    </div>
-	                    <span className="text-xs text-gray-400">{entry.percentage}%</span>
-	                  </div>
-	                ))}
-	              </div>
-            </div>
-	          ) : (
-	            <div className="h-full flex items-center justify-center text-gray-400">
-	              {t('no_data_available')}
-	            </div>
-	          )}
-	        </div>
-
-        {/* Yearly Breakdown Bar Chart */}
-	        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-96 overflow-hidden">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('yearly_expenditure_breakdown')}</h3>
-          {dashboardData.yearlyBreakdownData.length > 0 ? (
-            <div className="h-full overflow-y-auto relative" style={{ maxHeight: 6 * 52 + 80 }}>
-              <div style={{ height: Math.max(dashboardData.yearlyBreakdownData.length, 6) * 52, overflow: 'hidden' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboardData.yearlyBreakdownData} layout="vertical" margin={{ top: 10, right: 24, left: 10, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" hide domain={[0, 'dataMax']} />
-	                    <YAxis dataKey="name" type="category" width={150} tick={<CategoryAxisTick />} />
-                    <Tooltip 
-                      cursor={{fill: 'transparent'}}
-                      content={renderYearlyTooltip}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={28}>
-                        {/* Hide labels by default; hover shows tooltip already */}
-                        {dashboardData.yearlyBreakdownData.map((entry, idx) => (
-                          <Cell key={entry.name} fill={dashboardData.categoryColorMap[entry.name] || COLORS[idx % COLORS.length]} />
-                        ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              {t('no_paid_data_year')}
-            </div>
-          )}
+        {/* Lifetime Spend */}
+        <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+            <BarChart2 size={80} className="text-purple-500" />
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10">{t('lifetime_spend')}</p>
+          <div className="flex items-baseline space-x-2 mt-2 z-10">
+            <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {formatCurrency(dashboardData.lifetimeSpend, 'USD')}
+            </h3>
+          </div>
+          <p className="text-xs text-gray-400 mt-3 z-10">{t('all_time')}</p>
         </div>
       </div>
 
@@ -580,7 +316,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	                                      </div>
 	                                    </td>
                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                                        {item.sub.currency === 'USD' ? '$' : item.sub.currency} {item.cost.toFixed(2)}
+                                        {formatCurrency(item.cost, item.sub.currency)}
                                     </td>
                                     <td className="px-5 py-3 text-right text-gray-500 dark:text-gray-400">{formatDate(item.date)}</td>
                                 </tr>
@@ -642,7 +378,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
 	                                      </div>
 	                                    </td>
                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                                        {item.sub.currency === 'USD' ? '$' : item.sub.currency} {item.cost.toFixed(2)}
+                                        {formatCurrency(item.cost, item.sub.currency)}
                                     </td>
                                     <td className="px-5 py-3 text-right">
                                         {days <= 3 ? (

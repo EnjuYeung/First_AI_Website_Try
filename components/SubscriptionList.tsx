@@ -5,6 +5,7 @@ import { Edit2, Trash2, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, C
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { canonicalRenewalFeedback, displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { formatCurrency } from '../services/currency';
 import { parseLocalYMD } from '../services/dateUtils';
 
 interface Props {
@@ -181,21 +182,6 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
         { value: 'cancelled', label: t('cancelled') }
     ];
   }, [lang]);
-
-  const currencySymbol = (code: string) => {
-    const map: Record<string, string> = {
-      USD: '$',
-      CNY: '¥',
-      EUR: '€',
-      GBP: '£',
-      HKD: 'HK$',
-      JPY: '¥',
-      SGD: 'S$',
-      AUD: 'A$',
-      CAD: 'C$'
-    };
-    return map[code] || code;
-  };
 
   // --- Sorting & Filtering Logic ---
 
@@ -598,7 +584,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
                           {renderStatusBadge(sub.status)}
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="font-medium text-gray-900 dark:text-white">{currencySymbol(sub.currency)}{sub.price.toFixed(2)}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(sub.price, sub.currency)}</span>
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -737,7 +723,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
                          
                          <div className="flex items-baseline mb-4">
                             <span className={`text-2xl font-bold mr-1 ${sub.status === 'cancelled' ? 'text-gray-400 dark:text-gray-500 decoration-slate-400' : 'text-gray-900 dark:text-white'}`}>
-                                {currencySymbol(sub.currency)}{sub.price}
+                                {formatCurrency(sub.price, sub.currency)}
                             </span>
                              <span className="text-xs text-gray-500">
                                 / {lang === 'zh' ? (sub.frequency === Frequency.MONTHLY ? '月' : sub.frequency === Frequency.YEARLY ? '年' : '周期') : (sub.frequency === Frequency.MONTHLY ? 'mo' : sub.frequency === Frequency.YEARLY ? 'yr' : 'cycle')}
