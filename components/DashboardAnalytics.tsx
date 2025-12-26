@@ -149,7 +149,7 @@ const ModalWithPagination: React.FC<{ title: string, records: PaymentRecord[], o
   );
 };
 
-const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
+const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const t = getT(lang);
 
     const convertToUSD = (amount: number, currency: string) => {
@@ -587,4 +587,4 @@ const Statistics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
   );
 };
 
-export default Statistics;
+export default DashboardAnalytics;

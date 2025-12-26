@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Home, CreditCard, BarChart2, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw, WalletCards } from 'lucide-react';
+import { Plus, Home, CreditCard, BellRing, Settings as SettingsIcon, Globe, Moon, Sun, LogOut, RefreshCcw, WalletCards } from 'lucide-react';
 import { Subscription } from './types';
 import { getT } from './services/i18n';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
 import SubscriptionForm from './components/SubscriptionForm';
 import Settings from './components/Settings';
-import Statistics from './components/Statistics';
 import NotificationHistory from './components/NotificationHistory';
 import LoginPage from './components/LoginPage';
 
@@ -25,10 +24,10 @@ const App: React.FC = () => {
   
   useTheme(settings.theme);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'notifications' | 'settings'>(() => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'notifications' | 'settings'>(() => {
     if (typeof window === 'undefined') return 'dashboard';
     const stored = window.localStorage.getItem('subm.activeTab');
-    if (stored === 'dashboard' || stored === 'list' || stored === 'analytics' || stored === 'notifications' || stored === 'settings') {
+    if (stored === 'dashboard' || stored === 'list' || stored === 'notifications' || stored === 'settings') {
       return stored;
     }
     return 'dashboard';
@@ -90,7 +89,6 @@ const App: React.FC = () => {
   const navTabs = [
     { id: 'dashboard', icon: Home, label: t('dashboard') },
     { id: 'list', icon: CreditCard, label: t('subscriptions') },
-    { id: 'analytics', icon: BarChart2, label: t('analytics') },
     { id: 'notifications', icon: BellRing, label: t('notifications_history') },
     { id: 'settings', icon: SettingsIcon, label: t('settings') },
   ] as const;
@@ -168,10 +166,6 @@ const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'analytics' && (
-            <Statistics subscriptions={subscriptions} settings={settings} lang={settings.language} />
-          )}
-
           {activeTab === 'notifications' && (
             <NotificationHistory
               lang={settings.language}
@@ -223,7 +217,7 @@ const App: React.FC = () => {
       <nav className="fixed bottom-0 inset-x-0 z-30 md:hidden">
         <div className="px-4 pb-[env(safe-area-inset-bottom)]">
           <div className="mac-surface border border-white/40 dark:border-white/10 rounded-2xl shadow-mac-sm backdrop-blur-xl">
-            <div className="grid grid-cols-5">
+            <div className="grid grid-cols-4">
               {navTabs.map(tab => {
                 const isActive = activeTab === tab.id;
                 return (

@@ -7,6 +7,7 @@ import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
 import { formatCurrency } from '../services/currency';
+import DashboardAnalytics from './DashboardAnalytics';
 
 interface Props {
   subscriptions: Subscription[];
@@ -249,6 +250,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                  <h3 className="text-3xl font-bold text-gray-400">{dashboardData.cancelledCount}</h3>
               </div>
           </div>
+          <div className="mt-4 w-full h-1.5 opacity-0"></div>
         </div>
 
         {/* Lifetime Spend */}
@@ -262,7 +264,8 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
               {formatCurrency(dashboardData.lifetimeSpend, 'USD')}
             </h3>
           </div>
-          <p className="text-xs text-gray-400 mt-3 z-10">{t('all_time')}</p>
+          <div className="mt-4 w-full h-1.5 opacity-0"></div>
+          <p className="absolute bottom-5 left-6 text-xs text-gray-400">{t('all_time')}</p>
         </div>
       </div>
 
@@ -403,6 +406,9 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         </div>
 
       </div>
+
+      {/* Analytics Section */}
+      <DashboardAnalytics subscriptions={subscriptions} settings={settings} lang={lang} />
     </div>
   );
 };

@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
 import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
-import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Calendar, AlertTriangle, Mail, Send, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Calendar, Mail, Send, Trash2 } from 'lucide-react';
 import { PaymentGlyph } from './ui/glyphs';
 import { canonicalRenewalFeedback, displayPaymentMethodLabel } from '../services/displayLabels';
 import { formatCurrency, getCurrencySymbol } from '../services/currency';
@@ -255,68 +255,51 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                                  
                                  {/* Grid Layout for Fields */}
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
-                                     
-                                     {/* Common Fields */}
-                                     <div className="space-y-4">
-                                         <div className="flex items-center gap-3">
-                                             <Calendar className="text-blue-500" size={18} />
-                                             <div>
-                                                 <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_date')}</div>
-                                                 <div className="text-sm font-medium text-gray-900 dark:text-white">{notif.details.date}</div>
+                                     <div className="flex items-center gap-3">
+                                         <Calendar className="text-blue-500" size={18} />
+                                         <div>
+                                             <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_date')}</div>
+                                             <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                               {notif.details.date || '-'}
                                              </div>
                                          </div>
-
-                                         {notif.type === 'renewal_reminder' && feedbackLabel && (
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-[18px] flex justify-center">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_feedback')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{feedbackLabel}</div>
-                                                </div>
-                                            </div>
-                                         )}
-
-                                         {notif.details.amount && (
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-[18px] text-center text-yellow-500 font-bold">
-                                                  {getCurrencySymbol(notif.details.currency)}
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_amount')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                        {formatCurrency(notif.details.amount, notif.details.currency)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                         )}
-
                                      </div>
 
-                                     {/* Right Column / Conditional Fields */}
-                                     <div className="space-y-4">
-                                         {notif.details.paymentMethod && (
-                                             <div className="flex items-center gap-3">
-                                                <PaymentGlyph method={notif.details.paymentMethod} containerSize={18} size={12} />
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_payment')}</div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{displayPaymentMethodLabel(notif.details.paymentMethod, lang)}</div>
-                                                </div>
+                                     <div className="flex items-center gap-3">
+                                        <PaymentGlyph method={notif.details.paymentMethod || ''} containerSize={18} size={12} />
+                                        <div>
+                                            <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_payment')}</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                              {notif.details.paymentMethod ? displayPaymentMethodLabel(notif.details.paymentMethod, lang) : '-'}
                                             </div>
-                                         )}
-
-                                        {notif.status === 'failed' && notif.details.errorReason && (
-                                             <div className="flex items-start gap-3">
-                                                <AlertTriangle className="text-red-500 mt-1" size={18} />
-                                                <div>
-                                                    <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_error')}</div>
-                                                    <div className="text-sm font-bold text-red-600 dark:text-red-400">{notif.details.errorReason}</div>
-                                                </div>
-                                            </div>
-                                         )}
+                                        </div>
                                      </div>
 
+                                     <div className="flex items-center gap-3">
+                                        <div className="w-[18px] flex justify-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_feedback')}</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                              {feedbackLabel || '-'}
+                                            </div>
+                                        </div>
+                                     </div>
+
+                                     <div className="flex items-center gap-3">
+                                        <div className="w-[18px] text-center text-yellow-500 font-bold">
+                                          {getCurrencySymbol(notif.details.currency || '')}
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_amount')}</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                              {notif.details.amount !== undefined
+                                                ? formatCurrency(notif.details.amount, notif.details.currency)
+                                                : '-'}
+                                            </div>
+                                        </div>
+                                     </div>
                                  </div>
                              </div>
                          )}
