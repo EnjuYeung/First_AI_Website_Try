@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
-import { NotificationStatus, NotificationChannel } from '../types';
+import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
 import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Mail, Send, Trash2 } from 'lucide-react';
 import { canonicalRenewalFeedback } from '../services/displayLabels';
 
