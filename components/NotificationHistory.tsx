@@ -1,11 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { getT } from '../services/i18n';
-import { NotificationRecord, NotificationStatus, NotificationChannel } from '../types';
-import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Calendar, Mail, Send, Trash2 } from 'lucide-react';
-import { PaymentGlyph } from './ui/glyphs';
-import { canonicalRenewalFeedback, displayPaymentMethodLabel } from '../services/displayLabels';
-import { formatCurrency, getCurrencySymbol } from '../services/currency';
+import { NotificationStatus, NotificationChannel } from '../types';
+import { Search, ChevronDown, CheckCircle2, XCircle, BarChart3, Mail, Send, Trash2 } from 'lucide-react';
+import { canonicalRenewalFeedback } from '../services/displayLabels';
 
 interface Props {
   lang: 'en' | 'zh';
@@ -15,8 +13,6 @@ interface Props {
 }
 
 const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNotification, onClearNotifications }) => {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<NotificationStatus | 'all'>('all');
@@ -53,21 +49,15 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
     });
   }, [sortedNotifications, searchLower, statusFilter, channelFilter]);
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
-
   const handleDelete = (id: string) => {
     if (!window.confirm(t('confirm_delete_notification'))) return;
     onDeleteNotification(id);
-    if (expandedId === id) setExpandedId(null);
   };
 
   const handleClearAll = () => {
     if (sortedNotifications.length === 0) return;
     if (!window.confirm(t('confirm_clear_notifications'))) return;
     onClearNotifications();
-    setExpandedId(null);
   };
 
   // --- Render Helpers ---
@@ -88,9 +78,6 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
       </span>
     );
   };
-
-  const getTypeLabel = (type: NotificationRecord['type']) =>
-    type === 'subscription_change' ? t('notif_type_subscription_change') : t('notif_type_renewal_reminder');
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
@@ -196,113 +183,46 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
 
          <div className="space-y-3">
              {filteredNotifications.map(notif => {
-                 const isExpanded = expandedId === notif.id;
-                 const typeLabel = getTypeLabel(notif.type);
                  const feedbackLabel = getRenewalFeedbackLabel(notif.details?.renewalFeedback);
 
                  return (
                      <div 
                         key={notif.id} 
-                        className={`mac-surface border rounded-2xl overflow-hidden transition-all ${
-                            isExpanded 
-                            ? 'border-primary-500 ring-1 ring-primary-500 shadow-md' 
-                            : 'border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
+                        className="mac-surface border rounded-2xl overflow-hidden border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors relative"
                      >
-                         {/* Header */}
-                         <div 
-                            onClick={() => toggleExpand(notif.id)}
-                            className="p-5 cursor-pointer flex items-center justify-between group"
-                         >
-                             <div className="flex items-center gap-4">
-                                 {/* Status Icon */}
-                                 <div>{getStatusBadge(notif.status)}</div>
+                         <div className="p-5 pr-12">
+                           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                             <div className="flex items-center">{getStatusBadge(notif.status)}</div>
 
-                                 {/* Type Badge */}
-                                 <div className="px-2.5 py-1 rounded-md bg-gray-100 dark:bg-slate-700 text-xs font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                                     {typeLabel}
-                                 </div>
-
-                                 {/* Channel Badge */}
-                                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-medium text-slate-600 dark:text-slate-400">
-                                     {notif.channel === 'telegram' ? <Send size={10} /> : <Mail size={10} />}
-                                     {notif.channel === 'telegram' ? 'Telegram' : 'Email'}
-                                 </div>
+                             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-medium text-slate-600 dark:text-slate-400 w-fit">
+                                 {notif.channel === 'telegram' ? <Send size={10} /> : <Mail size={10} />}
+                                 {notif.channel === 'telegram' ? 'Telegram' : 'Email'}
                              </div>
 
-                             <div className="flex items-center gap-3">
-                                  <div className="text-right hidden sm:block">
-                                      <div className="text-sm font-bold text-gray-900 dark:text-white">{t('service')}: {notif.subscriptionName}</div>
-                                      <div className="text-xs text-gray-400 mt-0.5">{formatTime(notif.timestamp)}</div>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDelete(notif.id);
-                                    }}
-                                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                    title={t('notif_delete')}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                  <ChevronDown size={20} className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                             <div className="min-w-0">
+                               <div className="text-xs text-gray-400 uppercase font-bold">{t('service')}</div>
+                               <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{notif.subscriptionName}</div>
                              </div>
+
+                             <div>
+                               <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_sent_time')}</div>
+                               <div className="text-sm text-gray-700 dark:text-gray-200">{formatTime(notif.timestamp)}</div>
+                             </div>
+
+                             <div>
+                               <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_feedback')}</div>
+                               <div className="text-sm font-medium text-gray-900 dark:text-white">{feedbackLabel || '-'}</div>
+                             </div>
+                           </div>
                          </div>
 
-                         {/* Details (Expanded) */}
-                         {isExpanded && (
-                             <div className="border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-900/50 p-6 animate-fade-in">
-                                 
-                                 {/* Grid Layout for Fields */}
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
-                                     <div className="flex items-center gap-3">
-                                         <Calendar className="text-blue-500" size={18} />
-                                         <div>
-                                             <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_date')}</div>
-                                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                               {notif.details.date || '-'}
-                                             </div>
-                                         </div>
-                                     </div>
-
-                                     <div className="flex items-center gap-3">
-                                        <PaymentGlyph method={notif.details.paymentMethod || ''} containerSize={18} size={12} />
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_payment')}</div>
-                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                              {notif.details.paymentMethod ? displayPaymentMethodLabel(notif.details.paymentMethod, lang) : '-'}
-                                            </div>
-                                        </div>
-                                     </div>
-
-                                     <div className="flex items-center gap-3">
-                                        <div className="w-[18px] flex justify-center">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_feedback')}</div>
-                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                              {feedbackLabel || '-'}
-                                            </div>
-                                        </div>
-                                     </div>
-
-                                     <div className="flex items-center gap-3">
-                                        <div className="w-[18px] text-center text-yellow-500 font-bold">
-                                          {getCurrencySymbol(notif.details.currency || '')}
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 uppercase font-bold">{t('notif_detail_amount')}</div>
-                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                              {notif.details.amount !== undefined
-                                                ? formatCurrency(notif.details.amount, notif.details.currency)
-                                                : '-'}
-                                            </div>
-                                        </div>
-                                     </div>
-                                 </div>
-                             </div>
-                         )}
+                         <button
+                           onClick={() => handleDelete(notif.id)}
+                           className="absolute top-4 right-4 p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                           title={t('notif_delete')}
+                         >
+                           <Trash2 size={16} />
+                         </button>
                      </div>
                  )
              })}
