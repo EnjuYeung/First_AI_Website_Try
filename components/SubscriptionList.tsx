@@ -154,9 +154,11 @@ const SubscriptionList: React.FC<Props> = ({
   };
 
   const renderDateBadge = (dateStr: string, sub: Subscription) => {
+    if (sub.status === 'cancelled') return <span className="text-gray-300 dark:text-gray-600">-</span>;
+
     const days = getDaysRemaining(dateStr);
     const feedback = getRenewalFeedback(sub, dateStr);
-    const suppressBadge = sub.status === 'cancelled' || feedback === 'renewed' || feedback === 'deprecated';
+    const suppressBadge = feedback === 'renewed' || feedback === 'deprecated';
 
     if (days <= 3 && !suppressBadge) {
       return (
@@ -167,7 +169,7 @@ const SubscriptionList: React.FC<Props> = ({
           </span>
         </div>
       );
-    } else if (days <= 5) {
+    } else if (days <= 5 && !suppressBadge) {
       return (
         <div className="flex items-center">
           <span>{dateStr}</span>
