@@ -75,6 +75,7 @@ export interface Subscription {
   category: string; // Changed from Enum to string
   paymentMethod: string; // Changed from Enum to string
   status: 'active' | 'cancelled'; // New status field
+  cancelledAt?: string; // YYYY-MM-DD when status is cancelled
   startDate: string;
   nextBillingDate: string;
   iconUrl?: string;

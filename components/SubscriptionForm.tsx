@@ -41,6 +41,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     category: 'Other',
     paymentMethod: 'Credit Card',
     status: 'active',
+    cancelledAt: undefined,
     startDate: getTodayLocalYMD(),
     nextBillingDate: '',
     iconUrl: '',
@@ -136,6 +137,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         setFormData({
             ...initialData,
             status: initialData.status || 'active',
+            cancelledAt: initialData.status === 'cancelled' ? initialData.cancelledAt : undefined,
             iconUrl: initialData.iconUrl || '',
             notificationsEnabled: initialData.notificationsEnabled !== undefined ? initialData.notificationsEnabled : true
         });
@@ -184,6 +186,16 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         return crypto.randomUUID();
     }
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  };
+
+  const handleStatusChange = (value: 'active' | 'cancelled') => {
+    setFormData((prev) => {
+      if (value === 'cancelled') {
+        if (prev.status === 'cancelled') return { ...prev, status: value };
+        return { ...prev, status: value, cancelledAt: getTodayLocalYMD() };
+      }
+      return { ...prev, status: value, cancelledAt: undefined };
+    });
   };
 
   if (!isOpen) return null;
@@ -388,7 +400,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                     : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900'
                   }`}
                   value={formData.status}
-                  onChange={e => setFormData({...formData, status: e.target.value as 'active' | 'cancelled'})}
+                  onChange={e => handleStatusChange(e.target.value as 'active' | 'cancelled')}
                 >
                   <option value="active">{t('active')}</option>
                   <option value="cancelled">{t('cancelled')}</option>

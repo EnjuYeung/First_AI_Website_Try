@@ -11,6 +11,13 @@ const applySubscriptionAction = (subscription, action) => {
   if (action === 'deprecated') targetStatus = 'cancelled';
   const changed = subscription.status !== targetStatus;
   subscription.status = targetStatus;
+  if (changed) {
+    if (targetStatus === 'cancelled') {
+      subscription.cancelledAt = formatLocalYMD(new Date());
+    } else {
+      delete subscription.cancelledAt;
+    }
+  }
   return { changed, status: targetStatus };
 };
 
@@ -27,13 +34,13 @@ const parseLocalYMD = (ymd) => {
   return date;
 };
 
-const formatLocalYMD = (date) => {
+function formatLocalYMD(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
+}
 
 const addFrequencyToDate = (ymd, frequency) => {
   const date = parseLocalYMD(ymd);

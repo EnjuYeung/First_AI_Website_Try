@@ -295,7 +295,7 @@ const SubscriptionList: React.FC<Props> = ({ subscriptions, notifications, onEdi
   const renderDateBadge = (dateStr: string, sub: Subscription) => {
     const days = getDaysRemaining(dateStr);
     const feedback = getRenewalFeedback(sub, dateStr);
-    const suppressBadge = feedback === 'renewed' || feedback === 'deprecated';
+    const suppressBadge = sub.status === 'cancelled' || feedback === 'renewed' || feedback === 'deprecated';
     let badge = null;
 
     if (days <= 3) {

@@ -166,9 +166,9 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
     // --- Helper Functions ---
 
     // Generate billing events for a subscription up to today
-	    const getAllBillingEvents = (sub: Subscription): PaymentRecord[] => {
-	        const events: PaymentRecord[] = [];
-	        if (!sub.startDate) return events;
+    const getAllBillingEvents = (sub: Subscription): PaymentRecord[] => {
+        const events: PaymentRecord[] = [];
+        if (!sub.startDate) return events;
         
         let currentDate = parseLocalYMD(sub.startDate);
         const today = new Date();
@@ -176,7 +176,17 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
 
         if (isNaN(currentDate.getTime())) return events;
 
-        while (currentDate <= today) {
+        let effectiveEnd = today;
+        if (sub.status === 'cancelled' && sub.cancelledAt) {
+            const cancelledDate = parseLocalYMD(sub.cancelledAt);
+            if (!Number.isNaN(cancelledDate.getTime())) {
+                cancelledDate.setHours(0, 0, 0, 0);
+                if (cancelledDate < currentDate) return events;
+                if (cancelledDate < effectiveEnd) effectiveEnd = cancelledDate;
+            }
+        }
+
+        while (currentDate <= effectiveEnd) {
 	            events.push({
 	                subId: sub.id,
 	                subName: sub.name,

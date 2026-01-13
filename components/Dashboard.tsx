@@ -36,13 +36,25 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     const events: Date[] = [];
     if (!sub.startDate) return events;
 
+    const rangeStart = new Date(startRange);
+    const rangeEnd = new Date(endRange);
+
+    if (sub.status === 'cancelled' && sub.cancelledAt) {
+      const cancelledDate = parseLocalYMD(sub.cancelledAt);
+      if (!Number.isNaN(cancelledDate.getTime())) {
+        cancelledDate.setHours(0, 0, 0, 0);
+        if (cancelledDate < rangeStart) return events;
+        if (cancelledDate < rangeEnd) rangeEnd.setTime(cancelledDate.getTime());
+      }
+    }
+
     let currentDate = parseLocalYMD(sub.startDate);
     
     // Safety check to prevent infinite loops if start date is invalid
     if (isNaN(currentDate.getTime())) return events;
 
-    while (currentDate <= endRange) {
-      if (currentDate >= startRange) {
+    while (currentDate <= rangeEnd) {
+      if (currentDate >= rangeStart) {
         events.push(new Date(currentDate));
       }
 

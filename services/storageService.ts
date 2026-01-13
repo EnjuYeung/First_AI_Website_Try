@@ -87,8 +87,25 @@ export const uploadIconFile = async (file: File): Promise<string> => {
 const normalizeSubscription = (sub: any): Subscription => {
   const category = canonicalCategoryKey(sub?.category || 'Other') || 'Other';
   const paymentMethod = canonicalPaymentMethodKey(sub?.paymentMethod || 'Credit Card') || 'Credit Card';
+  const status = sub?.status === 'cancelled' ? 'cancelled' : 'active';
+
+  const normalizeYMD = (value: any): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) return trimmed.slice(0, 10);
+    return undefined;
+  };
+
+  const cancelledAt = status === 'cancelled'
+    ? normalizeYMD(sub?.cancelledAt) || normalizeYMD(sub?.startDate)
+    : undefined;
+
   return {
     ...sub,
+    status,
+    cancelledAt,
     category,
     paymentMethod,
   } as Subscription;
