@@ -12,7 +12,7 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 
 const normalizeCode = (code: string) => (code || 'USD').toUpperCase();
 
-export const getCurrencySymbol = (code: string) => {
+const getCurrencySymbol = (code: string) => {
   const normalized = normalizeCode(code);
   if (CURRENCY_SYMBOLS[normalized]) return CURRENCY_SYMBOLS[normalized];
   try {

@@ -1,21 +1,38 @@
 import { useState, useMemo } from 'react';
-import { Subscription, Frequency } from '../types';
+import { Subscription } from '../types';
 import { parseLocalYMD } from '../services/dateUtils';
 
-// Types for Filter State
 interface SortConfig {
     key: 'price' | 'nextBillingDate' | 'name' | 'category' | 'paymentMethod' | null;
     direction: 'asc' | 'desc';
 }
 
-interface FilterState {
-    searchTerm: string;
-    categories: string[];
-    frequencies: string[];
-    payments: string[];
-    priceRanges: string[];
-    statuses: string[];
-}
+const STRING_SORT_KEYS = new Set<NonNullable<SortConfig['key']>>(['name', 'category', 'paymentMethod']);
+
+const PRICE_RANGE_MATCHERS: Record<string, (price: number) => boolean> = {
+    low: (price) => price >= 0 && price <= 5,
+    mid: (price) => price > 5 && price <= 10,
+    high: (price) => price > 10,
+};
+
+const matchesSelection = (selected: string[], value: string) => (
+    selected.length === 0 || selected.includes(value)
+);
+
+const matchesPriceRanges = (selectedRanges: string[], price: number) => (
+    selectedRanges.length === 0 ||
+    selectedRanges.some(range => PRICE_RANGE_MATCHERS[range]?.(price) ?? false)
+);
+
+const getSortValue = (subscription: Subscription, key: NonNullable<SortConfig['key']>) => {
+    if (key === 'nextBillingDate') {
+        const time = parseLocalYMD(subscription.nextBillingDate).getTime();
+        return Number.isFinite(time) ? time : 0;
+    }
+
+    const value = subscription[key];
+    return STRING_SORT_KEYS.has(key) ? String(value || '').toLowerCase() : value;
+};
 
 export const useSubscriptionFilters = (subscriptions: Subscription[]) => {
     // State
@@ -50,53 +67,28 @@ export const useSubscriptionFilters = (subscriptions: Subscription[]) => {
 
     // Processing Logic
     const filteredSubscriptions = useMemo(() => {
+        const normalizedSearch = searchTerm.toLowerCase();
+
         return subscriptions
             .filter(sub => {
-                // Search Term (Name)
-                if (searchTerm && !sub.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+                if (normalizedSearch && !sub.name.toLowerCase().includes(normalizedSearch)) {
                     return false;
                 }
 
-                // Multi-Select Filters
-                if (selectedCategories.length > 0 && !selectedCategories.includes(sub.category)) return false;
-                if (selectedFrequencies.length > 0 && !selectedFrequencies.includes(sub.frequency)) return false;
-                if (selectedPayments.length > 0 && !selectedPayments.includes(sub.paymentMethod || 'Credit Card')) return false;
-                if (selectedStatuses.length > 0 && !selectedStatuses.includes(sub.status || 'active')) return false;
-
-                // Price Range Logic
-                if (selectedPriceRanges.length > 0) {
-                    const matchesRange = selectedPriceRanges.some(range => {
-                        if (range === 'low') return sub.price >= 0 && sub.price <= 5;
-                        if (range === 'mid') return sub.price > 5 && sub.price <= 10;
-                        if (range === 'high') return sub.price > 10;
-                        return false;
-                    });
-                    if (!matchesRange) return false;
-                }
-
-                return true;
+                return (
+                    matchesSelection(selectedCategories, sub.category) &&
+                    matchesSelection(selectedFrequencies, sub.frequency) &&
+                    matchesSelection(selectedPayments, sub.paymentMethod || 'Credit Card') &&
+                    matchesSelection(selectedStatuses, sub.status || 'active') &&
+                    matchesPriceRanges(selectedPriceRanges, sub.price)
+                );
             })
             .sort((a, b) => {
                 if (!sortConfig.key) return 0;
 
-                let aValue: any = a[sortConfig.key];
-                let bValue: any = b[sortConfig.key];
+                const aValue = getSortValue(a, sortConfig.key);
+                const bValue = getSortValue(b, sortConfig.key);
 
-                // String Normalization
-                if (['name', 'category', 'paymentMethod'].includes(sortConfig.key)) {
-                    aValue = (aValue || '').toLowerCase();
-                    bValue = (bValue || '').toLowerCase();
-                }
-
-                // Date Handling
-                if (sortConfig.key === 'nextBillingDate') {
-                    const aTime = parseLocalYMD(a.nextBillingDate).getTime();
-                    const bTime = parseLocalYMD(b.nextBillingDate).getTime();
-                    aValue = Number.isFinite(aTime) ? aTime : 0;
-                    bValue = Number.isFinite(bTime) ? bTime : 0;
-                }
-
-                // Comparison
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
                 return 0;

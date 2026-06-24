@@ -1,8 +1,3 @@
-export interface ReminderTemplate {
-  lines: string[];
-}
-
-export const DEFAULT_REMINDER_TEMPLATE: ReminderTemplate;
 export const DEFAULT_REMINDER_TEMPLATE_STRING: string;
 export function normalizeReminderTemplateString(templateString: string): string;
 export function renderReminderTemplate(
@@ -15,4 +10,3 @@ export function renderReminderTemplate(
     paymentMethod?: string;
   }
 ): string;
-

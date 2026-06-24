@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { getT } from '../services/i18n';
-import { Lock, User, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Lock, User, Globe, ArrowRight } from 'lucide-react';
 
 interface Props {
   onLogin: () => void;

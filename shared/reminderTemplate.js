@@ -6,7 +6,7 @@ const TOKEN_REPLACERS = {
   paymentMethod: (sub) => sub?.paymentMethod ?? '未填写',
 };
 
-export const DEFAULT_REMINDER_TEMPLATE = {
+const DEFAULT_REMINDER_TEMPLATE = {
   lines: [
     '🔔 续订提醒通知',
     '',
@@ -60,4 +60,3 @@ export const renderReminderTemplate = (templateString, subscription) => {
 
   return lines.map(replaceLine).filter(Boolean).join('\n');
 };
-

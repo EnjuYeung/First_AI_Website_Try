@@ -73,19 +73,19 @@ const StatCard: React.FC<{
       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
         <Icon size={80} className={iconColorClass} />
       </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10">{title}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10 truncate">{title}</p>
 
-      <div className="flex items-baseline space-x-2 mt-2 z-10">
-        <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
+      <div className="flex flex-wrap items-end gap-x-2 gap-y-1 mt-2 z-10 min-w-0">
+        <h3 className="max-w-full text-[clamp(1.375rem,1.45vw,1.875rem)] leading-tight font-bold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
           {isCount ? primaryValue : formatCurrency(primaryValue, 'USD')}
         </h3>
         {secondaryValue !== undefined && (
-          <>
-            <span className="text-gray-400 text-lg">{isCount ? '|' : '/'}</span>
-            <span className="text-xl font-semibold text-gray-400">
+          <div className="flex items-baseline gap-2 min-w-0 text-[clamp(0.875rem,1vw,1.25rem)] leading-tight font-semibold text-gray-400 whitespace-nowrap tabular-nums">
+            <span>{isCount ? '|' : '/'}</span>
+            <span>
               {isCount ? secondaryValue : formatCurrency(secondaryValue, 'USD')}
             </span>
-          </>
+          </div>
         )}
       </div>
 
@@ -235,7 +235,6 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
           break;
         }
 
-        const tTime = currentDate.getTime();
         const dateObj = new Date(currentDate); // Copy for storage
 
         // A. Lifetime (Before or on today)

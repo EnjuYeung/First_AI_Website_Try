@@ -435,7 +435,7 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
                   label={false}
                   labelLine={false}
               >
-                  {categoryPieData.map((entry, index) => (
+                  {categoryPieData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
               </Pie>
