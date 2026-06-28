@@ -248,7 +248,6 @@ const SubscriptionList: React.FC<Props> = ({
           onEdit={onEdit}
           onDuplicate={onDuplicate}
           onDelete={onDelete}
-          getRenewalFeedback={getRenewalFeedback}
           renderDateBadge={renderDateBadge}
           lang={lang}
           t={t}

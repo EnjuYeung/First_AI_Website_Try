@@ -114,11 +114,17 @@ export const createExchangeRate = ({ storage, defaults }) => {
         const ran0 = cfg.lastRunAt0 ? formatDateInTimeZone(tz, new Date(cfg.lastRunAt0)) : '';
         const ran12 = cfg.lastRunAt12 ? formatDateInTimeZone(tz, new Date(cfg.lastRunAt12)) : '';
 
-        if ((hour > 0 || (hour === 0 && minute >= 0)) && ran0 !== today) {
-          await updateExchangeRatesForUser(username, 0);
-        }
         if ((hour > 12 || (hour === 12 && minute >= 0)) && ran12 !== today) {
           await updateExchangeRatesForUser(username, 12);
+          if (ran0 !== today) {
+            const updatedData = await storage.loadUserData(username);
+            if (updatedData.settings?.exchangeRateApi) {
+              updatedData.settings.exchangeRateApi.lastRunAt0 = Date.now();
+              await storage.saveUserData(username, updatedData);
+            }
+          }
+        } else if ((hour > 0 || (hour === 0 && minute >= 0)) && ran0 !== today) {
+          await updateExchangeRatesForUser(username, 0);
         }
       } catch (err) {
         console.error('Exchange rate tick failed', err);

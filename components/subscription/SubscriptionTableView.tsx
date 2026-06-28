@@ -23,7 +23,6 @@ interface SubscriptionTableViewProps {
     onDuplicate: (sub: Subscription) => void;
     onDelete: (id: string) => void;
 
-    getRenewalFeedback: (sub: Subscription, dateStr: string) => string;
     renderDateBadge: (dateStr: string, sub: Subscription) => React.ReactNode;
 
     lang: 'en' | 'zh';

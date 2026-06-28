@@ -186,7 +186,15 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
             }
         }
 
+        const MAX_ITERATIONS = 5000;
+        let iterations = 0;
+
         while (currentDate <= effectiveEnd) {
+            iterations++;
+            if (iterations > MAX_ITERATIONS) {
+                console.warn(`[DashboardAnalytics] Max iterations exceeded for sub: ${sub.name}`);
+                break;
+            }
 	            events.push({
 	                subId: sub.id,
 	                subName: sub.name,

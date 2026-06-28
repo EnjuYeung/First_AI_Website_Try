@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import path from 'path';
+import { parseLocalYMD } from './dates.js';
 
 import {
   CREDENTIALS_FILE,
@@ -133,15 +134,9 @@ const resolveSubscriptionForNotification = (subscriptions, record) => {
   return list.find((sub) => sub?.name === name) || null;
 };
 
-const YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
 const isPastDate = (ymd) => {
-  if (!ymd) return false;
-  const match = YMD_RE.exec(String(ymd).trim());
-  if (!match) return false;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const date = parseLocalYMD(ymd);
   if (Number.isNaN(date.getTime())) return false;
-  date.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return date < today;
@@ -196,11 +191,14 @@ export const createStorage = ({ adminUser, adminPass }) => {
     await waitForPendingWrite(CREDENTIALS_FILE);
     try {
       return await readJson(CREDENTIALS_FILE);
-    } catch {
-      const passwordHash = bcrypt.hashSync(adminPass, 10);
-      const creds = { username: adminUser, passwordHash };
-      await atomicWriteJson(CREDENTIALS_FILE, creds);
-      return creds;
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        const passwordHash = bcrypt.hashSync(adminPass, 10);
+        const creds = { username: adminUser, passwordHash };
+        await atomicWriteJson(CREDENTIALS_FILE, creds);
+        return creds;
+      }
+      throw err;
     }
   };
 
@@ -222,10 +220,13 @@ export const createStorage = ({ adminUser, adminPass }) => {
         notifications,
         settings,
       };
-    } catch {
-      const initial = defaultUserData();
-      await atomicWriteJson(userDataPath(username), initial);
-      return initial;
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        const initial = defaultUserData();
+        await atomicWriteJson(filePath, initial);
+        return initial;
+      }
+      throw err;
     }
   };
 

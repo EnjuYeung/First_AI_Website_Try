@@ -258,18 +258,6 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
       !settings.customCurrencies.some((existing) => existing.code === c.code)
   );
 
-  const buildTestReminderMessage = () => {
-    const today = getTodayLocalYMD();
-    const normalized = normalizeReminderTemplateString(templateText);
-    return renderReminderTemplate(normalized, {
-      name: '测试订阅',
-      nextBillingDate: today,
-      price: '0.00',
-      currency: '',
-      paymentMethod: '测试支付方式',
-    });
-  };
-
   const handleTestTelegram = async () => {
     setIsTestingTelegram(true);
     try {
@@ -277,6 +265,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
       await apiFetchJson<any>('/api/notifications/test-telegram', {
         method: 'POST',
         headers: authJsonHeaders(),
+        body: JSON.stringify({ template: templateText }),
       });
       setAlertState({
         isOpen: true,
@@ -491,7 +480,6 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
   };
 
   const handleTestTemplate = () => {
-    void buildTestReminderMessage();
     handleTestTelegram();
   };
 

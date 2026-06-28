@@ -3,6 +3,7 @@ import speakeasy from 'speakeasy';
 import { renderReminderTemplate, DEFAULT_REMINDER_TEMPLATE_STRING } from '../../shared/reminderTemplate.js';
 import { createIconUpload } from './iconUpload.js';
 import { sendTelegramMessage, answerCallback, clearInlineKeyboard, ensureTelegramWebhook } from './telegram.js';
+import { parseLocalYMD, formatLocalYMD } from './dates.js';
 
 const applySubscriptionAction = (subscription, action) => {
   if (!subscription) return { changed: false, status: null };
@@ -20,27 +21,6 @@ const applySubscriptionAction = (subscription, action) => {
   }
   return { changed, status: targetStatus };
 };
-
-const YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-const parseLocalYMD = (ymd) => {
-  const match = YMD_RE.exec(String(ymd || '').trim());
-  if (!match) return new Date(NaN);
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  date.setHours(0, 0, 0, 0);
-  return date;
-};
-
-function formatLocalYMD(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 const addFrequencyToDate = (ymd, frequency) => {
   const date = parseLocalYMD(ymd);
@@ -443,8 +423,9 @@ export const registerRoutes = ({
       const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook/${botToken}`;
       await ensureTelegramWebhook({ debug: config.debugTelegram }, botToken, webhookUrl);
 
+      const { template } = req.body || {};
       const templateStr =
-        settings.notifications?.rules?.template || DEFAULT_REMINDER_TEMPLATE_STRING;
+        template || settings.notifications?.rules?.template || DEFAULT_REMINDER_TEMPLATE_STRING;
       const message = renderReminderTemplate(templateStr, {
         name: '测试订阅',
         nextBillingDate: new Date().toISOString().slice(0, 10),

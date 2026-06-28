@@ -121,6 +121,9 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         case Frequency.YEARLY:
           nextDate.setFullYear(nextDate.getFullYear() + 1);
           break;
+        default:
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          break;
       }
     }
     
