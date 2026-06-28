@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, RefreshCw, Bell, Loader2 } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
-import { uploadIconFile } from '../services/storageService';
+import { deleteUploadedIcon, uploadIconFile } from '../services/storageService';
 import { getTodayLocalYMD } from '../services/dateUtils';
 
 interface Props {
@@ -52,6 +52,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   const [iconLoadError, setIconLoadError] = useState(false);
   const [iconUploadError, setIconUploadError] = useState<string | null>(null);
   const [isIconUploading, setIsIconUploading] = useState(false);
+  const temporaryUploads = useRef(new Set<string>());
   const iconUrl = String(formData.iconUrl || '').trim();
 
   const handleIconFile = async (file: File | null) => {
@@ -69,6 +70,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     try {
       setIsIconUploading(true);
       const uploadedUrl = await uploadIconFile(file);
+      temporaryUploads.current.add(uploadedUrl);
       setFormData((prev) => ({ ...prev, iconUrl: uploadedUrl }));
     } catch (err: any) {
       const msg = String(err?.message || '');
@@ -203,6 +205,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
   if (!isOpen) return null;
 
+  const closeAndDiscardUploads = () => {
+    const pending = [...temporaryUploads.current];
+    temporaryUploads.current.clear();
+    pending.forEach((url) => void deleteUploadedIcon(url).catch(console.error));
+    onClose();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
@@ -211,6 +220,10 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
       price: Number(formData.price),
       iconUrl: iconUrl.length > 0 ? iconUrl : undefined
     });
+    temporaryUploads.current.delete(iconUrl);
+    const unused = [...temporaryUploads.current];
+    temporaryUploads.current.clear();
+    unused.forEach((url) => void deleteUploadedIcon(url).catch(console.error));
     onClose();
   };
 
@@ -221,7 +234,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
             {initialData ? t('edit_subscription') : t('add_subscription')}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+          <button onClick={closeAndDiscardUploads} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
             <X size={24} />
           </button>
         </div>

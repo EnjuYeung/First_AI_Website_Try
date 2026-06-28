@@ -165,7 +165,19 @@ export const createReminders = ({ config, storage, email }) => {
 
     if (changed) {
       try {
-        await storage.saveUserData(username, data);
+        const processedById = new Map(
+          (data.notifications || []).filter((record) => record?.id).map((record) => [record.id, record])
+        );
+        await storage.updateUserData(username, (current) => {
+          const currentIds = new Set((current.notifications || []).map((record) => record?.id));
+          const updatedExisting = (current.notifications || []).map(
+            (record) => processedById.get(record?.id) || record
+          );
+          const newlyCreated = (data.notifications || []).filter(
+            (record) => record?.id && !currentIds.has(record.id)
+          );
+          return { ...current, notifications: [...updatedExisting, ...newlyCreated] };
+        });
       } catch (err) {
         console.error('Failed to persist notifications history', err);
       }

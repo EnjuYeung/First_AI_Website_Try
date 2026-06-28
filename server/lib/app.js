@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { UPLOADS_DIR } from './storagePaths.js';
 import { registerRoutes } from './routes.js';
 
-export const createApp = ({ config, auth, storage, reminders, exchangeRate, email }) => {
+export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
   const app = express();
   app.disable('x-powered-by');
 
@@ -48,7 +48,6 @@ export const createApp = ({ config, auth, storage, reminders, exchangeRate, emai
     config,
     auth,
     storage,
-    reminders,
     exchangeRate,
     email,
     crypto,

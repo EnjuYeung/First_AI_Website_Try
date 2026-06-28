@@ -67,32 +67,34 @@ export const createExchangeRate = ({ storage, defaults }) => {
     const apiKey = await decryptExchangeRateApiKey(storage, cfg.encryptedKey);
     const conversionRates = await fetchUsdRatesFromExchangeRateApi(apiKey);
 
-    const desired = (settings.customCurrencies || []).map((c) => c.code).filter(Boolean);
-    const nextRates = { ...(settings.exchangeRates || {}) };
-    nextRates.USD = 1;
-
-    for (const code of desired) {
-      if (code === 'USD') continue;
-      const rate = conversionRates[code];
-      if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
-        nextRates[code] = rate;
-      }
-    }
-
     const now = Date.now();
-    settings.exchangeRates = nextRates;
-    settings.lastRatesUpdate = now;
-    settings.exchangeRateApi = {
-      ...defaults.defaultSettings().exchangeRateApi,
-      ...cfg,
-      ...(slotHour === 0 ? { lastRunAt0: now } : {}),
-      ...(slotHour === 12 ? { lastRunAt12: now } : {}),
+    const updatedData = await storage.updateUserData(username, (current) => {
+      const currentSettings = current.settings || defaults.defaultSettings();
+      const currentCfg = currentSettings.exchangeRateApi || defaults.defaultSettings().exchangeRateApi;
+      const nextRates = { ...(currentSettings.exchangeRates || {}), USD: 1 };
+      const currentDesired = (currentSettings.customCurrencies || []).map((c) => c.code).filter(Boolean);
+      for (const code of currentDesired) {
+        if (code === 'USD') continue;
+        const rate = conversionRates[code];
+        if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) nextRates[code] = rate;
+      }
+      currentSettings.exchangeRates = nextRates;
+      currentSettings.lastRatesUpdate = now;
+      currentSettings.exchangeRateApi = {
+        ...defaults.defaultSettings().exchangeRateApi,
+        ...currentCfg,
+        ...(slotHour === 0 ? { lastRunAt0: now } : {}),
+        ...(slotHour === 12 ? { lastRunAt12: now } : {}),
+      };
+      return { ...current, settings: currentSettings };
+    });
+
+    return {
+      updated: true,
+      lastRatesUpdate: now,
+      exchangeRates: updatedData.settings.exchangeRates,
+      exchangeRateApi: updatedData.settings.exchangeRateApi,
     };
-
-    data.settings = settings;
-    await storage.saveUserData(username, data);
-
-    return { updated: true, lastRatesUpdate: now, exchangeRates: nextRates, exchangeRateApi: settings.exchangeRateApi };
   };
 
   const startExchangeRateScheduler = ({ username }) => {
@@ -119,8 +121,10 @@ export const createExchangeRate = ({ storage, defaults }) => {
           if (ran0 !== today) {
             const updatedData = await storage.loadUserData(username);
             if (updatedData.settings?.exchangeRateApi) {
-              updatedData.settings.exchangeRateApi.lastRunAt0 = Date.now();
-              await storage.saveUserData(username, updatedData);
+              await storage.updateUserData(username, (current) => {
+                current.settings.exchangeRateApi.lastRunAt0 = Date.now();
+                return current;
+              });
             }
           }
         } else if ((hour > 0 || (hour === 0 && minute >= 0)) && ran0 !== today) {

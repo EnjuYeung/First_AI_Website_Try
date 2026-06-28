@@ -62,13 +62,11 @@ const waitForPendingWrite = async (key) => {
 const queueWrite = async (key, writeFn) => {
   const previous = pendingWrites.get(key) || Promise.resolve();
   const next = previous.then(writeFn, writeFn);
-  pendingWrites.set(
-    key,
-    next.finally(() => {
-      if (pendingWrites.get(key) === next) pendingWrites.delete(key);
-    })
-  );
-  return next;
+  const tracked = next.finally(() => {
+    if (pendingWrites.get(key) === tracked) pendingWrites.delete(key);
+  });
+  pendingWrites.set(key, tracked);
+  return tracked;
 };
 
 export const ensureDataDir = async () => {
@@ -230,17 +228,38 @@ export const createStorage = ({ adminUser, adminPass }) => {
     }
   };
 
-  const saveUserData = async (username, data) => {
+  const updateUserData = async (username, updater) => {
     await ensureDataDir();
-    const settings = mergeSettings(data.settings);
-    const notifications = normalizeNotifications(data.notifications || [], data.subscriptions || []);
-    const payload = {
-      subscriptions: data.subscriptions || [],
-      notifications,
-      settings,
-    };
     const filePath = userDataPath(username);
-    await queueWrite(filePath, () => atomicWriteJson(filePath, payload));
+    return queueWrite(filePath, async () => {
+      let current;
+      try {
+        const parsed = await readJson(filePath);
+        current = {
+          subscriptions: parsed.subscriptions || [],
+          notifications: normalizeNotifications(
+            parsed.notifications || [],
+            parsed.subscriptions || []
+          ),
+          settings: mergeSettings(parsed.settings),
+        };
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+        current = defaultUserData();
+      }
+
+      const updated = (await updater(current)) || current;
+      const payload = {
+        subscriptions: updated.subscriptions || [],
+        notifications: normalizeNotifications(
+          updated.notifications || [],
+          updated.subscriptions || []
+        ),
+        settings: mergeSettings(updated.settings),
+      };
+      await atomicWriteJson(filePath, payload);
+      return payload;
+    });
   };
 
   return {
@@ -248,6 +267,6 @@ export const createStorage = ({ adminUser, adminPass }) => {
     loadCredentials,
     saveCredentials,
     loadUserData,
-    saveUserData,
+    updateUserData,
   };
 };

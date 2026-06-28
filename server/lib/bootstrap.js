@@ -19,7 +19,7 @@ export const bootstrap = async () => {
 
   const exchangeRate = createExchangeRate({ storage, defaults });
 
-  const app = createApp({ config, auth, storage, reminders, exchangeRate, email });
+  const app = createApp({ config, auth, storage, exchangeRate, email });
 
   return { config, app, services: { auth, storage, reminders, exchangeRate, email } };
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Subscription, AppSettings, NotificationRecord } from '../types';
-import { fetchAllData, saveAllData, getDefaultSettings } from '../services/storageService';
+import { fetchAllData, saveDataPatch, getDefaultSettings } from '../services/storageService';
 import { getT } from '../services/i18n';
 import { UnauthorizedError } from '../services/apiClient';
 
@@ -10,6 +10,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const onUnauthorizedRef = useRef<(() => void) | undefined>(onUnauthorized);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     onUnauthorizedRef.current = onUnauthorized;
@@ -40,18 +41,20 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
     loadRemoteData();
   }, [loadRemoteData]);
 
-  const persistData = async (partial?: { subscriptions?: Subscription[]; settings?: AppSettings; notifications?: NotificationRecord[] }) => {
-    const payload = {
-      subscriptions: partial?.subscriptions ?? subscriptions,
-      settings: partial?.settings ?? settings,
-      notifications: partial?.notifications ?? notifications
+  const persistData = (partial: { subscriptions?: Subscription[]; settings?: AppSettings; notifications?: NotificationRecord[] }) => {
+    const save = async () => {
+      try {
+        await saveDataPatch(partial);
+      } catch (err) {
+        if (err instanceof UnauthorizedError) onUnauthorizedRef.current?.();
+        else {
+          console.error('Failed to persist data', err);
+          await loadRemoteData();
+        }
+      }
     };
-    try {
-      await saveAllData(payload);
-    } catch (err) {
-      if (err instanceof UnauthorizedError) onUnauthorizedRef.current?.();
-      else console.error('Failed to persist data', err);
-    }
+    saveQueueRef.current = saveQueueRef.current.then(save, save);
+    return saveQueueRef.current;
   };
 
   const updateSettings = (newSettings: AppSettings) => {

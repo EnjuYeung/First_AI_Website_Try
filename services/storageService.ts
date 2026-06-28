@@ -1,8 +1,9 @@
 
-import { Subscription, AppSettings, DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, NotificationRecord } from '../types';
+import { Subscription, AppSettings, NotificationRecord } from '../types';
 import { canonicalCategoryKey, canonicalPaymentMethodKey } from './displayLabels';
 import { authHeaderOnly, authJsonHeaders, apiFetch, apiFetchJson, UnauthorizedError } from './apiClient';
 import { DEFAULT_REMINDER_TEMPLATE_STRING, normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
+import { createDefaultSettings } from '../shared/defaultSettings.js';
 
 const API_BASE = '/api';
 
@@ -12,52 +13,7 @@ export interface PersistedData {
   notifications: NotificationRecord[];
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
-  language: 'zh',
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
-  theme: 'system',
-  customCategories: DEFAULT_CATEGORIES,
-  customPaymentMethods: DEFAULT_PAYMENT_METHODS,
-  customCurrencies: [
-    { code: 'USD', name: 'US Dollar' },
-    { code: 'CNY', name: 'Chinese Yuan' },
-    { code: 'EUR', name: 'Euro' },
-    { code: 'SGD', name: 'Singapore Dollar' },
-  ],
-  exchangeRates: {
-    'USD': 1,
-    'CNY': 7.2,
-    'EUR': 0.92,
-    'SGD': 1.34
-  },
-  lastRatesUpdate: 0,
-  exchangeRateApi: {
-    enabled: false,
-    encryptedKey: '',
-    lastTestedAt: 0,
-    lastRunAt0: 0,
-    lastRunAt12: 0,
-  },
-  notifications: {
-    telegram: { enabled: false, botToken: '', chatId: '' },
-    email: { enabled: false, emailAddress: '' },
-    rules: {
-      renewalReminder: true,
-      reminderDays: 3,
-      template: DEFAULT_REMINDER_TEMPLATE_STRING,
-      channels: {
-        renewalReminder: ['telegram', 'email']
-      }
-    },
-    scheduledTask: false,
-  },
-  security: {
-    twoFactorEnabled: false,
-    twoFactorSecret: '',
-    pendingTwoFactorSecret: '',
-    lastPasswordChange: new Date().toISOString(),
-  }
-};
+const DEFAULT_SETTINGS: AppSettings = createDefaultSettings();
 
 export const getDefaultSettings = (): AppSettings => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
@@ -82,6 +38,16 @@ export const uploadIconFile = async (file: File): Promise<string> => {
   const data = await resp.json();
   if (!data?.ok || !data?.url) throw new Error('upload_failed');
   return String(data.url);
+};
+
+export const deleteUploadedIcon = async (url: string): Promise<void> => {
+  const match = /^\/api\/uploads\/([a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(url);
+  if (!match) return;
+  const resp = await apiFetch(`${API_BASE}/icons/${encodeURIComponent(match[1])}`, {
+    method: 'DELETE',
+    headers: authHeaderOnly(),
+  });
+  if (!resp.ok) throw new Error(`http_${resp.status}`);
 };
 
 const normalizeSubscription = (sub: any): Subscription => {
@@ -205,15 +171,17 @@ export const fetchAllData = async (): Promise<PersistedData> => {
   }
 };
 
-export const saveAllData = async (data: PersistedData): Promise<void> => {
-  try {
-    await apiFetch(`${API_BASE}/data`, {
-      method: 'PUT',
-      headers: authJsonHeaders(),
-      body: JSON.stringify(data)
-    });
-  } catch (error) {
-    if (error instanceof UnauthorizedError) throw error;
-    console.error('Failed to save data to server', error);
+export const saveDataPatch = async (
+  data: Partial<PersistedData>
+): Promise<PersistedData> => {
+  const resp = await apiFetch(`${API_BASE}/data`, {
+    method: 'PATCH',
+    headers: authJsonHeaders(),
+    body: JSON.stringify(data)
+  });
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error((json as any)?.message || `http_${resp.status}`);
   }
+  return (json as any).data as PersistedData;
 };

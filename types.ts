@@ -133,7 +133,6 @@ export interface AppSettings {
       emailAddress: string;
     };
     rules: NotificationRule;
-    scheduledTask: boolean;
   };
   security: {
     twoFactorEnabled: boolean;
