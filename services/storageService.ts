@@ -148,8 +148,14 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       ...(parsed as any).exchangeRateApi,
     },
     notifications: {
-      ...DEFAULT_SETTINGS.notifications,
-      ...(parsed.notifications || {}),
+      telegram: {
+        ...DEFAULT_SETTINGS.notifications.telegram,
+        ...(parsed.notifications?.telegram || {}),
+      },
+      email: {
+        ...DEFAULT_SETTINGS.notifications.email,
+        ...(parsed.notifications?.email || {}),
+      },
       rules: { 
         ...normalizedRules
       }

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Subscription } from '../types';
+import { ExchangeRates, Subscription } from '../types';
 import { parseLocalYMD } from '../services/dateUtils';
+import { convertToUSD } from '../services/currency';
 
 interface SortConfig {
     key: 'price' | 'nextBillingDate' | 'name' | 'category' | 'paymentMethod' | null;
@@ -24,17 +25,28 @@ const matchesPriceRanges = (selectedRanges: string[], price: number) => (
     selectedRanges.some(range => PRICE_RANGE_MATCHERS[range]?.(price) ?? false)
 );
 
-const getSortValue = (subscription: Subscription, key: NonNullable<SortConfig['key']>) => {
+const getSortValue = (
+    subscription: Subscription,
+    key: NonNullable<SortConfig['key']>,
+    exchangeRates: ExchangeRates | undefined
+) => {
     if (key === 'nextBillingDate') {
         const time = parseLocalYMD(subscription.nextBillingDate).getTime();
         return Number.isFinite(time) ? time : 0;
+    }
+
+    if (key === 'price') {
+        return convertToUSD(subscription.price, subscription.currency, exchangeRates);
     }
 
     const value = subscription[key];
     return STRING_SORT_KEYS.has(key) ? String(value || '').toLowerCase() : value;
 };
 
-export const useSubscriptionFilters = (subscriptions: Subscription[]) => {
+export const useSubscriptionFilters = (
+    subscriptions: Subscription[],
+    exchangeRates: ExchangeRates | undefined
+) => {
     // State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -86,8 +98,8 @@ export const useSubscriptionFilters = (subscriptions: Subscription[]) => {
             .sort((a, b) => {
                 if (!sortConfig.key) return 0;
 
-                const aValue = getSortValue(a, sortConfig.key);
-                const bValue = getSortValue(b, sortConfig.key);
+                const aValue = getSortValue(a, sortConfig.key, exchangeRates);
+                const bValue = getSortValue(b, sortConfig.key, exchangeRates);
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -101,7 +113,8 @@ export const useSubscriptionFilters = (subscriptions: Subscription[]) => {
         selectedPayments,
         selectedPriceRanges,
         selectedStatuses,
-        sortConfig
+        sortConfig,
+        exchangeRates
     ]);
 
     return {

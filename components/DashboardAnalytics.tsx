@@ -27,6 +27,11 @@ interface DistributionPoint {
   count: number;
 }
 
+const DISTRIBUTION_CHART_BASE_MIN_WIDTH = 900;
+const DISTRIBUTION_CHART_FIXED_WIDTH = 120;
+const DISTRIBUTION_LABEL_CHARACTER_WIDTH = 7;
+const DISTRIBUTION_LABEL_GAP = 12;
+
 const convertToUSD = (
   amount: number,
   currency: string,
@@ -37,6 +42,11 @@ const convertToUSD = (
   const rate = rates?.[currency] ?? 1;
   return Number.isFinite(rate) && rate > 0 ? amount / rate : amount;
 };
+
+const formatDistributionLabel = (value: number) => formatCurrency(value, 'USD', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
 
 const DistributionLabel = ({
   x = 0,
@@ -51,11 +61,8 @@ const DistributionLabel = ({
 }) => {
   if (!Number.isFinite(value) || value <= 0) return null;
 
-  const label = formatCurrency(value, 'USD', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-  const centerX = x + width / 2 + 3;
+  const label = formatDistributionLabel(value);
+  const centerX = x + width / 2;
   const labelY = Math.max(y - 8, 84);
 
   return (
@@ -65,8 +72,7 @@ const DistributionLabel = ({
       fill="#6b7280"
       fontSize={11}
       fontWeight={600}
-      textAnchor="start"
-      transform={`rotate(-90 ${centerX} ${labelY})`}
+      textAnchor="middle"
     >
       {label}
     </text>
@@ -76,7 +82,7 @@ const DistributionLabel = ({
 const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) => {
   const t = getT(lang);
 
-  const { distributionData, monthLabel } = useMemo(() => {
+  const { distributionData, distributionChartMinWidth, monthLabel } = useMemo(() => {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth();
@@ -118,6 +124,17 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
 
     return {
       distributionData: points,
+      distributionChartMinWidth: Math.max(
+        DISTRIBUTION_CHART_BASE_MIN_WIDTH,
+        points.length * (
+          Math.max(
+            ...points.map((point) => (
+              point.amount > 0 ? formatDistributionLabel(point.amount).length : 0
+            )),
+          ) * DISTRIBUTION_LABEL_CHARACTER_WIDTH
+          + DISTRIBUTION_LABEL_GAP
+        ) + DISTRIBUTION_CHART_FIXED_WIDTH,
+      ),
       monthLabel: new Intl.DateTimeFormat(lang === 'zh' ? 'zh-CN' : 'en-US', {
         year: 'numeric',
         month: 'long',
@@ -136,7 +153,7 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
         </div>
 
         <div className="flex-1 w-full min-h-0 overflow-x-auto">
-          <div className="h-full min-w-[900px]">
+          <div className="h-full" style={{ minWidth: distributionChartMinWidth }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={distributionData}

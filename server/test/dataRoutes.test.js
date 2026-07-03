@@ -88,3 +88,50 @@ test('general settings updates preserve server-managed exchange-rate state', asy
   assert.deepEqual(savedSettings.exchangeRates, currentSettings.exchangeRates);
   assert.equal(savedSettings.lastRatesUpdate, currentSettings.lastRatesUpdate);
 });
+
+test('settings updates discard the legacy notification scheduled task', async () => {
+  const handlers = new Map();
+  const app = {};
+  for (const method of ['get', 'post', 'put', 'delete']) {
+    app[method] = (route, ...callbacks) => {
+      handlers.set(`${method.toUpperCase()} ${route}`, callbacks.at(-1));
+    };
+  }
+
+  const currentSettings = defaults.defaultSettings();
+  let savedSettings;
+  const storage = {
+    async updateUserFeature(_username, feature, revision, updater) {
+      assert.equal(feature, 'settings');
+      assert.equal(revision, 1);
+      savedSettings = await updater(structuredClone(currentSettings));
+      return { data: savedSettings, revision: 2 };
+    },
+  };
+  registerDataRoutes({
+    app,
+    auth: { authMiddleware() {} },
+    storage,
+    uploadsDir: path.join(os.tmpdir(), 'subm-data-routes-legacy-settings-test'),
+    maxIconBytes: 1024,
+  });
+
+  const incoming = defaults.defaultSettings();
+  incoming.theme = 'system';
+  incoming.notifications.scheduledTask = { enabled: true };
+  const response = createResponse();
+  await handlers.get('PUT /api/settings')(
+    {
+      body: incoming,
+      user: { username: 'admin' },
+      get(name) {
+        return name.toLowerCase() === 'if-match' ? '"1"' : '';
+      },
+    },
+    response
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(savedSettings.theme, 'system');
+  assert.equal('scheduledTask' in savedSettings.notifications, false);
+});

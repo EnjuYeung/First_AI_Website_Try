@@ -10,6 +10,16 @@ import {
 const uploadedIconFilename = (url) =>
   /^\/api\/uploads\/([a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
 
+const removeLegacySettingsFields = (settings) => {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
+  const notifications = settings.notifications;
+  if (!notifications || typeof notifications !== 'object' || Array.isArray(notifications)) {
+    return settings;
+  }
+  const { scheduledTask: _scheduledTask, ...currentNotifications } = notifications;
+  return { ...settings, notifications: currentNotifications };
+};
+
 export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconBytes }) => {
   const iconUpload = createIconUpload({ uploadsDir, maxIconBytes });
   const expectedRevision = (req) => {
@@ -124,10 +134,11 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
   });
 
   app.put('/api/settings', auth.authMiddleware, async (req, res) => {
-    const error = validateSettings(req.body);
+    const settings = removeLegacySettingsFields(req.body);
+    const error = validateSettings(settings);
     if (error) return res.status(400).json({ success: false, message: error });
     return updateFeature(req, res, 'settings', (currentSettings) => ({
-      ...req.body,
+      ...settings,
       // Exchange-rate credentials and scheduler state are server-managed. Preserving
       // the complete object prevents stale tabs from restoring legacy ciphertext.
       exchangeRateApi: currentSettings.exchangeRateApi,

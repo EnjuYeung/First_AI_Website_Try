@@ -22,7 +22,10 @@ test('storage migrates to feature files, prunes notifications, enforces revision
         language: 'zh',
         timezone: 'Asia/Shanghai',
         theme: 'system',
-        notifications: { rules: { reminderDays: 3 } },
+        notifications: {
+          rules: { reminderDays: 3 },
+          scheduledTask: { enabled: true },
+        },
       },
     })
   );
@@ -34,9 +37,14 @@ test('storage migrates to feature files, prunes notifications, enforces revision
     import fs from 'node:fs/promises';
     import path from 'node:path';
     const { createStorage } = await import(${JSON.stringify(storageUrl)});
+    const { validateSettings } = await import(
+      new URL('../../shared/dataSchema.js', ${JSON.stringify(storageUrl)}).href
+    );
     const storage = createStorage({ adminUser: 'admin', adminPass: 'password' });
     const data = await storage.loadUserData('admin');
     assert.deepEqual(data.notifications.map((item) => item.id), ['recent']);
+    assert.equal('scheduledTask' in data.settings.notifications, false);
+    assert.equal(validateSettings(data.settings), null);
     assert.equal(data.revisions.subscriptions, 1);
     data.subscriptions.push({ id: 'mutated-outside-cache' });
     const cachedData = await storage.loadUserData('admin');

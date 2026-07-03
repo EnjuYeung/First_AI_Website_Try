@@ -120,8 +120,14 @@ const mergeSettings = (incoming) => {
     exchangeRateApi,
     security: { ...base.security, ...(parsed.security || {}) },
     notifications: {
-      ...base.notifications,
-      ...(parsed.notifications || {}),
+      telegram: {
+        ...base.notifications.telegram,
+        ...(parsed.notifications?.telegram || {}),
+      },
+      email: {
+        ...base.notifications.email,
+        ...(parsed.notifications?.email || {}),
+      },
       rules,
     },
   };

@@ -146,6 +146,7 @@ const App: React.FC = () => {
               onDuplicate={duplicateSubscription}
               onBatchDelete={batchDeleteSubscriptions}
               lang={settings.language}
+              exchangeRates={settings.exchangeRates}
             />
           )}
 

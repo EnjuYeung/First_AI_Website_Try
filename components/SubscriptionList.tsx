@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Subscription, Frequency, NotificationRecord } from '../types';
+import { Subscription, Frequency, NotificationRecord, ExchangeRates } from '../types';
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { canonicalRenewalFeedback, displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
@@ -19,6 +19,7 @@ interface Props {
   onDuplicate: (sub: Subscription) => void;
   onBatchDelete: (ids: string[]) => void;
   lang: 'en' | 'zh';
+  exchangeRates: ExchangeRates;
 }
 
 const SubscriptionList: React.FC<Props> = ({
@@ -28,7 +29,8 @@ const SubscriptionList: React.FC<Props> = ({
   onDelete,
   onDuplicate,
   onBatchDelete,
-  lang
+  lang,
+  exchangeRates
 }) => {
   const t = getT(lang);
 
@@ -43,7 +45,7 @@ const SubscriptionList: React.FC<Props> = ({
     sortConfig, handleSort,
     resetFilters,
     filteredSubscriptions
-  } = useSubscriptionFilters(subscriptions);
+  } = useSubscriptionFilters(subscriptions, exchangeRates);
 
   // --- UI State ---
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
