@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { Subscription, Frequency, AppSettings } from '../types';
+import { Subscription, AppSettings } from '../types';
 import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, BarChart2, LucideIcon } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
+import { addBillingCycleYMD } from '../shared/billingDate.js';
 import { formatCurrency } from '../services/currency';
 import DashboardAnalytics from './DashboardAnalytics';
 
@@ -265,14 +266,13 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
           stats.upcomingRenewals.push({ sub, date: dateObj, cost: sub.price });
         }
 
-        // Advance Date
-        switch (sub.frequency) {
-          case Frequency.MONTHLY: currentDate.setMonth(currentDate.getMonth() + 1); break;
-          case Frequency.QUARTERLY: currentDate.setMonth(currentDate.getMonth() + 3); break;
-          case Frequency.SEMI_ANNUALLY: currentDate.setMonth(currentDate.getMonth() + 6); break;
-          case Frequency.YEARLY: currentDate.setFullYear(currentDate.getFullYear() + 1); break;
-          default: currentDate.setMonth(currentDate.getMonth() + 1);
-        }
+        const nextYmd = addBillingCycleYMD(
+          formatLocalYMD(currentDate),
+          sub.frequency,
+          sub.startDate
+        );
+        if (!nextYmd) break;
+        currentDate = parseLocalYMD(nextYmd);
       }
     }
 

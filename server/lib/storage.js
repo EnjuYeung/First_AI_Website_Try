@@ -8,7 +8,10 @@ import {
   CREDENTIALS_FILE,
   DATA_DIR,
   UPLOADS_DIR,
+  USERS_DIR,
   userDataPath,
+  userFeatureDir,
+  userFeaturePath,
 } from './storagePaths.js';
 import { defaultSettings, defaultUserData } from './defaults.js';
 import { DEFAULT_RULE_CHANNELS } from '../../shared/constants.js';
@@ -41,10 +44,12 @@ const readJson = async (filePath) => {
 };
 
 const atomicWriteJson = async (filePath, data) => {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  await fs.chmod(path.dirname(filePath), 0o700);
   const tmpPath = `${filePath}.tmp-${crypto.randomUUID()}`;
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: 0o600 });
   await fs.rename(tmpPath, filePath);
+  await fs.chmod(filePath, 0o600);
 };
 
 const pendingWrites = new Map();
@@ -70,8 +75,10 @@ const queueWrite = async (key, writeFn) => {
 };
 
 export const ensureDataDir = async () => {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  await fs.mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
+  await fs.mkdir(UPLOADS_DIR, { recursive: true, mode: 0o700 });
+  await fs.mkdir(USERS_DIR, { recursive: true, mode: 0o700 });
+  await Promise.all([DATA_DIR, UPLOADS_DIR, USERS_DIR].map((dir) => fs.chmod(dir, 0o700)));
 };
 
 const mergeSettings = (incoming) => {
@@ -142,7 +149,13 @@ const isPastDate = (ymd) => {
 
 const normalizeNotifications = (incoming, subscriptions) => {
   const list = Array.isArray(incoming) ? incoming : [];
-  const filtered = list.filter((record) => record?.type !== 'subscription_change');
+  const retentionCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const filtered = list.filter(
+    (record) =>
+      record?.type !== 'subscription_change' &&
+      typeof record?.timestamp === 'number' &&
+      record.timestamp >= retentionCutoff
+  );
   return filtered.map((record) => {
     if (!record || typeof record !== 'object') return record;
     const details =
@@ -184,15 +197,105 @@ const normalizeNotifications = (incoming, subscriptions) => {
 };
 
 export const createStorage = ({ adminUser, adminPass }) => {
+  const FEATURES = ['subscriptions', 'notifications', 'settings'];
+  const featureDefault = (feature) => defaultUserData()[feature];
+  const makeDocument = (data, revision = 1) => ({
+    schemaVersion: 1,
+    revision,
+    updatedAt: new Date().toISOString(),
+    data,
+  });
+
+  const normalizeFeature = (feature, value, subscriptions = []) => {
+    if (feature === 'subscriptions') return Array.isArray(value) ? value : [];
+    if (feature === 'notifications') return normalizeNotifications(value, subscriptions);
+    if (feature === 'settings') return mergeSettings(value);
+    throw new Error('unknown_storage_feature');
+  };
+
+  const ensureUserMigrated = async (username) => {
+    await ensureDataDir();
+    const migrationKey = `migration:${username}`;
+    return queueWrite(migrationKey, async () => {
+      const paths = FEATURES.map((feature) => userFeaturePath(username, feature));
+      const existing = await Promise.all(
+        paths.map((filePath) => fs.access(filePath).then(() => true).catch(() => false))
+      );
+      if (existing.every(Boolean)) return;
+
+      let legacy = null;
+      try {
+        legacy = await readJson(userDataPath(username));
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+      }
+      const initial = legacy || defaultUserData();
+      const subscriptions = normalizeFeature('subscriptions', initial.subscriptions);
+      const values = {
+        subscriptions,
+        notifications: normalizeFeature('notifications', initial.notifications, subscriptions),
+        settings: normalizeFeature('settings', initial.settings),
+      };
+      await fs.mkdir(userFeatureDir(username), { recursive: true, mode: 0o700 });
+      await fs.chmod(userFeatureDir(username), 0o700);
+      for (let index = 0; index < FEATURES.length; index += 1) {
+        if (!existing[index]) {
+          await atomicWriteJson(paths[index], makeDocument(values[FEATURES[index]]));
+        }
+      }
+      if (legacy) {
+        await fs.unlink(userDataPath(username)).catch((err) => {
+          if (err?.code !== 'ENOENT') throw err;
+        });
+      }
+    });
+  };
+
+  const readFeatureDocument = async (username, feature) => {
+    const filePath = userFeaturePath(username, feature);
+    try {
+      const document = await readJson(filePath);
+      const data = normalizeFeature(feature, document.data);
+      return {
+        schemaVersion: 1,
+        revision: Number.isInteger(document.revision) ? document.revision : 1,
+        updatedAt: document.updatedAt || new Date(0).toISOString(),
+        data,
+      };
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+      const document = makeDocument(normalizeFeature(feature, featureDefault(feature)));
+      await atomicWriteJson(filePath, document);
+      return document;
+    }
+  };
+
+  const loadAllDocuments = async (username) => {
+    await ensureUserMigrated(username);
+    const subscriptionsDoc = await readFeatureDocument(username, 'subscriptions');
+    const notificationsDoc = await readFeatureDocument(username, 'notifications');
+    const settingsDoc = await readFeatureDocument(username, 'settings');
+    const notifications = normalizeNotifications(notificationsDoc.data, subscriptionsDoc.data);
+    if (JSON.stringify(notifications) !== JSON.stringify(notificationsDoc.data)) {
+      notificationsDoc.data = notifications;
+      notificationsDoc.revision += 1;
+      notificationsDoc.updatedAt = new Date().toISOString();
+      await atomicWriteJson(userFeaturePath(username, 'notifications'), notificationsDoc);
+    }
+    return { subscriptionsDoc, notificationsDoc, settingsDoc };
+  };
+
   const loadCredentials = async () => {
     await ensureDataDir();
     await waitForPendingWrite(CREDENTIALS_FILE);
     try {
-      return await readJson(CREDENTIALS_FILE);
+      const credentials = await readJson(CREDENTIALS_FILE);
+      await fs.chmod(CREDENTIALS_FILE, 0o600);
+      return credentials;
     } catch (err) {
       if (err.code === 'ENOENT') {
         const passwordHash = bcrypt.hashSync(adminPass, 10);
-        const creds = { username: adminUser, passwordHash };
+        const creds = { username: adminUser, passwordHash, tokenVersion: 0 };
         await atomicWriteJson(CREDENTIALS_FILE, creds);
         return creds;
       }
@@ -206,59 +309,80 @@ export const createStorage = ({ adminUser, adminPass }) => {
   };
 
   const loadUserData = async (username) => {
-    await ensureDataDir();
-    const filePath = userDataPath(username);
-    await waitForPendingWrite(filePath);
-    try {
-      const parsed = await readJson(filePath);
-      const settings = mergeSettings(parsed.settings);
-      const notifications = normalizeNotifications(parsed.notifications || [], parsed.subscriptions || []);
+    await ensureUserMigrated(username);
+    return queueWrite(`user:${username}`, async () => {
+      const { subscriptionsDoc, notificationsDoc, settingsDoc } = await loadAllDocuments(username);
       return {
-        subscriptions: parsed.subscriptions || [],
-        notifications,
-        settings,
+        subscriptions: subscriptionsDoc.data,
+        notifications: notificationsDoc.data,
+        settings: settingsDoc.data,
+        revisions: {
+          subscriptions: subscriptionsDoc.revision,
+          notifications: notificationsDoc.revision,
+          settings: settingsDoc.revision,
+        },
       };
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        const initial = defaultUserData();
-        await atomicWriteJson(filePath, initial);
-        return initial;
-      }
-      throw err;
-    }
+    });
   };
 
   const updateUserData = async (username, updater) => {
-    await ensureDataDir();
-    const filePath = userDataPath(username);
-    return queueWrite(filePath, async () => {
-      let current;
-      try {
-        const parsed = await readJson(filePath);
-        current = {
-          subscriptions: parsed.subscriptions || [],
-          notifications: normalizeNotifications(
-            parsed.notifications || [],
-            parsed.subscriptions || []
-          ),
-          settings: mergeSettings(parsed.settings),
-        };
-      } catch (err) {
-        if (err.code !== 'ENOENT') throw err;
-        current = defaultUserData();
-      }
-
-      const updated = (await updater(current)) || current;
-      const payload = {
-        subscriptions: updated.subscriptions || [],
-        notifications: normalizeNotifications(
-          updated.notifications || [],
-          updated.subscriptions || []
-        ),
-        settings: mergeSettings(updated.settings),
+    await ensureUserMigrated(username);
+    return queueWrite(`user:${username}`, async () => {
+      const { subscriptionsDoc, notificationsDoc, settingsDoc } = await loadAllDocuments(username);
+      const current = {
+        subscriptions: subscriptionsDoc.data,
+        notifications: notificationsDoc.data,
+        settings: settingsDoc.data,
       };
-      await atomicWriteJson(filePath, payload);
-      return payload;
+      const updated = (await updater(current)) || current;
+      const next = {
+        subscriptions: normalizeFeature('subscriptions', updated.subscriptions),
+        notifications: normalizeFeature(
+          'notifications',
+          updated.notifications,
+          updated.subscriptions
+        ),
+        settings: normalizeFeature('settings', updated.settings),
+      };
+      const documents = { subscriptions: subscriptionsDoc, notifications: notificationsDoc, settings: settingsDoc };
+      for (const feature of FEATURES) {
+        if (JSON.stringify(documents[feature].data) === JSON.stringify(next[feature])) continue;
+        documents[feature] = makeDocument(next[feature], documents[feature].revision + 1);
+        await atomicWriteJson(userFeaturePath(username, feature), documents[feature]);
+      }
+      return {
+        ...next,
+        revisions: Object.fromEntries(FEATURES.map((feature) => [feature, documents[feature].revision])),
+      };
+    });
+  };
+
+  const updateUserFeature = async (username, feature, expectedRevision, updater) => {
+    if (!FEATURES.includes(feature)) throw new Error('unknown_storage_feature');
+    await ensureUserMigrated(username);
+    return queueWrite(`user:${username}`, async () => {
+      const subscriptionsDoc = await readFeatureDocument(username, 'subscriptions');
+      const document =
+        feature === 'subscriptions'
+          ? subscriptionsDoc
+          : await readFeatureDocument(username, feature);
+      if (!Number.isInteger(expectedRevision)) {
+        const error = new Error('precondition_required');
+        error.statusCode = 428;
+        throw error;
+      }
+      if (document.revision !== expectedRevision) {
+        const error = new Error('revision_conflict');
+        error.statusCode = 409;
+        error.currentRevision = document.revision;
+        throw error;
+      }
+      const updated = await updater(structuredClone(document.data));
+      const subscriptions = feature === 'subscriptions' ? updated : subscriptionsDoc.data;
+      const data = normalizeFeature(feature, updated, subscriptions);
+      const nextDocument = makeDocument(data, document.revision + 1);
+      await atomicWriteJson(userFeaturePath(username, feature), nextDocument);
+      return { data, revision: nextDocument.revision };
     });
   };
 
@@ -268,5 +392,6 @@ export const createStorage = ({ adminUser, adminPass }) => {
     saveCredentials,
     loadUserData,
     updateUserData,
+    updateUserFeature,
   };
 };

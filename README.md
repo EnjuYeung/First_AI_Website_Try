@@ -22,6 +22,9 @@
    * **必填项**（缺少将导致启动报错）：
      * `ADMIN_USER` / `ADMIN_PASS`
      * `JWT_SECRET`
+     * `DATA_ENCRYPTION_KEY`（用于 AES-256-GCM 加密 API Key，可用 `openssl rand -base64 32` 生成）
+     * `ADMIN_PASS` 必须为 12–128 位，并包含大写、小写、数字和符号
+     * `JWT_SECRET` 与 `DATA_ENCRYPTION_KEY` 均不得少于 32 个字符
    * **可选项**（按需启用）：
      * `PORT`（默认 `3001`）
      * `NOTIFY_INTERVAL_MS`（默认 `600000`，即10分钟）
@@ -35,3 +38,16 @@
 3. **启动**
    ```bash
    docker-compose up -d --build
+   ```
+
+## 数据存储
+
+- 用户数据按功能保存到 `server/data/users/<user>/`：
+  - `subscriptions.json`
+  - `notifications.json`
+  - `settings.json`
+- 旧版 `server/data/<user>.json` 会在首次启动时原子迁移，确认分区文件写入后删除。
+- 每个分区文件都有独立 `revision`；写 API 使用 `If-Match`，版本不一致返回 `409 revision_conflict`。
+- 通知历史自动保留最近 90 天。
+- 数据目录权限为 `0700`，JSON、凭据及密钥文件权限为 `0600`。
+- 汇率 API Key 使用 `DATA_ENCRYPTION_KEY` 进行 AES-256-GCM 加密。该环境变量必须长期保存且不得与数据文件一同备份；丢失后无法解密已有 API Key。

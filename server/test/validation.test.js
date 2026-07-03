@@ -1,11 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  validateDataPatch,
-  validateSettings,
-  validateSubscriptions,
-} from '../../shared/dataSchema.js';
+import { validateSettings, validateSubscriptions } from '../../shared/dataSchema.js';
+import { createDefaultSettings } from '../../shared/defaultSettings.js';
 
 const validSubscription = {
   id: 'sub-1',
@@ -21,22 +18,7 @@ const validSubscription = {
   notificationsEnabled: true,
 };
 
-const validSettings = {
-  language: 'zh',
-  timezone: 'Asia/Shanghai',
-  theme: 'system',
-  notifications: { rules: { reminderDays: 3 } },
-};
-
-test('validateDataPatch accepts a valid partial update', () => {
-  assert.equal(validateDataPatch({ subscriptions: [validSubscription] }), null);
-  assert.equal(validateDataPatch({ settings: validSettings }), null);
-});
-
-test('validateDataPatch rejects unknown fields and full malformed data', () => {
-  assert.equal(validateDataPatch({ unknown: true }), 'invalid_patch_fields');
-  assert.equal(validateDataPatch([]), 'invalid_payload');
-});
+const validSettings = createDefaultSettings();
 
 test('validateSubscriptions rejects duplicate IDs and impossible dates', () => {
   assert.equal(
@@ -47,21 +29,40 @@ test('validateSubscriptions rejects duplicate IDs and impossible dates', () => {
     validateSubscriptions([{ ...validSubscription, startDate: '2026-02-31' }]),
     'invalid_subscription_date'
   );
+  assert.equal(
+    validateSubscriptions([{ ...validSubscription, unexpected: true }]),
+    'unknown_subscription_field'
+  );
+  assert.equal(
+    validateSubscriptions([{ ...validSubscription, notes: 'x'.repeat(5001) }]),
+    'invalid_subscription_notes'
+  );
 });
 
 test('validateSettings bounds reminder days', () => {
   assert.equal(
     validateSettings({
       ...validSettings,
-      notifications: { rules: { reminderDays: Number.NaN } },
+      notifications: {
+        ...validSettings.notifications,
+        rules: { ...validSettings.notifications.rules, reminderDays: Number.NaN },
+      },
     }),
     'invalid_reminder_days'
   );
   assert.equal(
     validateSettings({
       ...validSettings,
-      notifications: { rules: { reminderDays: 366 } },
+      notifications: {
+        ...validSettings.notifications,
+        rules: { ...validSettings.notifications.rules, reminderDays: 366 },
+      },
     }),
     'invalid_reminder_days'
+  );
+  assert.equal(validateSettings({ ...validSettings, unexpected: true }), 'unknown_settings_field');
+  assert.equal(
+    validateSettings({ ...validSettings, timezone: 'Not/A-Timezone' }),
+    'invalid_timezone'
   );
 });

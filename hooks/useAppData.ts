@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Subscription, AppSettings, NotificationRecord } from '../types';
-import { fetchAllData, saveDataPatch, getDefaultSettings } from '../services/storageService';
+import {
+  clearNotificationHistory,
+  createSubscription,
+  DataRevisions,
+  fetchAllData,
+  getDefaultSettings,
+  removeNotification,
+  removeSubscription,
+  removeSubscriptions,
+  replaceSettings,
+  updateSubscription,
+} from '../services/storageService';
 import { getT } from '../services/i18n';
 import { UnauthorizedError } from '../services/apiClient';
 
@@ -11,6 +22,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
   const [isDataLoading, setIsDataLoading] = useState(false);
   const onUnauthorizedRef = useRef<(() => void) | undefined>(onUnauthorized);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const revisionsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
 
   useEffect(() => {
     onUnauthorizedRef.current = onUnauthorized;
@@ -26,6 +38,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
       setSubscriptions(data.subscriptions);
       setSettings(data.settings);
       setNotifications(data.notifications || []);
+      revisionsRef.current = data.revisions;
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         onUnauthorizedRef.current?.();
@@ -41,10 +54,16 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
     loadRemoteData();
   }, [loadRemoteData]);
 
-  const persistData = (partial: { subscriptions?: Subscription[]; settings?: AppSettings; notifications?: NotificationRecord[] }) => {
+  const persistFeature = <K extends keyof DataRevisions, T>(
+    feature: K,
+    operation: (revision: number) => Promise<{ data: T; revision: number }>,
+    apply: (data: T) => void
+  ) => {
     const save = async () => {
       try {
-        await saveDataPatch(partial);
+        const result = await operation(revisionsRef.current[feature]);
+        revisionsRef.current = { ...revisionsRef.current, [feature]: result.revision };
+        apply(result.data);
       } catch (err) {
         if (err instanceof UnauthorizedError) onUnauthorizedRef.current?.();
         else {
@@ -59,7 +78,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
 
   const updateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
-    void persistData({ settings: newSettings });
+    void persistFeature('settings', (revision) => replaceSettings(newSettings, revision), setSettings);
   };
 
   const saveSubscription = (sub: Subscription, isEditing: boolean) => {
@@ -70,14 +89,20 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
       updated = [...subscriptions, sub];
     }
     setSubscriptions(updated);
-    void persistData({ subscriptions: updated });
+    void persistFeature(
+      'subscriptions',
+      (revision) => isEditing
+        ? updateSubscription(sub, revision)
+        : createSubscription(sub, revision),
+      setSubscriptions
+    );
   };
 
   const deleteSubscription = (id: string) => {
      if (window.confirm(t('confirm_delete'))) {
       const updated = subscriptions.filter(s => s.id !== id);
       setSubscriptions(updated);
-      void persistData({ subscriptions: updated });
+      void persistFeature('subscriptions', (revision) => removeSubscription(id, revision), setSubscriptions);
     }
   };
 
@@ -86,7 +111,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
     if (window.confirm(message)) {
       const updated = subscriptions.filter(s => !ids.includes(s.id));
       setSubscriptions(updated);
-      void persistData({ subscriptions: updated });
+      void persistFeature('subscriptions', (revision) => removeSubscriptions(ids, revision), setSubscriptions);
     }
   };
 
@@ -107,18 +132,18 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
 
     const updated = [...subscriptions, newSub];
     setSubscriptions(updated);
-    void persistData({ subscriptions: updated });
+    void persistFeature('subscriptions', (revision) => createSubscription(newSub, revision), setSubscriptions);
   };
 
   const deleteNotification = (id: string) => {
     const updated = notifications.filter(n => n.id !== id);
     setNotifications(updated);
-    void persistData({ notifications: updated });
+    void persistFeature('notifications', (revision) => removeNotification(id, revision), setNotifications);
   };
 
   const clearNotifications = () => {
     setNotifications([]);
-    void persistData({ notifications: [] });
+    void persistFeature('notifications', clearNotificationHistory, setNotifications);
   };
 
   return {

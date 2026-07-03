@@ -8,7 +8,7 @@ import { registerRoutes } from '../lib/routes.js';
 test('registerRoutes preserves all public API endpoints after route split', () => {
   const registered = [];
   const app = {};
-  for (const method of ['get', 'post', 'patch', 'delete']) {
+  for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
     app[method] = (route) => registered.push(`${method.toUpperCase()} ${route}`);
   }
   registerRoutes({
@@ -31,10 +31,15 @@ test('registerRoutes preserves all public API endpoints after route split', () =
       'POST /api/2fa/disable',
       'POST /api/change-password',
       'GET /api/data',
-      'PATCH /api/data',
+      'POST /api/subscriptions',
+      'PUT /api/subscriptions/:id',
+      'DELETE /api/subscriptions/:id',
+      'POST /api/subscriptions/batch-delete',
+      'PUT /api/settings',
+      'DELETE /api/notifications/:id',
+      'DELETE /api/notifications',
       'POST /api/icons',
       'DELETE /api/icons/:filename',
-      'GET /api/exchange-rate/public-key',
       'POST /api/exchange-rate/config',
       'POST /api/exchange-rate/update',
       'POST /api/notifications/test-telegram',

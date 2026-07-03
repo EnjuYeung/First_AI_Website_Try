@@ -54,14 +54,22 @@ export const useSecuritySettings = (
   const start = async () => {
     setIs2faBusy(true);
     try {
-      const data = await apiFetchJson<any>('/api/2fa/init', { method: 'POST' });
+      const data = await apiFetchJson<any>('/api/2fa/init', {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({ currentPassword: passwords.current, code: twoFaCode }),
+      });
       onUpdate({ ...settings, security: { ...settings.security, pendingTwoFactorSecret: data.secret } });
     } catch (error) { fail(error); } finally { setIs2faBusy(false); }
   };
   const disable = async () => {
     setIs2faBusy(true);
     try {
-      await apiFetchJson('/api/2fa/disable', { method: 'POST' });
+      await apiFetchJson('/api/2fa/disable', {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({ currentPassword: passwords.current, code: twoFaCode }),
+      });
       setTwoFaCode(''); setTwoFaQrUrl(null); setShowQr(false);
       onUpdate({ ...settings, security: { ...settings.security, twoFactorEnabled: false, twoFactorSecret: '', pendingTwoFactorSecret: '' } });
       setToast(t('success_title'));

@@ -17,7 +17,12 @@ export const bootstrap = async () => {
   const email = createEmail({ smtp: config.smtp });
   const reminders = createReminders({ config, storage, email });
 
-  const exchangeRate = createExchangeRate({ storage, defaults });
+  const exchangeRate = createExchangeRate({
+    storage,
+    defaults,
+    dataEncryptionKey: config.dataEncryptionKey,
+  });
+  await exchangeRate.migrateLegacyKeyForUser(config.adminUser);
 
   const app = createApp({ config, auth, storage, exchangeRate, email });
 

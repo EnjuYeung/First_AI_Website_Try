@@ -1,3 +1,5 @@
+import { assertStrongSecret, isStrongPassword } from './securityPolicy.js';
+
 const requireEnv = (name) => {
   const val = process.env[name];
   if (!val) {
@@ -11,6 +13,12 @@ export const getConfig = () => {
   const adminUser = requireEnv('ADMIN_USER');
   const adminPass = requireEnv('ADMIN_PASS');
   const jwtSecret = requireEnv('JWT_SECRET');
+  const dataEncryptionKey = requireEnv('DATA_ENCRYPTION_KEY');
+  if (!isStrongPassword(adminPass)) {
+    throw new Error('ADMIN_PASS must be 12-128 characters with upper, lower, digit, and symbol');
+  }
+  assertStrongSecret('JWT_SECRET', jwtSecret);
+  assertStrongSecret('DATA_ENCRYPTION_KEY', dataEncryptionKey);
 
   const port = Number(process.env.PORT || 3001);
   const notifyIntervalMs = Number(process.env.NOTIFY_INTERVAL_MS || 10 * 60 * 1000);
@@ -36,6 +44,7 @@ export const getConfig = () => {
     adminUser,
     adminPass,
     jwtSecret,
+    dataEncryptionKey,
     port,
     notifyIntervalMs,
     jsonBodyLimit,

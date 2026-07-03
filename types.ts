@@ -106,7 +106,7 @@ export interface ExchangeRates {
 
 export interface ExchangeRateApiSettings {
   enabled: boolean;
-  encryptedKey: string; // RSA-OAEP encrypted, base64
+  encryptedKey: string; // Server-side AES-256-GCM envelope
   lastTestedAt: number; // epoch ms
   lastRunAt0: number; // epoch ms
   lastRunAt12: number; // epoch ms

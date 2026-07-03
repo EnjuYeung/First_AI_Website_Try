@@ -7,6 +7,7 @@ import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 import { deleteUploadedIcon, uploadIconFile } from '../services/storageService';
 import { getTodayLocalYMD } from '../services/dateUtils';
+import { calculateNextBillingDateYMD } from '../shared/billingDate.js';
 
 interface Props {
   isOpen: boolean;
@@ -88,51 +89,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
   // Helper to calculate next billing date
   const calculateNextDate = useCallback((startStr: string, freq: Frequency) => {
-    if (!startStr || !freq) return '';
-
-    // Manually parse YYYY-MM-DD to construct local date
-    const [y, m, d] = startStr.split('-').map(Number);
-    const start = new Date(y, m - 1, d);
-    start.setHours(0,0,0,0);
-
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    let nextDate = new Date(start);
-
-    // If the start date is in the future, that is the next billing date
-    if (nextDate > today) {
-      const year = nextDate.getFullYear();
-      const month = String(nextDate.getMonth() + 1).padStart(2, '0');
-      const day = String(nextDate.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
-
-    // If start date is today or past, add frequency until > today
-    while (nextDate <= today) {
-      switch (freq) {
-        case Frequency.MONTHLY:
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          break;
-        case Frequency.QUARTERLY:
-          nextDate.setMonth(nextDate.getMonth() + 3);
-          break;
-        case Frequency.SEMI_ANNUALLY:
-          nextDate.setMonth(nextDate.getMonth() + 6);
-          break;
-        case Frequency.YEARLY:
-          nextDate.setFullYear(nextDate.getFullYear() + 1);
-          break;
-        default:
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          break;
-      }
-    }
-    
-    const year = nextDate.getFullYear();
-    const month = String(nextDate.getMonth() + 1).padStart(2, '0');
-    const day = String(nextDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return calculateNextBillingDateYMD(startStr, freq, getTodayLocalYMD());
   }, []);
 
   // Initialize form when opening

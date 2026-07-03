@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 export const createAuth = async ({ jwtSecret, storage }) => {
   let credentials = await storage.loadCredentials();
   let adminHash = credentials.passwordHash;
+  let tokenVersion = Number.isInteger(credentials.tokenVersion) ? credentials.tokenVersion : 0;
   const cookieName = 'auth_token';
   const tokenMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -49,13 +50,18 @@ export const createAuth = async ({ jwtSecret, storage }) => {
     res.clearCookie(cookieName, baseCookieOptions(req));
   };
 
-  const signToken = (payload) => jwt.sign(payload, jwtSecret, { expiresIn: '7d' });
+  const signToken = (payload) => jwt.sign({ ...payload, tokenVersion }, jwtSecret, {
+    expiresIn: '7d',
+    issuer: 'subm',
+    audience: 'subm-web',
+  });
 
   const authMiddleware = (req, res, next) => {
     const token = getTokenFromRequest(req);
     if (!token) return res.status(401).json({ message: 'Missing token' });
     try {
-      req.user = jwt.verify(token, jwtSecret);
+      req.user = jwt.verify(token, jwtSecret, { issuer: 'subm', audience: 'subm-web' });
+      if (req.user.tokenVersion !== tokenVersion) throw new Error('revoked_token');
       next();
     } catch {
       clearAuthCookie(res, req);
@@ -67,7 +73,8 @@ export const createAuth = async ({ jwtSecret, storage }) => {
 
   const changeAdminPassword = async (newPassword) => {
     const newHash = bcrypt.hashSync(newPassword, 10);
-    credentials = { ...credentials, passwordHash: newHash };
+    tokenVersion += 1;
+    credentials = { ...credentials, passwordHash: newHash, tokenVersion };
     adminHash = newHash;
     await storage.saveCredentials(credentials);
   };
@@ -82,4 +89,3 @@ export const createAuth = async ({ jwtSecret, storage }) => {
     clearAuthCookie,
   };
 };
-

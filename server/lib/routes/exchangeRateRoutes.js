@@ -1,16 +1,11 @@
 export const registerExchangeRateRoutes = ({ app, auth, storage, exchangeRate }) => {
-  app.get('/api/exchange-rate/public-key', auth.authMiddleware, async (_req, res) => {
-    try {
-      res.json({ jwk: await exchangeRate.getPublicJwk() });
-    } catch (err) {
-      console.error('Failed to provide exchange rate public key', err);
-      res.status(500).json({ message: 'failed_to_get_public_key' });
-    }
-  });
-
   app.post('/api/exchange-rate/config', auth.authMiddleware, async (req, res) => {
     try {
-      const { encryptedKey, test } = req.body || {};
+      const { apiKey, test } = req.body || {};
+      if (typeof apiKey !== 'string' || !apiKey.trim()) {
+        return res.status(400).json({ ok: false, message: 'missing_api_key' });
+      }
+      const encryptedKey = exchangeRate.encryptApiKey(apiKey.trim());
       const username = req.user.username;
       const configured = await storage.updateUserData(username, (current) => {
         current.settings.exchangeRateApi = {
@@ -23,8 +18,8 @@ export const registerExchangeRateRoutes = ({ app, auth, storage, exchangeRate })
       let settings = configured.settings;
       if (test) {
         const keyToUse = settings.exchangeRateApi.encryptedKey;
-        const apiKey = await exchangeRate.decryptKeyForTest(keyToUse);
-        await exchangeRate.fetchUsdRatesFromExchangeRateApi(apiKey);
+        const decryptedApiKey = await exchangeRate.decryptApiKey(keyToUse);
+        await exchangeRate.fetchUsdRatesFromExchangeRateApi(decryptedApiKey);
         const tested = await storage.updateUserData(username, (current) => {
           if (current.settings.exchangeRateApi.encryptedKey !== keyToUse) {
             throw new Error('exchange_rate_key_changed');

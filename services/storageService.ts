@@ -11,6 +11,17 @@ export interface PersistedData {
   subscriptions: Subscription[];
   settings: AppSettings;
   notifications: NotificationRecord[];
+  revisions: DataRevisions;
+}
+
+export interface DataRevisions {
+  subscriptions: number;
+  settings: number;
+  notifications: number;
+}
+
+export class RevisionConflictError extends Error {
+  name = 'RevisionConflictError';
 }
 
 const DEFAULT_SETTINGS: AppSettings = createDefaultSettings();
@@ -160,7 +171,12 @@ export const fetchAllData = async (): Promise<PersistedData> => {
     return {
       subscriptions: (data.subscriptions || []).map(normalizeSubscription),
       notifications: data.notifications || [],
-      settings: mergeSettings(data.settings)
+      settings: mergeSettings(data.settings),
+      revisions: {
+        subscriptions: Number(data.revisions?.subscriptions || 0),
+        settings: Number(data.revisions?.settings || 0),
+        notifications: Number(data.revisions?.notifications || 0),
+      },
     };
   } catch (error: any) {
     if (error instanceof UnauthorizedError) {
@@ -171,17 +187,47 @@ export const fetchAllData = async (): Promise<PersistedData> => {
   }
 };
 
-export const saveDataPatch = async (
-  data: Partial<PersistedData>
-): Promise<PersistedData> => {
-  const resp = await apiFetch(`${API_BASE}/data`, {
-    method: 'PATCH',
-    headers: authJsonHeaders(),
-    body: JSON.stringify(data)
+const mutateFeature = async <T>(
+  path: string,
+  method: 'POST' | 'PUT' | 'DELETE',
+  revision: number,
+  body?: unknown
+): Promise<{ data: T; revision: number }> => {
+  const resp = await apiFetch(`${API_BASE}${path}`, {
+    method,
+    headers: { ...authJsonHeaders(), 'If-Match': `"${revision}"` },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const json = await resp.json().catch(() => ({}));
   if (!resp.ok) {
+    if (resp.status === 409) throw new RevisionConflictError((json as any)?.message || 'revision_conflict');
     throw new Error((json as any)?.message || `http_${resp.status}`);
   }
-  return (json as any).data as PersistedData;
+  return { data: (json as any).data as T, revision: Number((json as any).revision) };
 };
+
+export const createSubscription = (subscription: Subscription, revision: number) =>
+  mutateFeature<Subscription[]>('/subscriptions', 'POST', revision, subscription);
+
+export const updateSubscription = (subscription: Subscription, revision: number) =>
+  mutateFeature<Subscription[]>(
+    `/subscriptions/${encodeURIComponent(subscription.id)}`,
+    'PUT',
+    revision,
+    subscription
+  );
+
+export const removeSubscription = (id: string, revision: number) =>
+  mutateFeature<Subscription[]>(`/subscriptions/${encodeURIComponent(id)}`, 'DELETE', revision);
+
+export const removeSubscriptions = (ids: string[], revision: number) =>
+  mutateFeature<Subscription[]>('/subscriptions/batch-delete', 'POST', revision, { ids });
+
+export const replaceSettings = (settings: AppSettings, revision: number) =>
+  mutateFeature<AppSettings>('/settings', 'PUT', revision, settings);
+
+export const removeNotification = (id: string, revision: number) =>
+  mutateFeature<NotificationRecord[]>(`/notifications/${encodeURIComponent(id)}`, 'DELETE', revision);
+
+export const clearNotificationHistory = (revision: number) =>
+  mutateFeature<NotificationRecord[]>('/notifications', 'DELETE', revision);

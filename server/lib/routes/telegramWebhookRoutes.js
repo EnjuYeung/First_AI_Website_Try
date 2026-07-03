@@ -1,16 +1,7 @@
 import { DEFAULT_REMINDER_TEMPLATE_STRING } from '../../../shared/reminderTemplate.js';
+import { addBillingCycleYMD } from '../../../shared/billingDate.js';
 import { answerCallback, clearInlineKeyboard } from '../telegram.js';
-import { parseLocalYMD, formatLocalYMD } from '../dates.js';
-
-const addFrequencyToDate = (ymd, frequency) => {
-  const date = parseLocalYMD(ymd);
-  if (Number.isNaN(date.getTime())) return '';
-  const months = { Monthly: 1, Quarterly: 3, 'Semi-Annually': 6 };
-  if (months[frequency]) date.setMonth(date.getMonth() + months[frequency]);
-  else if (frequency === 'Yearly') date.setFullYear(date.getFullYear() + 1);
-  else return '';
-  return formatLocalYMD(date);
-};
+import { formatLocalYMD } from '../dates.js';
 
 const extractName = (templateString, messageText) => {
   const parseLines = (value) => {
@@ -93,7 +84,11 @@ export const registerTelegramWebhookRoutes = ({ app, auth, storage }) => {
         if (status === 'active') {
           delete subscription.cancelledAt;
           subscription.nextBillingDate =
-            addFrequencyToDate(billingDate, subscription.frequency) || billingDate;
+            addBillingCycleYMD(
+              billingDate,
+              subscription.frequency,
+              subscription.startDate || billingDate
+            ) || billingDate;
         } else {
           subscription.cancelledAt = formatLocalYMD(new Date());
           subscription.nextBillingDate = '';

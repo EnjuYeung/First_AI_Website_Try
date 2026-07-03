@@ -1,26 +1,9 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
-import { EXCHANGE_RATE_KEYPAIR_FILE } from './storagePaths.js';
+import { LEGACY_EXCHANGE_RATE_KEYPAIR_FILE } from './storagePaths.js';
 import { formatDateInTimeZone, getTimePartsInTimeZone } from './dates.js';
 
-const readExchangeRateKeypair = async (storage) => {
-  await storage.ensureDataDir();
-  try {
-    const raw = await fs.readFile(EXCHANGE_RATE_KEYPAIR_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (!parsed?.publicKeyPem || !parsed?.privateKeyPem) throw new Error('invalid_keypair');
-    return parsed;
-  } catch {
-    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-    const payload = { publicKeyPem: publicKey, privateKeyPem: privateKey };
-    await fs.writeFile(EXCHANGE_RATE_KEYPAIR_FILE, JSON.stringify(payload, null, 2), 'utf-8');
-    return payload;
-  }
-};
+const ENCRYPTION_PREFIX = 'aesgcm-v1';
 
 const fetchUsdRatesFromExchangeRateApi = async (apiKey) => {
   const url = `https://v6.exchangerate-api.com/v6/${encodeURIComponent(apiKey)}/latest/USD`;
@@ -37,22 +20,36 @@ const fetchUsdRatesFromExchangeRateApi = async (apiKey) => {
   return json.conversion_rates;
 };
 
-const decryptExchangeRateApiKey = async (storage, encryptedKeyBase64) => {
-  if (!encryptedKeyBase64) throw new Error('missing_encrypted_key');
-  const { privateKeyPem } = await readExchangeRateKeypair(storage);
-  const buf = Buffer.from(encryptedKeyBase64, 'base64');
-  const decrypted = crypto.privateDecrypt({ key: privateKeyPem, oaepHash: 'sha256' }, buf);
-  return decrypted.toString('utf-8');
-};
-
-export const createExchangeRate = ({ storage, defaults }) => {
+export const createExchangeRate = ({ storage, defaults, dataEncryptionKey }) => {
   let rateTimer = null;
   let rateRunning = false;
+  const key = crypto.createHash('sha256').update(dataEncryptionKey, 'utf8').digest();
 
-  const getPublicJwk = async () => {
-    const { publicKeyPem } = await readExchangeRateKeypair(storage);
-    const keyObj = crypto.createPublicKey(publicKeyPem);
-    return keyObj.export({ format: 'jwk' });
+  const encryptApiKey = (plainText) => {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return [ENCRYPTION_PREFIX, iv.toString('base64url'), tag.toString('base64url'), encrypted.toString('base64url')].join('.');
+  };
+
+  const decryptApiKey = async (encryptedValue) => {
+    if (!encryptedValue) throw new Error('missing_encrypted_key');
+    if (encryptedValue.startsWith(`${ENCRYPTION_PREFIX}.`)) {
+      const [, iv, tag, encrypted] = encryptedValue.split('.');
+      if (!iv || !tag || !encrypted) throw new Error('invalid_encrypted_key');
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'));
+      decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+      return Buffer.concat([
+        decipher.update(Buffer.from(encrypted, 'base64url')),
+        decipher.final(),
+      ]).toString('utf8');
+    }
+    const legacy = JSON.parse(await fs.readFile(LEGACY_EXCHANGE_RATE_KEYPAIR_FILE, 'utf8'));
+    return crypto.privateDecrypt(
+      { key: legacy.privateKeyPem, oaepHash: 'sha256' },
+      Buffer.from(encryptedValue, 'base64')
+    ).toString('utf8');
   };
 
   const updateExchangeRatesForUser = async (username, slotHour = null) => {
@@ -64,7 +61,7 @@ export const createExchangeRate = ({ storage, defaults }) => {
       return { updated: false, reason: 'exchange_rate_api_not_enabled' };
     }
 
-    const apiKey = await decryptExchangeRateApiKey(storage, cfg.encryptedKey);
+    const apiKey = await decryptApiKey(cfg.encryptedKey);
     const conversionRates = await fetchUsdRatesFromExchangeRateApi(apiKey);
 
     const now = Date.now();
@@ -141,11 +138,25 @@ export const createExchangeRate = ({ storage, defaults }) => {
     rateTimer = setInterval(tick, 5 * 60 * 1000);
   };
 
-  const decryptKeyForTest = async (encryptedKey) => decryptExchangeRateApiKey(storage, encryptedKey);
+  const migrateLegacyKeyForUser = async (username) => {
+    const data = await storage.loadUserData(username);
+    const encryptedKey = data.settings?.exchangeRateApi?.encryptedKey || '';
+    if (encryptedKey && !encryptedKey.startsWith(`${ENCRYPTION_PREFIX}.`)) {
+      const plainText = await decryptApiKey(encryptedKey);
+      await storage.updateUserData(username, (current) => {
+        current.settings.exchangeRateApi.encryptedKey = encryptApiKey(plainText);
+        return current;
+      });
+    }
+    await fs.unlink(LEGACY_EXCHANGE_RATE_KEYPAIR_FILE).catch((err) => {
+      if (err?.code !== 'ENOENT') throw err;
+    });
+  };
 
   return {
-    getPublicJwk,
-    decryptKeyForTest,
+    encryptApiKey,
+    decryptApiKey,
+    migrateLegacyKeyForUser,
     fetchUsdRatesFromExchangeRateApi,
     updateExchangeRatesForUser,
     startExchangeRateScheduler,

@@ -90,6 +90,16 @@ const SecurityTab: React.FC<Props> = ({
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
           {settings.security.twoFactorEnabled ? '已开启双重认证' : '未开启双重认证'}
         </p>
+        {settings.security.twoFactorEnabled && !isTwoFactorPending && (
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="关闭双重认证前请输入当前 6 位验证码"
+            className="w-full mb-3 px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white"
+            value={twoFaCode}
+            onChange={(e) => setTwoFaCode(e.target.value)}
+          />
+        )}
         {(showQr || isTwoFactorPending || twoFaQrUrl) && (
           <div className="p-6 bg-gray-50 dark:bg-slate-700 rounded-xl flex flex-col items-center gap-4">
             <div className="w-48 h-48 bg-white p-2">

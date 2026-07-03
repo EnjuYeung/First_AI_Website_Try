@@ -21,27 +21,14 @@ export const useExchangeRateSettings = (
       lastRatesUpdate: json.settings.lastRatesUpdate,
     });
 
-  const encryptKey = async (plainKey: string) => {
-    const { jwk } = await apiFetchJson<any>('/api/exchange-rate/public-key');
-    if (!jwk) throw new Error('failed_to_get_public_key');
-    const key = await crypto.subtle.importKey(
-      'jwk', jwk, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
-    );
-    const encrypted = await crypto.subtle.encrypt(
-      { name: 'RSA-OAEP' }, key, new TextEncoder().encode(plainKey)
-    );
-    return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
-  };
-
   const handleSaveExchangeApiKey = async (test: boolean) => {
     if (!exchangeApiKey.trim()) return;
     setIsSavingExchangeApi(true);
     try {
-      const encryptedKey = await encryptKey(exchangeApiKey.trim());
       const json = await apiFetchJson<any>('/api/exchange-rate/config', {
         method: 'POST',
         headers: authJsonHeaders(),
-        body: JSON.stringify({ encryptedKey, test }),
+        body: JSON.stringify({ apiKey: exchangeApiKey.trim(), test }),
       });
       applyResponse(json);
       setExchangeApiKey('');
