@@ -70,8 +70,12 @@ const App: React.FC = () => {
   };
 
   const toggleTheme = () => {
-    const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
-    updateSettings({ ...settings, theme: newTheme });
+    const nextTheme: Record<string, 'light' | 'dark' | 'system'> = {
+      system: 'light',
+      light: 'dark',
+      dark: 'system'
+    };
+    updateSettings({ ...settings, theme: nextTheme[settings.theme] || 'system' });
   };
 
   const handleLogoutConfirm = () => {
