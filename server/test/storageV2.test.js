@@ -38,11 +38,35 @@ test('storage migrates to feature files, prunes notifications, enforces revision
     const data = await storage.loadUserData('admin');
     assert.deepEqual(data.notifications.map((item) => item.id), ['recent']);
     assert.equal(data.revisions.subscriptions, 1);
+    data.subscriptions.push({ id: 'mutated-outside-cache' });
+    const cachedData = await storage.loadUserData('admin');
+    assert.deepEqual(cachedData.subscriptions, []);
+    const subscriptionsPath = path.join(
+      process.env.DATA_DIR,
+      'users',
+      'admin',
+      'subscriptions.json'
+    );
+    await fs.writeFile(
+      subscriptionsPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        revision: 99,
+        updatedAt: new Date().toISOString(),
+        data: [{ id: 'external-change' }],
+      })
+    );
+    const cachedAfterExternalWrite = await storage.loadUserData('admin');
+    assert.equal(cachedAfterExternalWrite.revisions.subscriptions, 1);
+    assert.deepEqual(cachedAfterExternalWrite.subscriptions, []);
     const created = await storage.updateUserFeature('admin', 'subscriptions', 1, (items) => [
       ...items,
       { id: 'sub-1' }
     ]);
     assert.equal(created.revision, 2);
+    const persisted = JSON.parse(await fs.readFile(subscriptionsPath, 'utf8'));
+    assert.equal(persisted.revision, 2);
+    assert.deepEqual(persisted.data, [{ id: 'sub-1' }]);
     await assert.rejects(
       () => storage.updateUserFeature('admin', 'subscriptions', 1, (items) => items),
       (error) => error.statusCode === 409

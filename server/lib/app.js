@@ -9,8 +9,11 @@ export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
   const app = express();
   app.disable('x-powered-by');
 
-  app.use((_, res, next) => {
+  app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (req.path.startsWith('/api/') && !req.path.startsWith('/api/uploads/')) {
+      res.setHeader('Cache-Control', 'private, no-store');
+    }
     next();
   });
 

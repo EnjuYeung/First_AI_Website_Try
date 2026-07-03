@@ -15,6 +15,8 @@ import {
 import { getT } from '../services/i18n';
 import { UnauthorizedError } from '../services/apiClient';
 
+const FOCUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void) => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
@@ -23,6 +25,8 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
   const onUnauthorizedRef = useRef<(() => void) | undefined>(onUnauthorized);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const revisionsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
+  const isLoadingRef = useRef(false);
+  const lastLoadedAtRef = useRef(0);
 
   useEffect(() => {
     onUnauthorizedRef.current = onUnauthorized;
@@ -31,7 +35,8 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
   const t = getT(settings.language);
 
   const loadRemoteData = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setIsDataLoading(true);
     try {
       const data = await fetchAllData();
@@ -39,6 +44,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
       setSettings(data.settings);
       setNotifications(data.notifications || []);
       revisionsRef.current = data.revisions;
+      lastLoadedAtRef.current = Date.now();
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         onUnauthorizedRef.current?.();
@@ -46,6 +52,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
       }
       console.error('Failed to load data', err);
     } finally {
+      isLoadingRef.current = false;
       setIsDataLoading(false);
     }
   }, [isAuthenticated]);
@@ -53,6 +60,26 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
   useEffect(() => {
     loadRemoteData();
   }, [loadRemoteData]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      lastLoadedAtRef.current = 0;
+      return;
+    }
+
+    const refreshIfStale = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (Date.now() - lastLoadedAtRef.current < FOCUS_REFRESH_INTERVAL_MS) return;
+      void loadRemoteData();
+    };
+
+    window.addEventListener('focus', refreshIfStale);
+    document.addEventListener('visibilitychange', refreshIfStale);
+    return () => {
+      window.removeEventListener('focus', refreshIfStale);
+      document.removeEventListener('visibilitychange', refreshIfStale);
+    };
+  }, [isAuthenticated, loadRemoteData]);
 
   const persistFeature = <K extends keyof DataRevisions, T>(
     feature: K,

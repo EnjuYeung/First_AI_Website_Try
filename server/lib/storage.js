@@ -198,6 +198,8 @@ const normalizeNotifications = (incoming, subscriptions) => {
 
 export const createStorage = ({ adminUser, adminPass }) => {
   const FEATURES = ['subscriptions', 'notifications', 'settings'];
+  const migratedUsers = new Set();
+  const featureCache = new Map();
   const featureDefault = (feature) => defaultUserData()[feature];
   const makeDocument = (data, revision = 1) => ({
     schemaVersion: 1,
@@ -205,6 +207,14 @@ export const createStorage = ({ adminUser, adminPass }) => {
     updatedAt: new Date().toISOString(),
     data,
   });
+  const featureCacheKey = (username, feature) => `${username}\0${feature}`;
+  const getCachedDocument = (username, feature) => {
+    const cached = featureCache.get(featureCacheKey(username, feature));
+    return cached ? structuredClone(cached) : null;
+  };
+  const setCachedDocument = (username, feature, document) => {
+    featureCache.set(featureCacheKey(username, feature), structuredClone(document));
+  };
 
   const normalizeFeature = (feature, value, subscriptions = []) => {
     if (feature === 'subscriptions') return Array.isArray(value) ? value : [];
@@ -214,9 +224,10 @@ export const createStorage = ({ adminUser, adminPass }) => {
   };
 
   const ensureUserMigrated = async (username) => {
+    if (migratedUsers.has(username)) return;
     await ensureDataDir();
     const migrationKey = `migration:${username}`;
-    return queueWrite(migrationKey, async () => {
+    await queueWrite(migrationKey, async () => {
       const paths = FEATURES.map((feature) => userFeaturePath(username, feature));
       const existing = await Promise.all(
         paths.map((filePath) => fs.access(filePath).then(() => true).catch(() => false))
@@ -240,7 +251,10 @@ export const createStorage = ({ adminUser, adminPass }) => {
       await fs.chmod(userFeatureDir(username), 0o700);
       for (let index = 0; index < FEATURES.length; index += 1) {
         if (!existing[index]) {
-          await atomicWriteJson(paths[index], makeDocument(values[FEATURES[index]]));
+          const feature = FEATURES[index];
+          const document = makeDocument(values[feature]);
+          await atomicWriteJson(paths[index], document);
+          setCachedDocument(username, feature, document);
         }
       }
       if (legacy) {
@@ -249,24 +263,31 @@ export const createStorage = ({ adminUser, adminPass }) => {
         });
       }
     });
+    migratedUsers.add(username);
   };
 
   const readFeatureDocument = async (username, feature) => {
+    const cached = getCachedDocument(username, feature);
+    if (cached) return cached;
+
     const filePath = userFeaturePath(username, feature);
     try {
       const document = await readJson(filePath);
       const data = normalizeFeature(feature, document.data);
-      return {
+      const normalizedDocument = {
         schemaVersion: 1,
         revision: Number.isInteger(document.revision) ? document.revision : 1,
         updatedAt: document.updatedAt || new Date(0).toISOString(),
         data,
       };
+      setCachedDocument(username, feature, normalizedDocument);
+      return structuredClone(normalizedDocument);
     } catch (err) {
       if (err.code !== 'ENOENT') throw err;
       const document = makeDocument(normalizeFeature(feature, featureDefault(feature)));
       await atomicWriteJson(filePath, document);
-      return document;
+      setCachedDocument(username, feature, document);
+      return structuredClone(document);
     }
   };
 
@@ -281,6 +302,7 @@ export const createStorage = ({ adminUser, adminPass }) => {
       notificationsDoc.revision += 1;
       notificationsDoc.updatedAt = new Date().toISOString();
       await atomicWriteJson(userFeaturePath(username, 'notifications'), notificationsDoc);
+      setCachedDocument(username, 'notifications', notificationsDoc);
     }
     return { subscriptionsDoc, notificationsDoc, settingsDoc };
   };
@@ -349,6 +371,7 @@ export const createStorage = ({ adminUser, adminPass }) => {
         if (JSON.stringify(documents[feature].data) === JSON.stringify(next[feature])) continue;
         documents[feature] = makeDocument(next[feature], documents[feature].revision + 1);
         await atomicWriteJson(userFeaturePath(username, feature), documents[feature]);
+        setCachedDocument(username, feature, documents[feature]);
       }
       return {
         ...next,
@@ -382,6 +405,7 @@ export const createStorage = ({ adminUser, adminPass }) => {
       const data = normalizeFeature(feature, updated, subscriptions);
       const nextDocument = makeDocument(data, document.revision + 1);
       await atomicWriteJson(userFeaturePath(username, feature), nextDocument);
+      setCachedDocument(username, feature, nextDocument);
       return { data, revision: nextDocument.revision };
     });
   };

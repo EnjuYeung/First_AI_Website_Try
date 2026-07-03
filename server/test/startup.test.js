@@ -33,6 +33,7 @@ test('backend initializes a fresh data directory and serves health and login end
 
     const health = await fetch(`${baseUrl}/api/health`);
     assert.equal(health.status, 200);
+    assert.equal(health.headers.get('cache-control'), 'private, no-store');
 
     const login = await fetch(`${baseUrl}/api/login`, {
       method: 'POST',
@@ -44,6 +45,15 @@ test('backend initializes a fresh data directory and serves health and login end
     });
     assert.equal(login.status, 200);
     assert.ok(login.headers.has('set-cookie'));
+    assert.equal(login.headers.get('cache-control'), 'private, no-store');
+
+    const iconPath = path.join(dataDir, 'uploads', 'cache-test.png');
+    await fs.writeFile(iconPath, 'not-a-real-image');
+    const icon = await fetch(`${baseUrl}/api/uploads/cache-test.png`);
+    assert.equal(icon.status, 200);
+    assert.match(icon.headers.get('cache-control') || '', /max-age=31536000/);
+    assert.match(icon.headers.get('cache-control') || '', /immutable/);
+    assert.doesNotMatch(icon.headers.get('cache-control') || '', /no-store/);
   } finally {
     if (server) await new Promise((resolve) => server.close(resolve));
     await fs.rm(dataDir, { recursive: true, force: true });

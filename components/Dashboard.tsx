@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Subscription, AppSettings } from '../types';
-import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, BarChart2, LucideIcon } from 'lucide-react';
+import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, LucideIcon } from 'lucide-react';
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
@@ -28,7 +28,6 @@ interface DashboardStats {
   monthlyPending: number;
   yearlyPaid: number;
   yearlyPending: number;
-  lifetimeSpend: number;
   activeCount: number;
   cancelledCount: number;
   recentPayments: BillingEvent[];
@@ -188,7 +187,6 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
       monthlyPending: 0,
       yearlyPaid: 0,
       yearlyPending: 0,
-      lifetimeSpend: 0,
       activeCount: 0,
       cancelledCount: 0,
       recentPayments: [],
@@ -238,29 +236,24 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
 
         const dateObj = new Date(currentDate); // Copy for storage
 
-        // A. Lifetime (Before or on today)
-        if (currentDate <= today) {
-          stats.lifetimeSpend += usdCost;
-        }
-
-        // B. Monthly
+        // A. Monthly
         if (currentDate >= monthStart && currentDate <= monthEnd) {
           if (currentDate <= today) stats.monthlyPaid += usdCost;
           else if (!isCancelled) stats.monthlyPending += usdCost;
         }
 
-        // C. Yearly
+        // B. Yearly
         if (currentDate >= yearStart && currentDate <= yearEnd) {
           if (currentDate <= today) stats.yearlyPaid += usdCost;
           else if (!isCancelled) stats.yearlyPending += usdCost;
         }
 
-        // D. Recent Payments (Last 7 Days)
+        // C. Recent Payments (Last 7 Days)
         if (currentDate >= last7DaysStart && currentDate <= today) {
           stats.recentPayments.push({ sub, date: dateObj, cost: sub.price });
         }
 
-        // E. Upcoming Renewals (Next 7 Days, exclude today, include future)
+        // D. Upcoming Renewals (Next 7 Days, exclude today, include future)
         // Only if active
         if (!isCancelled && currentDate > today && currentDate <= next7DaysEnd) {
           stats.upcomingRenewals.push({ sub, date: dateObj, cost: sub.price });
@@ -294,7 +287,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
     <div className="space-y-6 animate-fade-in">
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard
           title={t('monthly_paid_pending')}
           primaryValue={data.monthlyPaid}
@@ -319,13 +312,6 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           iconColorClass="text-green-500"
           progressColorClass="bg-green-500"
           isCount
-        />
-        <StatCard
-          title={t('lifetime_spend')}
-          primaryValue={data.lifetimeSpend}
-          icon={BarChart2}
-          iconColorClass="text-purple-500"
-          progressColorClass="bg-purple-500"
         />
       </div>
 
