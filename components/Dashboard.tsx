@@ -70,18 +70,18 @@ const StatCard: React.FC<{
   const percentage = total > 0 ? (primaryValue / total) * 100 : 0;
 
   return (
-    <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group">
+    <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group [container-type:inline-size]">
       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
         <Icon size={80} className={iconColorClass} />
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10 truncate">{title}</p>
 
-      <div className="flex flex-wrap items-end gap-x-2 gap-y-1 mt-2 z-10 min-w-0">
-        <h3 className="max-w-full text-[clamp(1.375rem,1.45vw,1.875rem)] leading-tight font-bold text-gray-900 dark:text-white whitespace-nowrap tabular-nums">
+      <div className="flex flex-nowrap items-baseline gap-x-2 mt-2 z-10 min-w-0 whitespace-nowrap">
+        <h3 className="shrink-0 text-[clamp(1.125rem,8cqw,1.875rem)] leading-none font-bold text-gray-900 dark:text-white tabular-nums">
           {isCount ? primaryValue : formatCurrency(primaryValue, 'USD')}
         </h3>
         {secondaryValue !== undefined && (
-          <div className="flex items-baseline gap-2 min-w-0 text-[clamp(0.875rem,1vw,1.25rem)] leading-tight font-semibold text-gray-400 whitespace-nowrap tabular-nums">
+          <div className="flex shrink-0 items-baseline gap-2 text-[clamp(0.75rem,5cqw,1.25rem)] leading-none font-semibold text-gray-400 tabular-nums">
             <span>{isCount ? '|' : '/'}</span>
             <span>
               {isCount ? secondaryValue : formatCurrency(secondaryValue, 'USD')}
