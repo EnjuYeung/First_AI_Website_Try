@@ -10,6 +10,7 @@ import {
   removeSubscription,
   removeSubscriptions,
   replaceSettings,
+  RevisionConflictError,
   updateSubscription,
 } from '../services/storageService';
 import { getT } from '../services/i18n';
@@ -34,7 +35,7 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
 
   const t = getT(settings.language);
 
-  const loadRemoteData = useCallback(async () => {
+  const fetchRemoteData = useCallback(async () => {
     if (!isAuthenticated || isLoadingRef.current) return;
     isLoadingRef.current = true;
     setIsDataLoading(true);
@@ -56,6 +57,13 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
       setIsDataLoading(false);
     }
   }, [isAuthenticated]);
+
+  const loadRemoteData = useCallback(async () => {
+    // A refresh must not replace an optimistic local update with the older
+    // server snapshot while that update is still being persisted.
+    await saveQueueRef.current;
+    await fetchRemoteData();
+  }, [fetchRemoteData]);
 
   useEffect(() => {
     loadRemoteData();
@@ -88,14 +96,35 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
   ) => {
     const save = async () => {
       try {
-        const result = await operation(revisionsRef.current[feature]);
+        let result: { data: T; revision: number };
+        try {
+          result = await operation(revisionsRef.current[feature]);
+        } catch (err) {
+          if (!(err instanceof RevisionConflictError)) throw err;
+
+          // Settings can also be changed by server-side tasks such as exchange
+          // rate refreshes. Refresh the revisions and retry the user's pending
+          // mutation once instead of discarding the optimistic local value.
+          if (err.currentRevision !== undefined) {
+            revisionsRef.current = {
+              ...revisionsRef.current,
+              [feature]: err.currentRevision,
+            };
+          } else {
+            const latest = await fetchAllData();
+            revisionsRef.current = latest.revisions;
+          }
+          result = await operation(revisionsRef.current[feature]);
+        }
         revisionsRef.current = { ...revisionsRef.current, [feature]: result.revision };
         apply(result.data);
       } catch (err) {
         if (err instanceof UnauthorizedError) onUnauthorizedRef.current?.();
         else {
           console.error('Failed to persist data', err);
-          await loadRemoteData();
+          // Do not call loadRemoteData here: this save is itself part of the
+          // queue that loadRemoteData waits for.
+          await fetchRemoteData();
         }
       }
     };

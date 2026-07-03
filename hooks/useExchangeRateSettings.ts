@@ -13,10 +13,14 @@ export const useExchangeRateSettings = (
   const [isSavingExchangeApi, setIsSavingExchangeApi] = useState(false);
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
   const isSavingExchangeApiRef = useRef(false);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   const applyResponse = (json: any) =>
     onUpdate({
-      ...settings,
+      // The request may finish after another setting (for example, theme) was
+      // changed. Merge into the latest settings instead of a stale closure.
+      ...settingsRef.current,
       exchangeRateApi: json.settings.exchangeRateApi,
       exchangeRates: json.settings.exchangeRates,
       lastRatesUpdate: json.settings.lastRatesUpdate,

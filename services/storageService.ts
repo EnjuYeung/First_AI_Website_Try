@@ -22,6 +22,10 @@ export interface DataRevisions {
 
 export class RevisionConflictError extends Error {
   name = 'RevisionConflictError';
+
+  constructor(message: string, public readonly currentRevision?: number) {
+    super(message);
+  }
 }
 
 const DEFAULT_SETTINGS: AppSettings = createDefaultSettings();
@@ -206,7 +210,13 @@ const mutateFeature = async <T>(
   });
   const json = await resp.json().catch(() => ({}));
   if (!resp.ok) {
-    if (resp.status === 409) throw new RevisionConflictError((json as any)?.message || 'revision_conflict');
+    if (resp.status === 409) {
+      const currentRevision = Number((json as any)?.currentRevision);
+      throw new RevisionConflictError(
+        (json as any)?.message || 'revision_conflict',
+        Number.isInteger(currentRevision) ? currentRevision : undefined
+      );
+    }
     throw new Error((json as any)?.message || `http_${resp.status}`);
   }
   return { data: (json as any).data as T, revision: Number((json as any).revision) };
