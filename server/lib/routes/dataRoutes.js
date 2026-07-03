@@ -126,7 +126,14 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
   app.put('/api/settings', auth.authMiddleware, async (req, res) => {
     const error = validateSettings(req.body);
     if (error) return res.status(400).json({ success: false, message: error });
-    return updateFeature(req, res, 'settings', () => req.body);
+    return updateFeature(req, res, 'settings', (currentSettings) => ({
+      ...req.body,
+      // Exchange-rate credentials and scheduler state are server-managed. Preserving
+      // the complete object prevents stale tabs from restoring legacy ciphertext.
+      exchangeRateApi: currentSettings.exchangeRateApi,
+      exchangeRates: currentSettings.exchangeRates,
+      lastRatesUpdate: currentSettings.lastRatesUpdate,
+    }));
   });
 
   app.delete('/api/notifications/:id', auth.authMiddleware, async (req, res) =>
