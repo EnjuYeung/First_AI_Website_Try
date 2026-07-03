@@ -68,7 +68,10 @@ test('general settings updates preserve server-managed exchange-rate state', asy
     lastRunAt0: 0,
     lastRunAt12: 0,
   };
-  incoming.exchangeRates = { USD: 1 };
+  incoming.exchangeRates = {
+    USD: 1,
+    as_of: '2025-12-12 (approximate, not real-time)',
+  };
   incoming.lastRatesUpdate = 0;
   const response = createResponse();
   await handlers.get('PUT /api/settings')(

@@ -22,6 +22,11 @@ test('storage migrates to feature files, prunes notifications, enforces revision
         language: 'zh',
         timezone: 'Asia/Shanghai',
         theme: 'system',
+        exchangeRates: {
+          USD: 1,
+          CNY: 7.2,
+          as_of: '2025-12-12 (approximate, not real-time)',
+        },
         notifications: {
           rules: { reminderDays: 3 },
           scheduledTask: { enabled: true },
@@ -44,6 +49,7 @@ test('storage migrates to feature files, prunes notifications, enforces revision
     const data = await storage.loadUserData('admin');
     assert.deepEqual(data.notifications.map((item) => item.id), ['recent']);
     assert.equal('scheduledTask' in data.settings.notifications, false);
+    assert.deepEqual(data.settings.exchangeRates, { USD: 1, CNY: 7.2 });
     assert.equal(validateSettings(data.settings), null);
     assert.equal(data.revisions.subscriptions, 1);
     data.subscriptions.push({ id: 'mutated-outside-cache' });

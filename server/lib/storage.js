@@ -19,6 +19,7 @@ import {
   DEFAULT_REMINDER_TEMPLATE_STRING,
   normalizeReminderTemplateString,
 } from '../../shared/reminderTemplate.js';
+import { normalizeExchangeRates } from '../../shared/defaultSettings.js';
 
 const PREVIOUS_REMINDER_TEMPLATE_STRING = JSON.stringify(
   {
@@ -91,6 +92,7 @@ const mergeSettings = (incoming) => {
     ...base.exchangeRateApi,
     ...(parsed.exchangeRateApi || {}),
   };
+  const exchangeRates = normalizeExchangeRates(parsed.exchangeRates, base.exchangeRates);
 
   const parsedRules = parsed.notifications?.rules || {};
   const parsedTemplate = parsedRules.template;
@@ -118,6 +120,7 @@ const mergeSettings = (incoming) => {
     ...base,
     ...parsed,
     exchangeRateApi,
+    exchangeRates,
     security: { ...base.security, ...(parsed.security || {}) },
     notifications: {
       telegram: {

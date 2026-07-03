@@ -1,6 +1,30 @@
 import { DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, DEFAULT_RULE_CHANNELS } from './constants.js';
 import { DEFAULT_REMINDER_TEMPLATE_STRING } from './reminderTemplate.js';
 
+const EXCHANGE_RATE_CODE_RE = /^[A-Z0-9]{2,10}$/;
+
+export const normalizeExchangeRates = (incoming, fallback = { USD: 1 }) => {
+  const collectValidRates = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        ([code, rate]) =>
+          EXCHANGE_RATE_CODE_RE.test(code) &&
+          typeof rate === 'number' &&
+          Number.isFinite(rate) &&
+          rate > 0
+      )
+    );
+  };
+
+  const incomingRates = collectValidRates(incoming);
+  const rates = Object.keys(incomingRates).length
+    ? incomingRates
+    : collectValidRates(fallback);
+  if (!rates.USD) rates.USD = 1;
+  return rates;
+};
+
 export const createDefaultSettings = () => ({
   language: 'zh',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',

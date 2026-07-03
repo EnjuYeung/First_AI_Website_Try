@@ -3,7 +3,7 @@ import { Subscription, AppSettings, NotificationRecord } from '../types';
 import { canonicalCategoryKey, canonicalPaymentMethodKey } from './displayLabels';
 import { authHeaderOnly, authJsonHeaders, apiFetch, apiFetchJson, UnauthorizedError } from './apiClient';
 import { DEFAULT_REMINDER_TEMPLATE_STRING, normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
-import { createDefaultSettings } from '../shared/defaultSettings.js';
+import { createDefaultSettings, normalizeExchangeRates } from '../shared/defaultSettings.js';
 
 const API_BASE = '/api';
 
@@ -168,7 +168,7 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       ...DEFAULT_SETTINGS.security,
       ...(parsed.security || {})
     },
-    exchangeRates: parsed.exchangeRates || DEFAULT_SETTINGS.exchangeRates,
+    exchangeRates: normalizeExchangeRates(parsed.exchangeRates, DEFAULT_SETTINGS.exchangeRates),
     customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
     customCategories: mergeStringList((parsed as any).customCategories, DEFAULT_SETTINGS.customCategories, canonicalCategoryKey),
     customPaymentMethods: mergeStringList((parsed as any).customPaymentMethods, DEFAULT_SETTINGS.customPaymentMethods, canonicalPaymentMethodKey)

@@ -135,16 +135,24 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
 
   app.put('/api/settings', auth.authMiddleware, async (req, res) => {
     const settings = removeLegacySettingsFields(req.body);
-    const error = validateSettings(settings);
-    if (error) return res.status(400).json({ success: false, message: error });
-    return updateFeature(req, res, 'settings', (currentSettings) => ({
-      ...settings,
-      // Exchange-rate credentials and scheduler state are server-managed. Preserving
-      // the complete object prevents stale tabs from restoring legacy ciphertext.
-      exchangeRateApi: currentSettings.exchangeRateApi,
-      exchangeRates: currentSettings.exchangeRates,
-      lastRatesUpdate: currentSettings.lastRatesUpdate,
-    }));
+    return updateFeature(req, res, 'settings', (currentSettings) => {
+      const nextSettings = {
+        ...settings,
+        // Exchange-rate credentials, rates, and scheduler state are server-managed.
+        // Replace them before validation so stale legacy metadata from a client
+        // cannot block an unrelated preference update.
+        exchangeRateApi: currentSettings.exchangeRateApi,
+        exchangeRates: currentSettings.exchangeRates,
+        lastRatesUpdate: currentSettings.lastRatesUpdate,
+      };
+      const error = validateSettings(nextSettings);
+      if (error) {
+        const validationError = new Error(error);
+        validationError.statusCode = 400;
+        throw validationError;
+      }
+      return nextSettings;
+    });
   });
 
   app.delete('/api/notifications/:id', auth.authMiddleware, async (req, res) =>
