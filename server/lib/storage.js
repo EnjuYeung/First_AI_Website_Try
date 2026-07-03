@@ -352,9 +352,9 @@ export const createStorage = ({ adminUser, adminPass }) => {
     return queueWrite(`user:${username}`, async () => {
       const { subscriptionsDoc, notificationsDoc, settingsDoc } = await loadAllDocuments(username);
       const current = {
-        subscriptions: subscriptionsDoc.data,
-        notifications: notificationsDoc.data,
-        settings: settingsDoc.data,
+        subscriptions: structuredClone(subscriptionsDoc.data),
+        notifications: structuredClone(notificationsDoc.data),
+        settings: structuredClone(settingsDoc.data),
       };
       const updated = (await updater(current)) || current;
       const next = {

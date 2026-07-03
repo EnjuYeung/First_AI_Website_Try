@@ -67,6 +67,20 @@ test('storage migrates to feature files, prunes notifications, enforces revision
     const persisted = JSON.parse(await fs.readFile(subscriptionsPath, 'utf8'));
     assert.equal(persisted.revision, 2);
     assert.deepEqual(persisted.data, [{ id: 'sub-1' }]);
+    const updatedData = await storage.updateUserData('admin', (current) => {
+      current.settings.theme = 'dark';
+      return current;
+    });
+    assert.equal(updatedData.settings.theme, 'dark');
+    const settingsPath = path.join(
+      process.env.DATA_DIR,
+      'users',
+      'admin',
+      'settings.json'
+    );
+    const persistedSettings = JSON.parse(await fs.readFile(settingsPath, 'utf8'));
+    assert.equal(persistedSettings.data.theme, 'dark');
+    assert.equal(persistedSettings.revision, 2);
     await assert.rejects(
       () => storage.updateUserFeature('admin', 'subscriptions', 1, (items) => items),
       (error) => error.statusCode === 409
