@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Home, CreditCard, BellRing, Settings as SettingsIcon, LogOut } from 'lucide-react';
-import { Subscription } from './types';
+import { Plus, Home, CreditCard, BellRing, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
+import { AppSettings, Subscription } from './types';
 import { getT } from './services/i18n';
 import Dashboard from './components/Dashboard';
 import SubscriptionList from './components/SubscriptionList';
@@ -12,6 +12,7 @@ import LoginPage from './components/LoginPage';
 // Custom Hooks
 import { useAuth } from './hooks/useAuth';
 import { useAppData } from './hooks/useAppData';
+import { useClientPreferences } from './hooks/useClientPreferences';
 import { useTheme } from './hooks/useTheme';
 
 // Layout Components
@@ -20,13 +21,16 @@ import { MobileNav } from './components/layout/MobileNav';
 
 const App: React.FC = () => {
   const { isAuthenticated, isLoadingAuth, login, logout } = useAuth();
+  const { language, setLanguage, theme, setTheme } = useClientPreferences();
   const {
     subscriptions, settings, notifications, isDataLoading,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
     batchDeleteSubscriptions, duplicateSubscription, deleteNotification, clearNotifications
-  } = useAppData(isAuthenticated, logout);
+  } = useAppData(isAuthenticated, logout, language);
 
-  useTheme(settings.theme);
+  const clientSettings: AppSettings = { ...settings, language, theme };
+
+  useTheme(theme);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'notifications' | 'settings'>(() => {
     if (typeof window === 'undefined') return 'dashboard';
@@ -40,8 +44,11 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [refreshAlert, setRefreshAlert] = useState<
+    { type: 'success' } | { type: 'error'; log: string } | null
+  >(null);
 
-  const t = getT(settings.language);
+  const t = getT(language);
 
   // Persist Tab
   useEffect(() => {
@@ -66,7 +73,7 @@ const App: React.FC = () => {
   };
 
   const toggleLanguage = () => {
-    updateSettings({ ...settings, language: settings.language === 'en' ? 'zh' : 'en' });
+    setLanguage(language === 'en' ? 'zh' : 'en');
   };
 
   const toggleTheme = () => {
@@ -75,7 +82,41 @@ const App: React.FC = () => {
       light: 'dark',
       dark: 'system'
     };
-    updateSettings({ ...settings, theme: nextTheme[settings.theme] || 'system' });
+    setTheme(nextTheme[theme] || 'system');
+  };
+
+  const handleSettingsUpdate = (nextSettings: AppSettings) => {
+    if (nextSettings.language !== language) setLanguage(nextSettings.language);
+    if (nextSettings.theme !== theme) setTheme(nextSettings.theme);
+
+    const { language: _nextLanguage, theme: _nextTheme, ...nextServerSettings } = nextSettings;
+    const { language: _language, theme: _theme, ...currentServerSettings } = settings;
+    if (JSON.stringify(nextServerSettings) === JSON.stringify(currentServerSettings)) return;
+
+    updateSettings({
+      ...nextSettings,
+      language: settings.language,
+      theme: settings.theme,
+    });
+  };
+
+  const handleManualRefresh = async () => {
+    const result = await loadRemoteData();
+    if (result.ok) {
+      setRefreshAlert({ type: 'success' });
+      return;
+    }
+
+    const error = result.error;
+    const detail = error instanceof Error
+      ? error.stack || `${error.name}: ${error.message}`
+      : typeof error === 'string'
+        ? error
+        : JSON.stringify(error, null, 2);
+    setRefreshAlert({
+      type: 'error',
+      log: `[${new Date().toISOString()}] ${detail || 'Unknown refresh error'}`,
+    });
   };
 
   const handleLogoutConfirm = () => {
@@ -99,7 +140,7 @@ const App: React.FC = () => {
     return (
       <LoginPage
         onLogin={login}
-        lang={settings.language}
+        lang={language}
         toggleLanguage={toggleLanguage}
       />
     );
@@ -113,8 +154,8 @@ const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isDataLoading={isDataLoading}
-        loadRemoteData={loadRemoteData}
-        settings={settings}
+        loadRemoteData={handleManualRefresh}
+        settings={clientSettings}
         toggleLanguage={toggleLanguage}
         toggleTheme={toggleTheme}
         onLogoutClick={() => setIsLogoutModalOpen(true)}
@@ -139,7 +180,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="animate-fade-in">
-          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={settings.language} settings={settings} />}
+          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={language} settings={clientSettings} />}
 
           {activeTab === 'list' && (
             <SubscriptionList
@@ -149,21 +190,21 @@ const App: React.FC = () => {
               onDelete={deleteSubscription}
               onDuplicate={duplicateSubscription}
               onBatchDelete={batchDeleteSubscriptions}
-              lang={settings.language}
-              exchangeRates={settings.exchangeRates}
+              lang={language}
+              exchangeRates={clientSettings.exchangeRates}
             />
           )}
 
           {activeTab === 'notifications' && (
             <NotificationHistory
-              lang={settings.language}
+              lang={language}
               notifications={notifications}
               onDeleteNotification={deleteNotification}
               onClearNotifications={clearNotifications}
             />
           )}
 
-          {activeTab === 'settings' && <Settings settings={settings} onUpdateSettings={updateSettings} />}
+          {activeTab === 'settings' && <Settings settings={clientSettings} onUpdateSettings={handleSettingsUpdate} />}
         </div>
       </main>
 
@@ -172,8 +213,8 @@ const App: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveWrapper}
         initialData={editingSub}
-        settings={settings}
-        lang={settings.language}
+        settings={clientSettings}
+        lang={language}
       />
 
       <MobileNav
@@ -183,6 +224,34 @@ const App: React.FC = () => {
       />
 
       {/* Global Modals */}
+      {refreshAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
+          <div className="mac-surface rounded-2xl shadow-xl w-full max-w-lg overflow-hidden p-6 text-center animate-pop-in">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              refreshAlert.type === 'success'
+                ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                : 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+            }`}>
+              {refreshAlert.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              {t(refreshAlert.type === 'success' ? 'refresh_success' : 'refresh_failed')}
+            </h3>
+            {refreshAlert.type === 'error' && (
+              <pre className="max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-left text-xs leading-5 text-red-200 whitespace-pre-wrap break-words">
+                {refreshAlert.log}
+              </pre>
+            )}
+            <button
+              onClick={() => setRefreshAlert(null)}
+              className="w-full mt-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-colors"
+            >
+              {t('close')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {isLogoutModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
           <div className="mac-surface rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center animate-pop-in">

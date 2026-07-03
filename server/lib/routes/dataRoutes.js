@@ -136,8 +136,18 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
   app.put('/api/settings', auth.authMiddleware, async (req, res) => {
     const settings = removeLegacySettingsFields(req.body);
     return updateFeature(req, res, 'settings', (currentSettings) => {
+      const {
+        language: _language,
+        theme: _theme,
+        ...serverSettings
+      } = settings || {};
       const nextSettings = {
-        ...settings,
+        ...currentSettings,
+        ...serverSettings,
+        // Language and theme are client-only preferences. Preserve legacy
+        // values only to keep the persisted settings schema compatible.
+        language: currentSettings.language,
+        theme: currentSettings.theme,
         // Exchange-rate credentials, rates, and scheduler state are server-managed.
         // Replace them before validation so stale legacy metadata from a client
         // cannot block an unrelated preference update.

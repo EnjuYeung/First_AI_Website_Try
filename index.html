@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>subm</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      try {
+        const theme = localStorage.getItem('subm.theme') || 'system';
+        const isDark = theme === 'dark' ||
+          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', isDark);
+      } catch {
+        // Local storage can be unavailable in restricted browsing contexts.
+      }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {

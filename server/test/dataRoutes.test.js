@@ -86,7 +86,7 @@ test('general settings updates preserve server-managed exchange-rate state', asy
   );
 
   assert.equal(response.statusCode, 200);
-  assert.equal(savedSettings.theme, 'dark');
+  assert.equal(savedSettings.theme, currentSettings.theme);
   assert.deepEqual(savedSettings.exchangeRateApi, currentSettings.exchangeRateApi);
   assert.deepEqual(savedSettings.exchangeRates, currentSettings.exchangeRates);
   assert.equal(savedSettings.lastRatesUpdate, currentSettings.lastRatesUpdate);
@@ -135,6 +135,6 @@ test('settings updates discard the legacy notification scheduled task', async ()
   );
 
   assert.equal(response.statusCode, 200);
-  assert.equal(savedSettings.theme, 'system');
+  assert.equal(savedSettings.theme, currentSettings.theme);
   assert.equal('scheduledTask' in savedSettings.notifications, false);
 });

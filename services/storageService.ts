@@ -239,8 +239,12 @@ export const removeSubscription = (id: string, revision: number) =>
 export const removeSubscriptions = (ids: string[], revision: number) =>
   mutateFeature<Subscription[]>('/subscriptions/batch-delete', 'POST', revision, { ids });
 
-export const replaceSettings = (settings: AppSettings, revision: number) =>
-  mutateFeature<AppSettings>('/settings', 'PUT', revision, settings);
+export const replaceSettings = (settings: AppSettings, revision: number) => {
+  // Language and theme are device-local preferences. Do not send them to the
+  // server when persisting the remaining application settings.
+  const { language: _language, theme: _theme, ...serverSettings } = settings;
+  return mutateFeature<AppSettings>('/settings', 'PUT', revision, serverSettings);
+};
 
 export const removeNotification = (id: string, revision: number) =>
   mutateFeature<NotificationRecord[]>(`/notifications/${encodeURIComponent(id)}`, 'DELETE', revision);

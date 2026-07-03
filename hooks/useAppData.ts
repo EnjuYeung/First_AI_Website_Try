@@ -18,7 +18,15 @@ import { UnauthorizedError } from '../services/apiClient';
 
 const FOCUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void) => {
+export type DataRefreshResult =
+  | { ok: true }
+  | { ok: false; error: unknown };
+
+export const useAppData = (
+  isAuthenticated: boolean,
+  onUnauthorized?: () => void,
+  language: AppSettings['language'] = 'zh'
+) => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
@@ -33,10 +41,11 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
     onUnauthorizedRef.current = onUnauthorized;
   }, [onUnauthorized]);
 
-  const t = getT(settings.language);
+  const t = getT(language);
 
-  const fetchRemoteData = useCallback(async () => {
-    if (!isAuthenticated || isLoadingRef.current) return;
+  const fetchRemoteData = useCallback(async (): Promise<DataRefreshResult> => {
+    if (!isAuthenticated) return { ok: false, error: new Error('not_authenticated') };
+    if (isLoadingRef.current) return { ok: false, error: new Error('refresh_in_progress') };
     isLoadingRef.current = true;
     setIsDataLoading(true);
     try {
@@ -46,27 +55,28 @@ export const useAppData = (isAuthenticated: boolean, onUnauthorized?: () => void
       setNotifications(data.notifications || []);
       revisionsRef.current = data.revisions;
       lastLoadedAtRef.current = Date.now();
+      return { ok: true };
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         onUnauthorizedRef.current?.();
-        return;
       }
       console.error('Failed to load data', err);
+      return { ok: false, error: err };
     } finally {
       isLoadingRef.current = false;
       setIsDataLoading(false);
     }
   }, [isAuthenticated]);
 
-  const loadRemoteData = useCallback(async () => {
+  const loadRemoteData = useCallback(async (): Promise<DataRefreshResult> => {
     // A refresh must not replace an optimistic local update with the older
     // server snapshot while that update is still being persisted.
     await saveQueueRef.current;
-    await fetchRemoteData();
+    return fetchRemoteData();
   }, [fetchRemoteData]);
 
   useEffect(() => {
-    loadRemoteData();
+    void loadRemoteData();
   }, [loadRemoteData]);
 
   useEffect(() => {
