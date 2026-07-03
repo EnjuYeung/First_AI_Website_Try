@@ -5,42 +5,41 @@ export const registerExchangeRateRoutes = ({ app, auth, storage, exchangeRate })
       if (typeof apiKey !== 'string' || !apiKey.trim()) {
         return res.status(400).json({ ok: false, message: 'missing_api_key' });
       }
-      const encryptedKey = exchangeRate.encryptApiKey(apiKey.trim());
+      const plainApiKey = apiKey.trim();
+      const encryptedKey = exchangeRate.encryptApiKey(plainApiKey);
       const username = req.user.username;
+      const conversionRates = test
+        ? await exchangeRate.fetchUsdRatesFromExchangeRateApi(plainApiKey)
+        : null;
+      const now = Date.now();
       const configured = await storage.updateUserData(username, (current) => {
+        const currentSettings = current.settings;
         current.settings.exchangeRateApi = {
-          ...current.settings.exchangeRateApi,
-          ...(typeof encryptedKey === 'string' ? { encryptedKey } : {}),
-          enabled: false,
+          ...currentSettings.exchangeRateApi,
+          encryptedKey,
+          enabled: Boolean(test),
+          lastTestedAt: test ? now : 0,
+          lastRunAt0: test ? currentSettings.exchangeRateApi.lastRunAt0 : 0,
+          lastRunAt12: test ? currentSettings.exchangeRateApi.lastRunAt12 : 0,
         };
+        if (conversionRates) {
+          const nextRates = { ...(currentSettings.exchangeRates || {}), USD: 1 };
+          const desiredCurrencies = (currentSettings.customCurrencies || [])
+            .map((currency) => currency.code)
+            .filter(Boolean);
+          for (const code of desiredCurrencies) {
+            if (code === 'USD') continue;
+            const rate = conversionRates[code];
+            if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
+              nextRates[code] = rate;
+            }
+          }
+          currentSettings.exchangeRates = nextRates;
+          currentSettings.lastRatesUpdate = now;
+        }
         return current;
       });
-      let settings = configured.settings;
-      if (test) {
-        const keyToUse = settings.exchangeRateApi.encryptedKey;
-        const decryptedApiKey = await exchangeRate.decryptApiKey(keyToUse);
-        await exchangeRate.fetchUsdRatesFromExchangeRateApi(decryptedApiKey);
-        const tested = await storage.updateUserData(username, (current) => {
-          if (current.settings.exchangeRateApi.encryptedKey !== keyToUse) {
-            throw new Error('exchange_rate_key_changed');
-          }
-          Object.assign(current.settings.exchangeRateApi, {
-            enabled: true,
-            lastTestedAt: Date.now(),
-          });
-          return current;
-        });
-        settings = tested.settings;
-        const updated = await exchangeRate.updateExchangeRatesForUser(username, null);
-        return res.json({
-          ok: true,
-          settings: {
-            exchangeRateApi: updated.exchangeRateApi,
-            exchangeRates: updated.exchangeRates,
-            lastRatesUpdate: updated.lastRatesUpdate,
-          },
-        });
-      }
+      const settings = configured.settings;
       res.json({
         ok: true,
         settings: {

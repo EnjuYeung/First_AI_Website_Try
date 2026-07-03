@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AppSettings } from '../types';
 import { apiFetchJson, authJsonHeaders } from '../services/apiClient';
 import { SettingsAlert } from './settingsTypes';
@@ -12,6 +12,7 @@ export const useExchangeRateSettings = (
   const [exchangeApiKey, setExchangeApiKey] = useState('');
   const [isSavingExchangeApi, setIsSavingExchangeApi] = useState(false);
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
+  const isSavingExchangeApiRef = useRef(false);
 
   const applyResponse = (json: any) =>
     onUpdate({
@@ -22,7 +23,8 @@ export const useExchangeRateSettings = (
     });
 
   const handleSaveExchangeApiKey = async (test: boolean) => {
-    if (!exchangeApiKey.trim()) return;
+    if (!exchangeApiKey.trim() || isSavingExchangeApiRef.current) return;
+    isSavingExchangeApiRef.current = true;
     setIsSavingExchangeApi(true);
     try {
       const json = await apiFetchJson<any>('/api/exchange-rate/config', {
@@ -36,6 +38,7 @@ export const useExchangeRateSettings = (
     } catch (err: any) {
       setAlert({ isOpen: true, type: 'error', title: t('error_title'), message: err?.message || 'save_failed' });
     } finally {
+      isSavingExchangeApiRef.current = false;
       setIsSavingExchangeApi(false);
     }
   };
