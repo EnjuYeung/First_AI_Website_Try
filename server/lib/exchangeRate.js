@@ -20,7 +20,12 @@ const fetchUsdRatesFromExchangeRateApi = async (apiKey) => {
   return json.conversion_rates;
 };
 
-export const createExchangeRate = ({ storage, defaults, dataEncryptionKey }) => {
+export const createExchangeRate = ({
+  storage,
+  defaults,
+  dataEncryptionKey,
+  legacyKeypairFile = LEGACY_EXCHANGE_RATE_KEYPAIR_FILE,
+}) => {
   let rateTimer = null;
   let rateRunning = false;
   const key = crypto.createHash('sha256').update(dataEncryptionKey, 'utf8').digest();
@@ -45,7 +50,7 @@ export const createExchangeRate = ({ storage, defaults, dataEncryptionKey }) => 
         decipher.final(),
       ]).toString('utf8');
     }
-    const legacy = JSON.parse(await fs.readFile(LEGACY_EXCHANGE_RATE_KEYPAIR_FILE, 'utf8'));
+    const legacy = JSON.parse(await fs.readFile(legacyKeypairFile, 'utf8'));
     return crypto.privateDecrypt(
       { key: legacy.privateKeyPem, oaepHash: 'sha256' },
       Buffer.from(encryptedValue, 'base64')
@@ -142,13 +147,34 @@ export const createExchangeRate = ({ storage, defaults, dataEncryptionKey }) => 
     const data = await storage.loadUserData(username);
     const encryptedKey = data.settings?.exchangeRateApi?.encryptedKey || '';
     if (encryptedKey && !encryptedKey.startsWith(`${ENCRYPTION_PREFIX}.`)) {
-      const plainText = await decryptApiKey(encryptedKey);
-      await storage.updateUserData(username, (current) => {
-        current.settings.exchangeRateApi.encryptedKey = encryptApiKey(plainText);
-        return current;
-      });
+      try {
+        const plainText = await decryptApiKey(encryptedKey);
+        await storage.updateUserData(username, (current) => {
+          current.settings.exchangeRateApi.encryptedKey = encryptApiKey(plainText);
+          return current;
+        });
+      } catch (err) {
+        if (err?.code !== 'ENOENT') throw err;
+        console.warn(
+          'Legacy exchange-rate keypair is missing; disabling the exchange-rate API until a new key is configured.'
+        );
+        await storage.updateUserData(username, (current) => {
+          const currentConfig = current.settings?.exchangeRateApi;
+          if (!currentConfig || currentConfig.encryptedKey !== encryptedKey) return current;
+          current.settings.exchangeRateApi = {
+            ...defaults.defaultSettings().exchangeRateApi,
+            ...currentConfig,
+            enabled: false,
+            encryptedKey: '',
+            lastTestedAt: 0,
+            lastRunAt0: 0,
+            lastRunAt12: 0,
+          };
+          return current;
+        });
+      }
     }
-    await fs.unlink(LEGACY_EXCHANGE_RATE_KEYPAIR_FILE).catch((err) => {
+    await fs.unlink(legacyKeypairFile).catch((err) => {
       if (err?.code !== 'ENOENT') throw err;
     });
   };
