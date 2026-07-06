@@ -51,6 +51,39 @@ test('password changes revoke existing JWTs', async () => {
   assert.equal(after.body.message, 'Invalid token');
 });
 
+test('malformed cookie encoding does not crash authentication', async () => {
+  const credentials = {
+    username: 'admin',
+    passwordHash: bcrypt.hashSync('Password-1!', 4),
+    tokenVersion: 0,
+  };
+  const storage = {
+    loadCredentials: async () => credentials,
+    saveCredentials: async () => {},
+  };
+  const auth = await createAuth({ jwtSecret: 'test-secret', storage });
+  const token = auth.signToken({ username: 'admin' });
+
+  const valid = response();
+  auth.authMiddleware(
+    { headers: { cookie: `broken=%E0%A4%A; auth_token=${token}` } },
+    valid,
+    () => { valid.body = 'passed'; }
+  );
+  assert.equal(valid.body, 'passed');
+
+  const invalid = response();
+  assert.doesNotThrow(() => {
+    auth.authMiddleware(
+      { headers: { cookie: 'auth_token=%E0%A4%A' } },
+      invalid,
+      () => { invalid.body = 'passed'; }
+    );
+  });
+  assert.equal(invalid.statusCode, 401);
+  assert.equal(invalid.body.message, 'Invalid token');
+});
+
 test('login is rate limited and sensitive auth changes require stronger checks', async () => {
   const handlers = new Map();
   const app = {

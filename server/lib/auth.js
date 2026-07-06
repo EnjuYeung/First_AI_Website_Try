@@ -26,7 +26,13 @@ export const createAuth = async ({ jwtSecret, storage }) => {
       const key = rawKey.trim();
       if (!key) return;
       const value = rest.join('=').trim();
-      jar[key] = decodeURIComponent(value || '');
+      try {
+        jar[key] = decodeURIComponent(value || '');
+      } catch {
+        // A malformed cookie must not crash authentication for the whole request.
+        // Keep it raw so an invalid auth token is handled by the normal JWT check.
+        jar[key] = value || '';
+      }
     });
     return jar;
   };
