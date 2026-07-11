@@ -52,17 +52,17 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
 
     const renderSortHeader = (key: string, label: string) => (
         <th
-            className="px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none group whitespace-nowrap"
-            onClick={() => onSort(key)}
+            aria-sort={sortConfig.key === key ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+            className="p-0 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap"
         >
-            <div className="flex items-center gap-1">
+            <button type="button" onClick={() => onSort(key)} className="group flex w-full items-center gap-1 px-5 py-4 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors select-none">
                 {label}
                 {sortConfig.key === key ? (
                     sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-primary-600" /> : <ArrowDown size={14} className="text-primary-600" />
                 ) : (
                     <ArrowUpDown size={14} className="text-gray-300 group-hover:text-gray-500" />
                 )}
-            </div>
+            </button>
         </th>
     );
 
@@ -76,6 +76,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                 <div className="flex items-center">
                                     <input
                                         type="checkbox"
+                                        aria-label={lang === 'zh' ? '全选' : 'Select all'}
                                         className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 dark:bg-slate-800 dark:border-gray-600 cursor-pointer"
                                         checked={selectedIds.size === subscriptions.length && subscriptions.length > 0}
                                         onChange={onSelectAll}
@@ -102,6 +103,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                     <div className="flex items-center">
                                         <input
                                             type="checkbox"
+                                            aria-label={`${lang === 'zh' ? '选择' : 'Select'} ${sub.name}`}
                                             className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 dark:bg-slate-800 dark:border-gray-600 cursor-pointer"
                                             checked={selectedIds.has(sub.id)}
                                             onChange={() => onSelectOne(sub.id)}
@@ -165,6 +167,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                 <td className="px-5 py-4 text-left whitespace-nowrap">
                                     <div className="flex items-center justify-start space-x-1">
                                         <button
+                                            aria-label={t('edit_subscription')}
                                             onClick={(e) => { e.stopPropagation(); onEdit(sub); }}
                                             className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-600 rounded-lg transition"
                                             title={t('edit_subscription')}
@@ -172,6 +175,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                             <Edit2 size={16} />
                                         </button>
                                         <button
+                                            aria-label={t('duplicate')}
                                             onClick={(e) => { e.stopPropagation(); onDuplicate(sub); }}
                                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-600 rounded-lg transition"
                                             title={t('duplicate')}
@@ -179,6 +183,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                             <Copy size={16} />
                                         </button>
                                         <button
+                                            aria-label={t('remove')}
                                             onClick={(e) => { e.stopPropagation(); onDelete(sub.id); }}
                                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
                                             title={t('remove')}

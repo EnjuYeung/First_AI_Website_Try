@@ -15,7 +15,7 @@ import SecurityTab from './settings/tabs/SecurityTab';
 
 interface Props {
   settings: AppSettings;
-  onUpdateSettings: (settings: AppSettings) => void;
+  onUpdateSettings: (settings: AppSettings) => boolean | Promise<boolean>;
 }
 
 const Toast = ({ message, onClose }: { message: string; onClose: () => void }) => {
@@ -48,7 +48,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings }) => {
 
   const exchange = useExchangeRateSettings(settings, onUpdateSettings, t, setAlert);
   const notification = useNotificationSettings(settings, onUpdateSettings, t, setAlert);
-  const security = useSecuritySettings(settings, onUpdateSettings, t, setAlert, setToastMessage);
+  const security = useSecuritySettings(settings, t, setAlert, setToastMessage);
 
   const addCategory = () => {
     const value = canonicalCategoryKey(newCategory);

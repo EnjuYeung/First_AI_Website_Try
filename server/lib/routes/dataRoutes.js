@@ -20,6 +20,23 @@ const removeLegacySettingsFields = (settings) => {
   return { ...settings, notifications: currentNotifications };
 };
 
+const clientSettings = (settings) => {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
+  const security = settings.security || {};
+  return {
+    ...settings,
+    security: {
+      twoFactorEnabled: Boolean(security.twoFactorEnabled),
+      lastPasswordChange: security.lastPasswordChange,
+    },
+  };
+};
+
+const clientUserData = (data) => ({
+  ...data,
+  settings: clientSettings(data?.settings),
+});
+
 export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconBytes }) => {
   const iconUpload = createIconUpload({ uploadsDir, maxIconBytes });
   const expectedRevision = (req) => {
@@ -35,9 +52,21 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
         expectedRevision(req),
         updater
       );
-      if (afterSuccess) await afterSuccess(result.data);
+      if (afterSuccess) {
+        try {
+          await afterSuccess(result.data);
+        } catch (cleanupError) {
+          // The feature write is already committed. Report success to preserve
+          // truthful revision semantics and leave file cleanup as best effort.
+          console.error('Post-update cleanup failed', {
+            feature,
+            message: cleanupError?.message || 'cleanup_failed',
+          });
+        }
+      }
       res.setHeader('ETag', `"${result.revision}"`);
-      return res.json({ success: true, data: result.data, revision: result.revision });
+      const responseData = feature === 'settings' ? clientSettings(result.data) : result.data;
+      return res.json({ success: true, data: responseData, revision: result.revision });
     } catch (err) {
       const status = err?.statusCode || 500;
       return res.status(status).json({
@@ -49,7 +78,7 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
   };
 
   app.get('/api/data', auth.authMiddleware, async (req, res) => {
-    res.json(await storage.loadUserData(req.user.username));
+    res.json(clientUserData(await storage.loadUserData(req.user.username)));
   });
 
   app.post('/api/subscriptions', auth.authMiddleware, async (req, res) => {
@@ -139,6 +168,7 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
       const {
         language: _language,
         theme: _theme,
+        security: _security,
         ...serverSettings
       } = settings || {};
       const nextSettings = {
@@ -154,6 +184,9 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
         exchangeRateApi: currentSettings.exchangeRateApi,
         exchangeRates: currentSettings.exchangeRates,
         lastRatesUpdate: currentSettings.lastRatesUpdate,
+        // 2FA secrets and status can only be changed by the dedicated,
+        // reauthenticated /api/2fa routes.
+        security: currentSettings.security,
       };
       const error = validateSettings(nextSettings);
       if (error) {

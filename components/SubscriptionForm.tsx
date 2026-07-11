@@ -6,13 +6,13 @@ import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 import { deleteUploadedIcon, uploadIconFile } from '../services/storageService';
-import { getTodayLocalYMD } from '../services/dateUtils';
+import { getTodayYMD } from '../services/dateUtils';
 import { calculateNextBillingDateYMD } from '../shared/billingDate.js';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (sub: Subscription) => void;
+  onSave: (sub: Subscription) => boolean | Promise<boolean>;
   initialData?: Subscription | null;
   settings: AppSettings;
   lang: 'en' | 'zh';
@@ -43,7 +43,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     paymentMethod: 'Credit Card',
     status: 'active',
     cancelledAt: undefined,
-    startDate: getTodayLocalYMD(),
+    startDate: getTodayYMD(settings.timezone),
     nextBillingDate: '',
     iconUrl: '',
     notes: '',
@@ -53,11 +53,18 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   const [iconLoadError, setIconLoadError] = useState(false);
   const [iconUploadError, setIconUploadError] = useState<string | null>(null);
   const [isIconUploading, setIsIconUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const temporaryUploads = useRef(new Set<string>());
+  const formSession = useRef(0);
+  const initializedFor = useRef<string | null>(null);
+  const scheduleTouched = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const iconUrl = String(formData.iconUrl || '').trim();
 
   const handleIconFile = async (file: File | null) => {
     if (!file) return;
+    const uploadSession = formSession.current;
     setIconLoadError(false);
     setIconUploadError(null);
 
@@ -71,9 +78,14 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     try {
       setIsIconUploading(true);
       const uploadedUrl = await uploadIconFile(file);
+      if (formSession.current !== uploadSession) {
+        await deleteUploadedIcon(uploadedUrl).catch(console.error);
+        return;
+      }
       temporaryUploads.current.add(uploadedUrl);
       setFormData((prev) => ({ ...prev, iconUrl: uploadedUrl }));
     } catch (err: any) {
+      if (formSession.current !== uploadSession) return;
       const msg = String(err?.message || '');
       if (msg.includes('icon_too_large') || msg.includes('LIMIT_FILE_SIZE')) {
         setIconUploadError(t('upload_icon_too_large'));
@@ -83,18 +95,35 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
         setIconUploadError(t('upload_icon_failed'));
       }
     } finally {
-      setIsIconUploading(false);
+      if (formSession.current === uploadSession) setIsIconUploading(false);
     }
   };
 
   // Helper to calculate next billing date
   const calculateNextDate = useCallback((startStr: string, freq: Frequency) => {
-    return calculateNextBillingDateYMD(startStr, freq, getTodayLocalYMD());
-  }, []);
+    return calculateNextBillingDateYMD(startStr, freq, getTodayYMD(settings.timezone));
+  }, [settings.timezone]);
 
   // Initialize form when opening
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      initializedFor.current = null;
+      formSession.current += 1;
+      setIsIconUploading(false);
+      setIsSubmitting(false);
+      return;
+    }
+
+    const recordKey = initialData?.id || '__new__';
+    if (initializedFor.current === recordKey) return;
+    initializedFor.current = recordKey;
+    formSession.current += 1;
+    scheduleTouched.current = false;
+    setSubmitError(null);
+    setIsSubmitting(false);
+    setIconLoadError(false);
+    setIconUploadError(null);
+
       if (initialData) {
         setFormData({
             ...initialData,
@@ -103,11 +132,9 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
             iconUrl: initialData.iconUrl || '',
             notificationsEnabled: initialData.notificationsEnabled !== undefined ? initialData.notificationsEnabled : true
         });
-        setIconLoadError(false);
-        setIconUploadError(null);
       } else {
         // Default Initialization for New Subscription
-        const today = getTodayLocalYMD();
+        const today = getTodayYMD(settings.timezone);
         const defaultFreq = Frequency.MONTHLY;
         const initialNextBill = calculateNextDate(today, defaultFreq);
 
@@ -125,15 +152,18 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           notes: '',
           notificationsEnabled: true
         });
-        setIconLoadError(false);
-        setIconUploadError(null);
       }
-    }
-  }, [isOpen, initialData, settings.customCategories, settings.customPaymentMethods, calculateNextDate]);
+  }, [isOpen, initialData?.id, calculateNextDate]);
 
   // Auto-calculate Next Billing Date when Start Date or Frequency changes
   useEffect(() => {
-    if (!isOpen || !formData.startDate || !formData.frequency) return;
+    if (
+      !isOpen ||
+      formData.status === 'cancelled' ||
+      !formData.startDate ||
+      !formData.frequency ||
+      (initialData && !scheduleTouched.current)
+    ) return;
     
     const calculated = calculateNextDate(formData.startDate, formData.frequency);
     
@@ -141,7 +171,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     if (calculated !== formData.nextBillingDate) {
       setFormData(prev => ({ ...prev, nextBillingDate: calculated }));
     }
-  }, [formData.startDate, formData.frequency, isOpen, calculateNextDate, formData.nextBillingDate]);
+  }, [formData.startDate, formData.frequency, formData.status, isOpen, initialData, calculateNextDate, formData.nextBillingDate]);
 
   const generateId = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -153,30 +183,76 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   const handleStatusChange = (value: 'active' | 'cancelled') => {
     setFormData((prev) => {
       if (value === 'cancelled') {
-        if (prev.status === 'cancelled') return { ...prev, status: value };
-        return { ...prev, status: value, cancelledAt: getTodayLocalYMD() };
+        if (prev.status === 'cancelled') return { ...prev, status: value, nextBillingDate: '' };
+        return { ...prev, status: value, cancelledAt: getTodayYMD(settings.timezone), nextBillingDate: '' };
       }
+      scheduleTouched.current = true;
       return { ...prev, status: value, cancelledAt: undefined };
     });
   };
 
-  if (!isOpen) return null;
-
-  const closeAndDiscardUploads = () => {
+  const closeAndDiscardUploads = useCallback(() => {
+    formSession.current += 1;
+    setIsIconUploading(false);
+    setIsSubmitting(false);
     const pending = [...temporaryUploads.current];
     temporaryUploads.current.clear();
     pending.forEach((url) => void deleteUploadedIcon(url).catch(console.error));
     onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    const firstInput = dialog?.querySelector<HTMLElement>('input:not([type="hidden"]), button, select, textarea');
+    firstInput?.focus();
+  }, [isOpen]);
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeAndDiscardUploads();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ) || [])];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      id: initialData?.id || generateId(),
-      ...formData as Subscription,
-      price: Number(formData.price),
-      iconUrl: iconUrl.length > 0 ? iconUrl : undefined
-    });
+    if (isSubmitting || isIconUploading) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    let saved = false;
+    try {
+      saved = await onSave({
+          id: initialData?.id || generateId(),
+          ...formData as Subscription,
+          price: Number(formData.price),
+          iconUrl: iconUrl.length > 0 ? iconUrl : undefined
+        });
+    } catch {
+      saved = false;
+    }
+    if (!saved) {
+      setIsSubmitting(false);
+      setSubmitError(lang === 'zh' ? '保存失败，请检查网络后重试。' : 'Save failed. Check your connection and try again.');
+      return;
+    }
     temporaryUploads.current.delete(iconUrl);
     const unused = [...temporaryUploads.current];
     temporaryUploads.current.clear();
@@ -186,12 +262,12 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
-      <div className="mac-surface rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto my-8 animate-pop-in">
+      <div ref={dialogRef} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby="subscription-form-title" className="mac-surface rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto my-8 animate-pop-in">
         <div className="flex justify-between items-center p-8 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+          <h2 id="subscription-form-title" className="text-xl font-bold text-gray-800 dark:text-white">
             {initialData ? t('edit_subscription') : t('add_subscription')}
           </h2>
-          <button onClick={closeAndDiscardUploads} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+          <button aria-label={t('close')} onClick={closeAndDiscardUploads} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
             <X size={24} />
           </button>
         </div>
@@ -321,7 +397,10 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                 <select
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   value={formData.frequency}
-                  onChange={e => setFormData({...formData, frequency: e.target.value as Frequency})}
+                  onChange={e => {
+                    scheduleTouched.current = true;
+                    setFormData({...formData, frequency: e.target.value as Frequency});
+                  }}
                 >
                   {Object.values(Frequency).map(f => (
                     <option key={f} value={f}>{frequencyLabel(f as Frequency)}</option>
@@ -391,7 +470,10 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                   type="date"
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
                   value={formData.startDate}
-                  onChange={e => setFormData({...formData, startDate: e.target.value})}
+                  onChange={e => {
+                    scheduleTouched.current = true;
+                    setFormData({...formData, startDate: e.target.value});
+                  }}
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -441,11 +523,14 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
           <button
             type="submit"
-            disabled={isIconUploading}
+            disabled={isIconUploading || isSubmitting}
             className="w-full py-4 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-600/60 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 mt-2"
           >
-            {initialData ? t('save') : t('add_new')}
+            {isSubmitting
+              ? (lang === 'zh' ? '保存中…' : 'Saving…')
+              : initialData ? t('save') : t('add_new')}
           </button>
+          {submitError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{submitError}</p>}
         </form>
       </div>
     </div>

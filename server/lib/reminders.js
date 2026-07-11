@@ -1,18 +1,25 @@
 import crypto from 'crypto';
 import { daysUntilDate } from './dates.js';
-import { renderReminderTemplate, DEFAULT_REMINDER_TEMPLATE_STRING } from '../../shared/reminderTemplate.js';
-import { sendTelegramMessage, ensureTelegramWebhook } from './telegram.js';
+import {
+  renderReminderTemplate,
+  DEFAULT_REMINDER_TEMPLATE_STRING,
+} from '../../shared/reminderTemplate.js';
+import {
+  createTelegramWebhookSecret,
+  sendTelegramMessage,
+  ensureTelegramWebhook,
+} from './telegram.js';
 
 const randomId = () =>
   typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-const buildInlineKeyboard = (subscriptionId) => ({
+const buildInlineKeyboard = (notificationId, billingDate) => ({
   inline_keyboard: [
     [
-      { text: '✅ 已续订', callback_data: `renewed|${subscriptionId}` },
-      { text: '🛑 已弃用', callback_data: `deprecated|${subscriptionId}` },
+      { text: '✅ 已续订', callback_data: `renewed|${notificationId}|${billingDate}` },
+      { text: '🛑 已弃用', callback_data: `deprecated|${notificationId}|${billingDate}` },
     ],
   ],
 });
@@ -22,28 +29,57 @@ const normalizeBaseUrl = (value) =>
     .trim()
     .replace(/\/+$/, '');
 
-const notificationAlreadySent = (notifications, subscription, channel) => {
+const matchesSubscription = (record, subscription, sameNameCount) => {
+  const recordSubscriptionId = record?.details?.subscriptionId;
+  if (recordSubscriptionId && subscription?.id) {
+    return recordSubscriptionId === subscription.id;
+  }
+  if (recordSubscriptionId || !subscription?.name) return false;
+  return sameNameCount === 1 && record?.subscriptionName === subscription.name;
+};
+
+const notificationAttemptExists = (
+  notifications,
+  subscription,
+  channel,
+  subscriptions
+) => {
+  const sameNameCount = (subscriptions || []).filter(
+    (candidate) => candidate?.name === subscription.name
+  ).length;
   return (notifications || []).some(
-    (n) =>
-      n.type === 'renewal_reminder' &&
-      ((n.details?.subscriptionId && subscription.id && n.details.subscriptionId === subscription.id) ||
-        n.subscriptionName === subscription.name) &&
-      n.channel === channel &&
-      n.status === 'success' &&
-      n.details?.date === subscription.nextBillingDate
+    (record) =>
+      record.type === 'renewal_reminder' &&
+      matchesSubscription(record, subscription, sameNameCount) &&
+      record.channel === channel &&
+      record.details?.date === subscription.nextBillingDate &&
+      (record.status === 'success' ||
+        ['attempting', 'delivered', 'unknown'].includes(record.details?.deliveryState))
   );
 };
 
-const updateRenewalFeedback = (notifications, subscription, dateLabel, feedback, { onlyIfEmpty = false } = {}) => {
+const updateRenewalFeedback = (
+  notifications,
+  subscription,
+  dateLabel,
+  feedback,
+  subscriptions,
+  { onlyIfEmpty = false } = {}
+) => {
   if (!dateLabel) return false;
   let updated = false;
+  const sameNameCount = (subscriptions || []).filter(
+    (candidate) => candidate?.name === subscription.name
+  ).length;
   (notifications || []).forEach((record) => {
     if (record.type !== 'renewal_reminder') return;
     if (record.details?.date !== dateLabel) return;
-    const matchesId = record.details?.subscriptionId && subscription.id
-      ? record.details.subscriptionId === subscription.id
-      : record.subscriptionName === subscription.name;
-    if (!matchesId) return;
+    const recordSubscriptionId = record.details?.subscriptionId;
+    const sameSubscription = recordSubscriptionId
+      ? recordSubscriptionId === subscription.id
+      : sameNameCount === 1 &&
+        record.subscriptionName === subscription.name;
+    if (!sameSubscription) return;
     if (onlyIfEmpty && record.details?.renewalFeedback) return;
     record.details = {
       ...record.details,
@@ -53,6 +89,14 @@ const updateRenewalFeedback = (notifications, subscription, dateLabel, feedback,
     updated = true;
   });
   return updated;
+};
+
+const safeErrorMessage = (err, secret = '') => {
+  let message = String(err?.message || 'unknown_error');
+  for (const value of [secret, encodeURIComponent(secret || '')]) {
+    if (value) message = message.split(value).join('[redacted]');
+  }
+  return message;
 };
 
 export const createReminders = ({ config, storage, email }) => {
@@ -65,7 +109,7 @@ export const createReminders = ({ config, storage, email }) => {
     try {
       data = await storage.loadUserData(username);
     } catch (err) {
-      console.error('Failed to load user data for reminders', err);
+      console.error('Failed to load user data for reminders', safeErrorMessage(err));
       return;
     }
 
@@ -74,26 +118,57 @@ export const createReminders = ({ config, storage, email }) => {
     const reminderDays = Number(settings.notifications?.rules?.reminderDays ?? 3);
     const ruleChannels = settings.notifications?.rules?.channels;
     const webhookBaseUrl = normalizeBaseUrl(config.publicBaseUrl);
+    const timeZone = settings.timezone;
+
+    const telegramConfig = settings.notifications?.telegram || {};
+    if (webhookBaseUrl && telegramConfig.enabled && telegramConfig.botToken) {
+      const secretToken = createTelegramWebhookSecret(
+        config.jwtSecret,
+        telegramConfig.botToken
+      );
+      try {
+        await ensureTelegramWebhook(
+          { debug: config.debugTelegram, secretToken },
+          telegramConfig.botToken,
+          `${webhookBaseUrl}/api/telegram/webhook`
+        );
+      } catch (err) {
+        console.error(
+          'Failed to ensure Telegram webhook',
+          safeErrorMessage(err, telegramConfig.botToken)
+        );
+      }
+    }
 
     if (!reminderRule) return;
 
     const subs = data.subscriptions || [];
-    let changed = false;
-
     for (const sub of subs) {
       if (!sub?.notificationsEnabled) continue;
       if (sub.status && sub.status !== 'active') continue;
 
-      const days = daysUntilDate(sub.nextBillingDate);
+      const days = daysUntilDate(sub.nextBillingDate, timeZone);
+      if (!Number.isFinite(days)) continue;
       if (days < 0) {
-        const feedbackUpdated = updateRenewalFeedback(
-          data.notifications,
-          sub,
-          sub.nextBillingDate,
-          'pending',
-          { onlyIfEmpty: true }
-        );
-        if (feedbackUpdated) changed = true;
+        try {
+          await storage.updateUserData(username, (current) => {
+            const currentSub = (current.subscriptions || []).find(
+              (candidate) => candidate?.id === sub.id
+            );
+            if (!currentSub || currentSub.nextBillingDate !== sub.nextBillingDate) return current;
+            updateRenewalFeedback(
+              current.notifications,
+              currentSub,
+              currentSub.nextBillingDate,
+              'pending',
+              current.subscriptions,
+              { onlyIfEmpty: true }
+            );
+            return current;
+          });
+        } catch (err) {
+          console.error('Failed to persist renewal feedback', safeErrorMessage(err));
+        }
         continue;
       }
       if (days > reminderDays) continue;
@@ -104,12 +179,25 @@ export const createReminders = ({ config, storage, email }) => {
       const dateLabel = sub.nextBillingDate || '';
 
       const attemptChannel = async (channel) => {
+        if (channel === 'telegram') {
+          const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
+          const allowed = (ruleChannels?.renewalReminder || []).includes('telegram');
+          if (!enabled || !botToken || !chatId || !allowed) return;
+        } else if (channel === 'email') {
+          const { enabled, emailAddress } = settings.notifications?.email || {};
+          const allowed = (ruleChannels?.renewalReminder || []).includes('email');
+          if (!enabled || !emailAddress || !allowed) return;
+        } else {
+          return;
+        }
+
+        const timestamp = Date.now();
         const recordBase = {
           id: randomId(),
           subscriptionName: sub.name,
           type: 'renewal_reminder',
           channel,
-          timestamp: Date.now(),
+          timestamp,
           details: {
             date: dateLabel,
             amount: sub.price,
@@ -121,66 +209,120 @@ export const createReminders = ({ config, storage, email }) => {
           },
         };
 
-        if (notificationAlreadySent(data.notifications, sub, channel)) return;
+        let claimed = false;
+        try {
+          await storage.updateUserData(username, (current) => {
+            const currentSub = (current.subscriptions || []).find(
+              (candidate) => candidate?.id === sub.id
+            );
+            if (
+              !currentSub ||
+              currentSub.status !== 'active' ||
+              !currentSub.notificationsEnabled ||
+              currentSub.nextBillingDate !== dateLabel ||
+              notificationAttemptExists(
+                current.notifications,
+                currentSub,
+                channel,
+                current.subscriptions
+              )
+            ) {
+              return current;
+            }
+            if (!Array.isArray(current.notifications)) current.notifications = [];
+            current.notifications.push({
+              ...recordBase,
+              status: 'failed',
+              details: {
+                ...recordBase.details,
+                deliveryState: 'attempting',
+                deliveryAttemptedAt: timestamp,
+              },
+            });
+            claimed = true;
+            return current;
+          });
+        } catch (err) {
+          console.error('Failed to persist notification attempt', safeErrorMessage(err));
+          return;
+        }
+        if (!claimed) return;
 
+        let deliveryStatus = 'success';
+        let deliveryState = 'delivered';
+        let deliveryError = '';
         try {
           if (channel === 'telegram') {
-            const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
-            const allowed = (ruleChannels?.renewalReminder || []).includes('telegram');
-            if (!enabled || !botToken || !chatId || !allowed) return;
+            const { botToken, chatId } = settings.notifications.telegram;
             if (webhookBaseUrl) {
-              const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook/${botToken}`;
+              const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook`;
+              const secretToken = createTelegramWebhookSecret(config.jwtSecret, botToken);
               try {
-                await ensureTelegramWebhook({ debug: config.debugTelegram }, botToken, webhookUrl);
+                await ensureTelegramWebhook(
+                  { debug: config.debugTelegram, secretToken },
+                  botToken,
+                  webhookUrl
+                );
               } catch (err) {
-                console.error('Failed to ensure Telegram webhook', err);
+                console.error(
+                  'Failed to ensure Telegram webhook',
+                  safeErrorMessage(err, botToken)
+                );
               }
             }
-            const replyMarkup = buildInlineKeyboard(sub.id || sub.name || 'unknown');
-            await sendTelegramMessage({ debug: config.debugTelegram }, botToken, chatId, message, replyMarkup);
-          } else if (channel === 'email') {
-            const { enabled, emailAddress } = settings.notifications?.email || {};
-            const allowed = (ruleChannels?.renewalReminder || []).includes('email');
-            if (!enabled || !emailAddress || !allowed) return;
-            await email.sendEmailMessage(emailAddress, '续订提醒通知', message);
+            const replyMarkup = buildInlineKeyboard(recordBase.id, dateLabel);
+            await sendTelegramMessage(
+              { debug: config.debugTelegram },
+              botToken,
+              chatId,
+              message,
+              replyMarkup
+            );
           } else {
-            return;
+            const { emailAddress } = settings.notifications.email;
+            await email.sendEmailMessage(emailAddress, '续订提醒通知', message);
           }
-
-          data.notifications.push({ ...recordBase, status: 'success' });
-          changed = true;
         } catch (err) {
-          data.notifications.push({
-            ...recordBase,
-            status: 'failed',
-            details: { ...recordBase.details, errorReason: err?.message || 'unknown_error' },
+          deliveryStatus = 'failed';
+          const secret =
+            channel === 'telegram' ? settings.notifications.telegram.botToken : '';
+          deliveryError = safeErrorMessage(err, secret);
+          deliveryState =
+            channel === 'telegram' &&
+            (deliveryError === 'telegram_timeout' ||
+              deliveryError.endsWith('_request_failed'))
+              ? 'unknown'
+              : 'failed';
+        }
+
+        try {
+          await storage.updateUserData(username, (current) => {
+            const record = (current.notifications || []).find(
+              (candidate) => candidate?.id === recordBase.id
+            );
+            if (!record) return current;
+            record.status = deliveryStatus;
+            record.details = {
+              ...record.details,
+              deliveryState,
+              deliveryCompletedAt: Date.now(),
+            };
+            if (deliveryError) record.details.errorReason = deliveryError;
+            else delete record.details.errorReason;
+            return current;
           });
-          changed = true;
+        } catch (err) {
+          const secret =
+            channel === 'telegram' ? settings.notifications.telegram.botToken : '';
+          console.error(
+            'Failed to finalize notification attempt',
+            safeErrorMessage(err, secret)
+          );
         }
       };
 
       await attemptChannel('telegram');
       await attemptChannel('email');
-    }
-
-    if (changed) {
-      try {
-        const processedById = new Map(
-          (data.notifications || []).filter((record) => record?.id).map((record) => [record.id, record])
-        );
-        await storage.updateUserData(username, (current) => {
-          const currentIds = new Set((current.notifications || []).map((record) => record?.id));
-          const updatedExisting = (current.notifications || []).map(
-            (record) => processedById.get(record?.id) || record
-          );
-          const newlyCreated = (data.notifications || []).filter(
-            (record) => record?.id && !currentIds.has(record.id)
-          );
-          return { ...current, notifications: [...updatedExisting, ...newlyCreated] };
-        });
-      } catch (err) {
-        console.error('Failed to persist notifications history', err);
-      }
     }
   };
 
@@ -193,7 +335,7 @@ export const createReminders = ({ config, storage, email }) => {
       try {
         await processRenewalReminders();
       } catch (err) {
-        console.error('Reminder tick failed', err);
+        console.error('Reminder tick failed', safeErrorMessage(err));
       } finally {
         reminderRunning = false;
       }

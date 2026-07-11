@@ -19,21 +19,35 @@ export const formatLocalYMD = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-export const daysUntilDate = (dateString) => {
-  if (!dateString) return Infinity;
-  const toStartOfDay = (d) => {
-    const clone = new Date(d);
-    clone.setHours(0, 0, 0, 0);
-    return clone;
-  };
+const ymdToEpochDay = (value) => {
+  const match = YMD_RE.exec(String(value || '').trim());
+  if (!match) return NaN;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const parsed = new Date(timestamp);
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return NaN;
+  }
+  return Math.floor(timestamp / (1000 * 60 * 60 * 24));
+};
 
-  const todayStart = toStartOfDay(new Date());
-  const targetStart = toStartOfDay(parseLocalYMD(dateString));
-  const diff = targetStart.getTime() - todayStart.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+export const daysUntilDate = (dateString, timeZone, now = new Date()) => {
+  if (!dateString) return Infinity;
+  const today = timeZone ? formatDateInTimeZone(timeZone, now) : formatLocalYMD(now);
+  const targetDay = ymdToEpochDay(dateString);
+  const todayDay = ymdToEpochDay(today);
+  if (!Number.isFinite(targetDay) || !Number.isFinite(todayDay)) return NaN;
+  return targetDay - todayDay;
 };
 
 export const formatDateInTimeZone = (timeZone, date = new Date()) => {
+  if (!timeZone) return formatLocalYMD(date);
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -54,4 +68,3 @@ export const getTimePartsInTimeZone = (timeZone, date = new Date()) => {
   const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
   return { hour: Number(map.hour), minute: Number(map.minute) };
 };
-

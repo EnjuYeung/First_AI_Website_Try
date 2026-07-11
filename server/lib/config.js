@@ -9,11 +9,61 @@ const requireEnv = (name) => {
   return val;
 };
 
+const defaultAllowedOrigins = [
+  'https://subm.junziguozi.cc',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+];
+
+const normalizeAllowedOrigin = (value) => {
+  const raw = String(value || '').trim();
+  try {
+    const parsed = new URL(raw);
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== '/' ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error('invalid_origin');
+    }
+    return parsed.origin;
+  } catch {
+    throw new Error(`ALLOWED_ORIGINS contains invalid origin: ${raw || '(empty)'}`);
+  }
+};
+
+const configuredAllowedOrigins = () => {
+  const configured = process.env.ALLOWED_ORIGINS;
+  const values = configured === undefined
+    ? defaultAllowedOrigins
+    : configured.split(',').map((value) => value.trim()).filter(Boolean);
+  return [...new Set(values.map(normalizeAllowedOrigin))];
+};
+
+const configuredTrustProxy = () => {
+  const configured = process.env.TRUST_PROXY?.trim();
+  if (configured === undefined || configured === '') return 'loopback, linklocal, uniquelocal';
+  if (['0', 'false', 'off'].includes(configured.toLowerCase())) return false;
+  if (/^\d+$/.test(configured)) return Number(configured);
+  return configured;
+};
+
 export const getConfig = () => {
   const adminUser = requireEnv('ADMIN_USER');
   const adminPass = requireEnv('ADMIN_PASS');
   const jwtSecret = requireEnv('JWT_SECRET');
   const dataEncryptionKey = requireEnv('DATA_ENCRYPTION_KEY');
+  if (adminUser.length > 128) {
+    throw new Error('ADMIN_USER must be 1-128 characters');
+  }
   if (!isStrongPassword(adminPass)) {
     throw new Error('ADMIN_PASS must be 12-128 characters with upper, lower, digit, and symbol');
   }
@@ -34,11 +84,8 @@ export const getConfig = () => {
     from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
   };
 
-  const allowedOrigins = [
-    'https://subm.junziguozi.cc',
-    'http://localhost:5173',
-    'http://localhost:3000',
-  ];
+  const allowedOrigins = configuredAllowedOrigins();
+  const trustProxy = configuredTrustProxy();
 
   return {
     adminUser,
@@ -51,6 +98,7 @@ export const getConfig = () => {
     maxIconBytes,
     smtp,
     allowedOrigins,
+    trustProxy,
     debugTelegram: process.env.DEBUG_TELEGRAM === '1',
     publicBaseUrl,
   };

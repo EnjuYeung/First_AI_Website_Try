@@ -119,7 +119,8 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
   };
 
   const mergeStringList = (existing: any, defaults: string[], canonicalize: (v: string) => string) => {
-    const raw = Array.isArray(existing) ? existing : [];
+    const hasPersistedList = Array.isArray(existing);
+    const raw = hasPersistedList ? existing : defaults;
     const list: string[] = [];
     const seen = new Set<string>();
 
@@ -127,14 +128,6 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
       if (typeof v !== 'string') return;
       const canon = canonicalize(v);
       if (!canon) return;
-      const key = canon.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      list.push(canon);
-    });
-
-    defaults.forEach((item) => {
-      const canon = canonicalize(item);
       const key = canon.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
@@ -243,7 +236,8 @@ export const replaceSettings = (settings: AppSettings, revision: number) => {
   // Language and theme are device-local preferences. Do not send them to the
   // server when persisting the remaining application settings.
   const { language: _language, theme: _theme, ...serverSettings } = settings;
-  return mutateFeature<AppSettings>('/settings', 'PUT', revision, serverSettings);
+  return mutateFeature<AppSettings>('/settings', 'PUT', revision, serverSettings)
+    .then((result) => ({ ...result, data: mergeSettings(result.data) }));
 };
 
 export const removeNotification = (id: string, revision: number) =>

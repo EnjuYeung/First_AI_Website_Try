@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetchJson, UnauthorizedError } from '../services/apiClient';
+import { apiFetchJson, SESSION_EXPIRED_EVENT, UnauthorizedError } from '../services/apiClient';
 
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -28,6 +28,12 @@ export const useAuth = () => {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => setIsAuthenticated(false);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
   }, []);
 
   const login = useCallback(() => {

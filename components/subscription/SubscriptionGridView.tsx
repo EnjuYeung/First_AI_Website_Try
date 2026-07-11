@@ -62,18 +62,21 @@ export const SubscriptionGridView: React.FC<SubscriptionGridViewProps> = ({
                     {/* Actions (Absolute) */}
                     <div className="absolute top-3 right-3 flex space-x-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
+                            aria-label={t('edit_subscription')}
                             onClick={(e) => { e.stopPropagation(); onEdit(sub); }}
                             className="p-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-white hover:text-primary-600 rounded-md text-gray-500 shadow-sm transition-colors"
                         >
                             <Edit2 size={14} />
                         </button>
                         <button
+                            aria-label={t('duplicate')}
                             onClick={(e) => { e.stopPropagation(); onDuplicate(sub); }}
                             className="p-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-white hover:text-blue-600 rounded-md text-gray-500 shadow-sm transition-colors"
                         >
                             <Copy size={14} />
                         </button>
                         <button
+                            aria-label={t('remove')}
                             onClick={(e) => { e.stopPropagation(); onDelete(sub.id); }}
                             className="p-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-white hover:text-red-600 rounded-md text-gray-500 shadow-sm transition-colors"
                         >

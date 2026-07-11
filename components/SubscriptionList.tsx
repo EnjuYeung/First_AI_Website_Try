@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Subscription, Frequency, NotificationRecord, ExchangeRates } from '../types';
 import { getT } from '../services/i18n';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
 import { canonicalRenewalFeedback, displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
-import { parseLocalYMD } from '../services/dateUtils';
+import { daysUntilYMD } from '../services/dateUtils';
 import { useSubscriptionFilters } from '../hooks/useSubscriptionFilters';
 
 // Sub Components
@@ -20,7 +20,15 @@ interface Props {
   onBatchDelete: (ids: string[]) => void;
   lang: 'en' | 'zh';
   exchangeRates: ExchangeRates;
+  timezone: string;
 }
+
+export const getVisibleSelectedIds = (
+  visibleSubscriptions: Pick<Subscription, 'id'>[],
+  selectedIds: ReadonlySet<string>
+) => visibleSubscriptions
+  .map((subscription) => subscription.id)
+  .filter((id) => selectedIds.has(id));
 
 const SubscriptionList: React.FC<Props> = ({
   subscriptions,
@@ -30,7 +38,8 @@ const SubscriptionList: React.FC<Props> = ({
   onDuplicate,
   onBatchDelete,
   lang,
-  exchangeRates
+  exchangeRates,
+  timezone
 }) => {
   const t = getT(lang);
 
@@ -54,10 +63,25 @@ const SubscriptionList: React.FC<Props> = ({
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const visibleIds = useMemo(
+    () => new Set(filteredSubscriptions.map((subscription) => subscription.id)),
+    [filteredSubscriptions]
+  );
+  const visibleSelectedCount = useMemo(
+    () => getVisibleSelectedIds(filteredSubscriptions, selectedIds).length,
+    [filteredSubscriptions, selectedIds]
+  );
+
+  useEffect(() => {
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => visibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [visibleIds]);
 
   // --- Handlers ---
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredSubscriptions.length && filteredSubscriptions.length > 0) {
+    if (visibleSelectedCount === filteredSubscriptions.length && filteredSubscriptions.length > 0) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(filteredSubscriptions.map(s => s.id)));
@@ -75,8 +99,9 @@ const SubscriptionList: React.FC<Props> = ({
   };
 
   const executeBatchDelete = () => {
-    if (selectedIds.size > 0) {
-      onBatchDelete(Array.from(selectedIds));
+    const visibleSelection = getVisibleSelectedIds(filteredSubscriptions, selectedIds);
+    if (visibleSelection.length > 0) {
+      onBatchDelete(visibleSelection);
       setSelectedIds(new Set());
     }
   };
@@ -147,12 +172,7 @@ const SubscriptionList: React.FC<Props> = ({
 
   const getDaysRemaining = (dateStr: string) => {
     if (!dateStr) return Infinity;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = parseLocalYMD(dateStr);
-    if (Number.isNaN(target.getTime())) return Infinity;
-    const diffTime = target.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return daysUntilYMD(dateStr, timezone);
   };
 
   const renderDateBadge = (dateStr: string, sub: Subscription) => {
@@ -231,7 +251,7 @@ const SubscriptionList: React.FC<Props> = ({
         onResetFilters={resetFilters}
         hasActiveFilters={hasActiveFilters}
 
-        selectedCount={selectedIds.size}
+        selectedCount={visibleSelectedCount}
         onBatchDelete={executeBatchDelete}
 
         viewMode={viewMode}

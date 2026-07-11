@@ -34,6 +34,7 @@ export const useClientPreferences = () => {
     } catch {
       // Keep the preference in memory if storage is unavailable.
     }
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
   }, [language]);
 
   useEffect(() => {

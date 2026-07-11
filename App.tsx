@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Plus, Home, CreditCard, BellRing, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
 import { AppSettings, Subscription } from './types';
 import { getT } from './services/i18n';
-import Dashboard from './components/Dashboard';
-import SubscriptionList from './components/SubscriptionList';
-import SubscriptionForm from './components/SubscriptionForm';
-import Settings from './components/Settings';
-import NotificationHistory from './components/NotificationHistory';
 import LoginPage from './components/LoginPage';
+
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const SubscriptionList = lazy(() => import('./components/SubscriptionList'));
+const SubscriptionForm = lazy(() => import('./components/SubscriptionForm'));
+const Settings = lazy(() => import('./components/Settings'));
+const NotificationHistory = lazy(() => import('./components/NotificationHistory'));
 
 // Custom Hooks
 import { useAuth } from './hooks/useAuth';
@@ -25,7 +26,8 @@ const App: React.FC = () => {
   const {
     subscriptions, settings, notifications, isDataLoading,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
-    batchDeleteSubscriptions, duplicateSubscription, deleteNotification, clearNotifications
+    batchDeleteSubscriptions, duplicateSubscription, deleteNotification, clearNotifications,
+    lastMutationError, clearMutationError
   } = useAppData(isAuthenticated, logout, language);
 
   const clientSettings: AppSettings = { ...settings, language, theme };
@@ -62,9 +64,10 @@ const App: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveWrapper = (sub: Subscription) => {
-    saveSubscription(sub, !!editingSub);
-    setEditingSub(null);
+  const handleSaveWrapper = async (sub: Subscription) => {
+    const saved = await saveSubscription(sub, !!editingSub);
+    if (saved) setEditingSub(null);
+    return saved;
   };
 
   const openAddModal = () => {
@@ -91,9 +94,11 @@ const App: React.FC = () => {
 
     const { language: _nextLanguage, theme: _nextTheme, ...nextServerSettings } = nextSettings;
     const { language: _language, theme: _theme, ...currentServerSettings } = settings;
-    if (JSON.stringify(nextServerSettings) === JSON.stringify(currentServerSettings)) return;
+    if (JSON.stringify(nextServerSettings) === JSON.stringify(currentServerSettings)) {
+      return Promise.resolve(true);
+    }
 
-    updateSettings({
+    return updateSettings({
       ...nextSettings,
       language: settings.language,
       theme: settings.theme,
@@ -124,6 +129,16 @@ const App: React.FC = () => {
     setIsLogoutModalOpen(false);
     setActiveTab('dashboard');
   };
+
+  const mutationAlert = lastMutationError
+    ? {
+        type: 'error' as const,
+        log: lastMutationError instanceof Error
+          ? lastMutationError.stack || `${lastMutationError.name}: ${lastMutationError.message}`
+          : String(lastMutationError),
+      }
+    : null;
+  const visibleAlert = refreshAlert || mutationAlert;
 
   // Nav Configuration
   const navTabs = [
@@ -179,6 +194,7 @@ const App: React.FC = () => {
           )}
         </div>
 
+        <Suspense fallback={<div className="py-16 text-center text-gray-500">{language === 'zh' ? '加载中…' : 'Loading…'}</div>}>
         <div className="animate-fade-in">
           {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={language} settings={clientSettings} />}
 
@@ -192,6 +208,7 @@ const App: React.FC = () => {
               onBatchDelete={batchDeleteSubscriptions}
               lang={language}
               exchangeRates={clientSettings.exchangeRates}
+              timezone={clientSettings.timezone}
             />
           )}
 
@@ -206,8 +223,10 @@ const App: React.FC = () => {
 
           {activeTab === 'settings' && <Settings settings={clientSettings} onUpdateSettings={handleSettingsUpdate} />}
         </div>
+        </Suspense>
       </main>
 
+      <Suspense fallback={null}>
       <SubscriptionForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -216,6 +235,7 @@ const App: React.FC = () => {
         settings={clientSettings}
         lang={language}
       />
+      </Suspense>
 
       <MobileNav
         navTabs={navTabs}
@@ -224,26 +244,29 @@ const App: React.FC = () => {
       />
 
       {/* Global Modals */}
-      {refreshAlert && (
+      {visibleAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
           <div className="mac-surface rounded-2xl shadow-xl w-full max-w-lg overflow-hidden p-6 text-center animate-pop-in">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              refreshAlert.type === 'success'
+              visibleAlert.type === 'success'
                 ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
                 : 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400'
             }`}>
-              {refreshAlert.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
+              {visibleAlert.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              {t(refreshAlert.type === 'success' ? 'refresh_success' : 'refresh_failed')}
+              {t(visibleAlert.type === 'success' ? 'refresh_success' : 'refresh_failed')}
             </h3>
-            {refreshAlert.type === 'error' && (
+            {visibleAlert.type === 'error' && (
               <pre className="max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-left text-xs leading-5 text-red-200 whitespace-pre-wrap break-words">
-                {refreshAlert.log}
+                {visibleAlert.log}
               </pre>
             )}
             <button
-              onClick={() => setRefreshAlert(null)}
+              onClick={() => {
+                setRefreshAlert(null);
+                clearMutationError();
+              }}
               className="w-full mt-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-colors"
             >
               {t('close')}

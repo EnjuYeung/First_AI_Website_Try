@@ -1,17 +1,43 @@
 import speakeasy from 'speakeasy';
+import { isIP } from 'node:net';
 import { isStrongPassword } from '../securityPolicy.js';
 
 export const registerAuthRoutes = ({ app, auth, storage }) => {
   const attempts = new Map();
   const windowMs = 15 * 60 * 1000;
   const maxAttempts = 5;
-  const rateKey = (req, username) =>
-    `${req.socket?.remoteAddress || 'unknown'}:${String(username || '').toLowerCase()}`;
-  const checkRateLimit = (req, res, username) => {
-    const key = rateKey(req, username);
+  const maxRateLimitEntries = 1000;
+  const loginFields = new Set(['username', 'password', 'code']);
+  const loginBodyIsValid = (body) =>
+    body !== null &&
+    typeof body === 'object' &&
+    !Array.isArray(body) &&
+    Object.keys(body).length <= loginFields.size &&
+    Object.keys(body).every((key) => key.length <= 32 && loginFields.has(key)) &&
+    typeof body.username === 'string' &&
+    body.username.length >= 1 &&
+    body.username.length <= 128 &&
+    typeof body.password === 'string' &&
+    body.password.length >= 1 &&
+    body.password.length <= 128 &&
+    (body.code === undefined ||
+      (typeof body.code === 'string' && body.code.length <= 16));
+  const clientIp = (req) => {
+    const candidate = String(req.ip || req.socket?.remoteAddress || '');
+    return candidate.length <= 64 && isIP(candidate) ? candidate.toLowerCase() : '';
+  };
+  const checkRateLimit = (req, res) => {
+    const key = clientIp(req);
+    if (!key) {
+      res.status(400).json({ message: 'invalid_login_request' });
+      return null;
+    }
     const now = Date.now();
     const state = attempts.get(key);
-    if (!state || state.resetAt <= now) return { key, count: 0, resetAt: now + windowMs };
+    if (!state || state.resetAt <= now) {
+      if (state) attempts.delete(key);
+      return { key, count: 0, resetAt: now + windowMs };
+    }
     if (state.count >= maxAttempts) {
       res.setHeader('Retry-After', String(Math.ceil((state.resetAt - now) / 1000)));
       res.status(429).json({ message: 'too_many_login_attempts' });
@@ -20,11 +46,18 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
     return { key, ...state };
   };
   const failLogin = (state) => {
-    attempts.set(state.key, { count: state.count + 1, resetAt: state.resetAt });
-    if (attempts.size > 1000) {
-      const now = Date.now();
-      for (const [key, value] of attempts) if (value.resetAt <= now) attempts.delete(key);
+    const now = Date.now();
+    if (!attempts.has(state.key) && attempts.size >= maxRateLimitEntries) {
+      for (const [key, value] of attempts) {
+        if (value.resetAt <= now) attempts.delete(key);
+      }
+      while (attempts.size >= maxRateLimitEntries) {
+        const oldestKey = attempts.keys().next().value;
+        if (oldestKey === undefined) break;
+        attempts.delete(oldestKey);
+      }
     }
+    attempts.set(state.key, { count: state.count + 1, resetAt: state.resetAt });
   };
   const verifyCurrentTotp = (security, code) =>
     !security.twoFactorEnabled ||
@@ -37,8 +70,11 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       }));
 
   app.post('/api/login', async (req, res) => {
+    if (!loginBodyIsValid(req.body)) {
+      return res.status(400).json({ message: 'invalid_login_request' });
+    }
     const { username, password, code } = req.body || {};
-    const rateState = checkRateLimit(req, res, username);
+    const rateState = checkRateLimit(req, res);
     if (!rateState) return;
     if (username !== auth.getAdminUsername() || !(await auth.verifyAdminPassword(password))) {
       failLogin(rateState);
@@ -153,7 +189,21 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       return res.status(400).json({ message: 'weak_password' });
     }
     await auth.changeAdminPassword(newPassword);
+    const lastPasswordChange = new Date().toISOString();
+    try {
+      await storage.updateUserData(req.user.username, (current) => {
+        current.settings.security.lastPasswordChange = lastPasswordChange;
+        return current;
+      });
+    } catch (metadataError) {
+      // The credential write is already committed and all tokens are revoked.
+      // Do not report the password change as failed because optional display
+      // metadata could not be updated.
+      console.error('Failed to update password-change metadata', {
+        message: metadataError?.message || 'metadata_update_failed',
+      });
+    }
     auth.clearAuthCookie(res, req);
-    res.json({ success: true });
+    res.json({ success: true, lastPasswordChange });
   });
 };

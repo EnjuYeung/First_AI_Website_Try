@@ -25,6 +25,15 @@ const matchesPriceRanges = (selectedRanges: string[], price: number) => (
     selectedRanges.some(range => PRICE_RANGE_MATCHERS[range]?.(price) ?? false)
 );
 
+export const matchesSubscriptionPriceRanges = (
+    selectedRanges: string[],
+    subscription: Pick<Subscription, 'price' | 'currency'>,
+    exchangeRates: ExchangeRates | undefined
+) => matchesPriceRanges(
+    selectedRanges,
+    convertToUSD(subscription.price, subscription.currency, exchangeRates)
+);
+
 const getSortValue = (
     subscription: Subscription,
     key: NonNullable<SortConfig['key']>,
@@ -92,7 +101,7 @@ export const useSubscriptionFilters = (
                     matchesSelection(selectedFrequencies, sub.frequency) &&
                     matchesSelection(selectedPayments, sub.paymentMethod || 'Credit Card') &&
                     matchesSelection(selectedStatuses, sub.status || 'active') &&
-                    matchesPriceRanges(selectedPriceRanges, sub.price)
+                    matchesSubscriptionPriceRanges(selectedPriceRanges, sub, exchangeRates)
                 );
             })
             .sort((a, b) => {

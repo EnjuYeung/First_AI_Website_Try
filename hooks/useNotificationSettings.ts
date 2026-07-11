@@ -11,7 +11,7 @@ const assertTemplate = (raw: string) => {
 
 export const useNotificationSettings = (
   settings: AppSettings,
-  onUpdate: (settings: AppSettings) => void,
+  onUpdate: (settings: AppSettings) => boolean | Promise<boolean>,
   t: (key: any) => string,
   setAlert: (alert: SettingsAlert) => void
 ) => {
@@ -39,18 +39,22 @@ export const useNotificationSettings = (
     }
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     try {
       assertTemplate(templateText);
       const template = normalizeReminderTemplateString(templateText);
-      onUpdate({
+      const saved = await onUpdate({
         ...settings,
         notifications: { ...settings.notifications, rules: { ...settings.notifications.rules, template } },
       });
+      if (!saved) throw new Error('save_failed');
       setTemplateText(template);
       setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: '模板已保存' });
-    } catch {
-      setAlert({ isOpen: true, type: 'error', title: t('error_title'), message: '模板格式错误，请输入包含 lines 数组的 JSON。' });
+    } catch (error) {
+      const message = error instanceof Error && error.message === 'save_failed'
+        ? t('connection_failed')
+        : '模板格式错误，请输入包含 lines 数组的 JSON。';
+      setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
     }
   };
 

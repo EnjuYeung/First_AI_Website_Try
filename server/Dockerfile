@@ -1,7 +1,7 @@
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 COPY server/server.js ./
 COPY server/lib/ ./lib/
 COPY shared/ /app/shared

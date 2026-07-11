@@ -164,13 +164,14 @@ const GeneralTab: React.FC<Props> = ({
               <CategoryGlyph category={cat} containerSize={18} size={12} />
               {displayCategoryLabel(cat, currentLanguage)}
               <button
+                disabled={categories.length <= 1}
                 onClick={() =>
                   onUpdateSettings({
                     ...settings,
                     customCategories: categories.filter((c) => c !== cat),
                   })
                 }
-                className="text-gray-400 hover:text-red-500"
+                className="text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-gray-400"
               >
                 <XIcon size={12} />
               </button>
@@ -213,13 +214,14 @@ const GeneralTab: React.FC<Props> = ({
               <PaymentGlyph method={pm} containerSize={18} size={12} />
               {displayPaymentMethodLabel(pm, currentLanguage)}
               <button
+                disabled={payments.length <= 1}
                 onClick={() =>
                   onUpdateSettings({
                     ...settings,
                     customPaymentMethods: payments.filter((p) => p !== pm),
                   })
                 }
-                className="text-gray-400 hover:text-red-500"
+                className="text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-gray-400"
               >
                 <XIcon size={12} />
               </button>
@@ -232,4 +234,3 @@ const GeneralTab: React.FC<Props> = ({
 };
 
 export default GeneralTab;
-

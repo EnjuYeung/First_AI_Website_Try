@@ -8,6 +8,7 @@ import { registerRoutes } from './routes.js';
 export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', config.trustProxy ?? false);
 
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -20,9 +21,11 @@ export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
   app.use(
     cors({
       origin: (origin, cb) => {
-        if (!origin) return cb(null, origin);
-        if (config.allowedOrigins.includes(origin)) return cb(null, origin);
-        return cb(new Error('Not allowed by CORS'));
+        if (!origin) return cb(null, true);
+        if (config.allowedOrigins.includes(origin)) return cb(null, true);
+        const error = new Error('cors_origin_denied');
+        error.code = 'cors_origin_denied';
+        return cb(error);
       },
       credentials: true,
     })
@@ -55,6 +58,13 @@ export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
     email,
     crypto,
     uploadsDir: UPLOADS_DIR,
+  });
+
+  app.use((err, _req, res, next) => {
+    if (err?.code === 'cors_origin_denied') {
+      return res.status(403).json({ message: 'cors_origin_denied' });
+    }
+    return next(err);
   });
 
   return app;

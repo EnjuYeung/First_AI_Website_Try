@@ -7,6 +7,14 @@ import { createExchangeRate } from './exchangeRate.js';
 import * as defaults from './defaults.js';
 import { createApp } from './app.js';
 
+export const assertAdminIdentity = (configuredUsername, persistedUsername) => {
+  if (configuredUsername !== persistedUsername) {
+    throw new Error(
+      'ADMIN_USER does not match persisted credentials; restore the original value or perform an explicit account migration'
+    );
+  }
+};
+
 export const bootstrap = async () => {
   const config = getConfig();
   await ensureDataDir();
@@ -14,6 +22,7 @@ export const bootstrap = async () => {
   const storage = createStorage({ adminUser: config.adminUser, adminPass: config.adminPass });
 
   const auth = await createAuth({ jwtSecret: config.jwtSecret, storage });
+  assertAdminIdentity(config.adminUser, auth.getAdminUsername());
   const email = createEmail({ smtp: config.smtp });
   const reminders = createReminders({ config, storage, email });
 

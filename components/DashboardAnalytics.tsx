@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { AppSettings, Subscription } from '../types';
 import { formatCurrency } from '../services/currency';
-import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
+import { formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
 import { getT } from '../services/i18n';
 import { calculateNextBillingDateYMD } from '../shared/billingDate.js';
 
@@ -83,12 +83,13 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
   const t = getT(lang);
 
   const { distributionData, distributionChartMinWidth, monthLabel } = useMemo(() => {
-    const today = new Date();
+    const today = parseLocalYMD(getTodayYMD(settings.timezone));
     const year = today.getFullYear();
     const month = today.getMonth();
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
     const dayBeforeMonth = new Date(year, month, 0);
+    today.setHours(0, 0, 0, 0);
     const points: DistributionPoint[] = Array.from(
       { length: monthEnd.getDate() },
       (_, index) => ({ day: index + 1, amount: 0, count: 0 }),
@@ -104,7 +105,14 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
         );
         if (!billingYmd) return;
 
-        const billingDate = parseLocalYMD(billingYmd);
+        let billingDate = parseLocalYMD(billingYmd);
+        const persistedNextBilling = parseLocalYMD(subscription.nextBillingDate);
+        if (
+          billingDate > today
+          && Number.isFinite(persistedNextBilling.getTime())
+        ) {
+          billingDate = persistedNextBilling;
+        }
         if (
           Number.isNaN(billingDate.getTime())
           || billingDate < monthStart
@@ -140,7 +148,7 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
         month: 'long',
       }).format(monthStart),
     };
-  }, [lang, settings.exchangeRates, subscriptions]);
+  }, [lang, settings.exchangeRates, settings.timezone, subscriptions]);
 
   return (
     <div className="animate-fade-in pb-10">

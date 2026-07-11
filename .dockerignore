@@ -7,7 +7,6 @@ Dockerfile
 docker-compose.yml
 server/node_modules
 server/.env.local
-server/package-lock.json
 *.log
 
 # Runtime secrets and mutable data must never enter image layers.

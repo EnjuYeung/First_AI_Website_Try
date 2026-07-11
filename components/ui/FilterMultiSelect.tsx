@@ -18,6 +18,7 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const listboxId = React.useId();
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -25,8 +26,15 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
                 setIsOpen(false);
             }
         };
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setIsOpen(false);
+        };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
     }, []);
 
     const toggleOption = (value: string) => {
@@ -40,7 +48,11 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
     return (
         <div className="relative z-40" ref={containerRef}>
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
+                aria-haspopup="listbox"
+                aria-expanded={isOpen}
+                aria-controls={listboxId}
                 className={`flex items-center justify-between gap-2 px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors ${selectedValues.length > 0 ? 'text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
             >
                 <span>{label} {selectedValues.length > 0 && `(${selectedValues.length})`}</span>
@@ -48,20 +60,23 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 mt-2 w-56 mac-surface rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
+                <div id={listboxId} role="listbox" aria-multiselectable="true" aria-label={label} className="absolute z-50 mt-2 w-56 mac-surface rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
                     <div className="p-2 max-h-60 overflow-y-auto space-y-1">
                         {options.map((opt) => (
-                            <div
+                            <button
+                                type="button"
+                                role="option"
+                                aria-selected={selectedValues.includes(opt.value)}
                                 key={opt.value}
                                 onClick={() => toggleOption(opt.value)}
-                                className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                                className="flex w-full items-center gap-2 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg cursor-pointer text-left text-sm text-gray-700 dark:text-gray-200"
                             >
                                 {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
                                 <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedValues.includes(opt.value) ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 dark:border-gray-500'}`}>
                                     {selectedValues.includes(opt.value) && <Check size={10} strokeWidth={3} />}
                                 </div>
                                 <span className="truncate">{opt.label}</span>
-                            </div>
+                            </button>
                         ))}
                     </div>
                     {selectedValues.length > 0 && (

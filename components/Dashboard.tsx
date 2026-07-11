@@ -4,7 +4,7 @@ import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, LucideIcon } from
 import { getT } from '../services/i18n';
 import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
-import { formatLocalYMD, parseLocalYMD } from '../services/dateUtils';
+import { daysUntilYMD, formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
 import { addBillingCycleYMD } from '../shared/billingDate.js';
 import { formatCurrency } from '../services/currency';
 import DashboardAnalytics from './DashboardAnalytics';
@@ -44,14 +44,8 @@ const convertToUSD = (amount: number, currency: string, rates: Record<string, nu
   return amount / rate;
 };
 
-const getDaysRemaining = (date: Date): number => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  const diffTime = target.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
+const getDaysRemaining = (date: Date, timeZone: string): number =>
+  daysUntilYMD(formatLocalYMD(date), timeZone);
 
 // --- Sub-Components (UI) ---
 
@@ -106,10 +100,11 @@ const StatCard: React.FC<{
 const PaymentRow: React.FC<{
   item: BillingEvent;
   lang: 'en' | 'zh';
+  timeZone: string;
   showDaysRemaining?: boolean;
-}> = ({ item, lang, showDaysRemaining }) => {
+}> = ({ item, lang, timeZone, showDaysRemaining }) => {
   const t = getT(lang);
-  const days = showDaysRemaining ? getDaysRemaining(item.date) : 0;
+  const days = showDaysRemaining ? getDaysRemaining(item.date, timeZone) : 0;
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
@@ -164,8 +159,7 @@ const PaymentRow: React.FC<{
 const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings): DashboardStats => {
   return useMemo(() => {
     // 1. Initialize Dates
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = parseLocalYMD(getTodayYMD(settings.timezone));
 
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
@@ -206,6 +200,8 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
       if (!sub.startDate) continue;
 
       const usdCost = convertToUSD(sub.price, sub.currency, settings.exchangeRates);
+      const persistedNextBilling = parseLocalYMD(sub.nextBillingDate);
+      const hasPersistedNextBilling = Number.isFinite(persistedNextBilling.getTime());
 
       // Determine Iteration Range
       // We iterate from startDate until we cover all relevant future ranges (upto year end or next 7 days)
@@ -235,28 +231,27 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
         }
 
         const dateObj = new Date(currentDate); // Copy for storage
+        const isSupersededFutureCycle =
+          !isCancelled &&
+          currentDate > today &&
+          hasPersistedNextBilling &&
+          currentDate < persistedNextBilling;
 
         // A. Monthly
         if (currentDate >= monthStart && currentDate <= monthEnd) {
           if (currentDate <= today) stats.monthlyPaid += usdCost;
-          else if (!isCancelled) stats.monthlyPending += usdCost;
+          else if (!isCancelled && !isSupersededFutureCycle) stats.monthlyPending += usdCost;
         }
 
         // B. Yearly
         if (currentDate >= yearStart && currentDate <= yearEnd) {
           if (currentDate <= today) stats.yearlyPaid += usdCost;
-          else if (!isCancelled) stats.yearlyPending += usdCost;
+          else if (!isCancelled && !isSupersededFutureCycle) stats.yearlyPending += usdCost;
         }
 
         // C. Recent Payments (Last 7 Days)
         if (currentDate >= last7DaysStart && currentDate <= today) {
           stats.recentPayments.push({ sub, date: dateObj, cost: sub.price });
-        }
-
-        // D. Upcoming Renewals (Next 7 Days, exclude today, include future)
-        // Only if active
-        if (!isCancelled && currentDate > today && currentDate <= next7DaysEnd) {
-          stats.upcomingRenewals.push({ sub, date: dateObj, cost: sub.price });
         }
 
         const nextYmd = addBillingCycleYMD(
@@ -267,6 +262,18 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
         if (!nextYmd) break;
         currentDate = parseLocalYMD(nextYmd);
       }
+
+      // The persisted date is the authoritative next unpaid cycle. It may have
+      // been advanced early by the Telegram renewal flow, so do not reconstruct
+      // this list from startDate.
+      if (
+        !isCancelled &&
+        hasPersistedNextBilling &&
+        persistedNextBilling > today &&
+        persistedNextBilling <= next7DaysEnd
+      ) {
+        stats.upcomingRenewals.push({ sub, date: persistedNextBilling, cost: sub.price });
+      }
     }
 
     // 5. Final Sorts
@@ -274,7 +281,7 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
     stats.upcomingRenewals.sort((a, b) => a.date.getTime() - b.date.getTime());
 
     return stats;
-  }, [subscriptions, settings.exchangeRates]);
+  }, [subscriptions, settings.exchangeRates, settings.timezone]);
 };
 
 // --- Main Layout ---
@@ -339,7 +346,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {data.recentPayments.map((item, idx) => (
-                    <PaymentRow key={`${item.sub.id}-${idx}`} item={item} lang={lang} />
+                    <PaymentRow key={`${item.sub.id}-${idx}`} item={item} lang={lang} timeZone={settings.timezone} />
                   ))}
                 </tbody>
               </table>
@@ -370,7 +377,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {data.upcomingRenewals.map((item, idx) => (
-                    <PaymentRow key={`${item.sub.id}-${idx}`} item={item} lang={lang} showDaysRemaining />
+                    <PaymentRow key={`${item.sub.id}-${idx}`} item={item} lang={lang} timeZone={settings.timezone} showDaysRemaining />
                   ))}
                 </tbody>
               </table>

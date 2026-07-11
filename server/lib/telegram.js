@@ -1,10 +1,58 @@
-const scrubToken = (token) =>
-  token ? `${token.slice(0, 6)}...${token.slice(-4)}` : 'undefined';
+import crypto from 'crypto';
+
+const TELEGRAM_REQUEST_TIMEOUT_MS = 10_000;
 
 const webhookCache = new Map();
 
+export const createTelegramWebhookSecret = (jwtSecret, botToken) => {
+  if (!jwtSecret || !botToken) return '';
+  return crypto
+    .createHmac('sha256', jwtSecret)
+    .update(`telegram-webhook:${botToken}`)
+    .digest('base64url');
+};
+
+const redact = (value, botToken) => {
+  let safe = String(value || '');
+  for (const secret of [botToken, encodeURIComponent(botToken || '')]) {
+    if (secret) safe = safe.split(secret).join('[redacted]');
+  }
+  return safe;
+};
+
+const telegramRequest = async (
+  botToken,
+  method,
+  payload,
+  { errorPrefix = 'telegram_error', timeoutMs = TELEGRAM_REQUEST_TIMEOUT_MS } = {}
+) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let resp;
+  try {
+    resp = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch {
+    if (controller.signal.aborted) throw new Error('telegram_timeout');
+    throw new Error(`${errorPrefix}_request_failed`);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok || json?.ok === false) {
+    const description = redact(json?.description, botToken);
+    throw new Error(description || `${errorPrefix}_${resp.status}`);
+  }
+  return json;
+};
+
 export const sendTelegramMessage = async (
-  { debug },
+  { debug, timeoutMs } = {},
   botToken,
   chatId,
   text,
@@ -25,95 +73,102 @@ export const sendTelegramMessage = async (
     }
   }
 
-  const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const json = await resp.json().catch(() => ({}));
-
-  if (debug) {
-    console.log('telegram sendMessage', {
-      ok: json?.ok,
-      description: json?.description,
-      chatId,
-      hasMarkup: !!replyMarkup,
-      markupType: typeof payload.reply_markup,
-      replyMarkup: payload.reply_markup,
-      resultMarkup: json?.result?.reply_markup,
-      bot: scrubToken(botToken),
+  try {
+    const json = await telegramRequest(botToken, 'sendMessage', payload, {
+      errorPrefix: 'telegram_error',
+      timeoutMs,
     });
+    if (debug) {
+      console.log('telegram sendMessage', {
+        ok: json?.ok,
+        description: redact(json?.description, botToken),
+        chatId,
+        hasMarkup: !!replyMarkup,
+        markupType: typeof payload.reply_markup,
+        replyMarkup: payload.reply_markup,
+        resultMarkup: json?.result?.reply_markup,
+      });
+    }
+    return json;
+  } catch (err) {
+    if (debug) {
+      console.log('telegram sendMessage', {
+        ok: false,
+        description: redact(err?.message, botToken),
+        chatId,
+        hasMarkup: !!replyMarkup,
+      });
+    }
+    throw new Error(redact(err?.message, botToken) || 'telegram_error');
   }
-
-  if (!resp.ok || json?.ok === false) {
-    const errMsg = json?.description || `telegram_error_${resp.status}`;
-    throw new Error(errMsg);
-  }
-
-  return json;
 };
 
-export const setTelegramWebhook = async ({ debug }, botToken, webhookUrl) => {
+export const setTelegramWebhook = async (
+  { debug, timeoutMs, secretToken } = {},
+  botToken,
+  webhookUrl
+) => {
   const payload = {
     url: webhookUrl,
     allowed_updates: ['callback_query'],
+    ...(secretToken ? { secret_token: secretToken } : {}),
   };
 
-  const resp = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const json = await resp.json().catch(() => ({}));
-
-  if (debug) {
-    console.log('telegram setWebhook', {
-      ok: json?.ok,
-      description: json?.description,
-      url: webhookUrl,
-      bot: scrubToken(botToken),
+  try {
+    const json = await telegramRequest(botToken, 'setWebhook', payload, {
+      errorPrefix: 'telegram_webhook_error',
+      timeoutMs,
     });
+    if (debug) {
+      console.log('telegram setWebhook', {
+        ok: json?.ok,
+        description: redact(json?.description, botToken),
+        webhookConfigured: true,
+      });
+    }
+    return json;
+  } catch (err) {
+    if (debug) {
+      console.log('telegram setWebhook', {
+        ok: false,
+        description: redact(err?.message, botToken),
+        webhookConfigured: false,
+      });
+    }
+    throw new Error(redact(err?.message, botToken) || 'telegram_webhook_error');
   }
-
-  if (!resp.ok || json?.ok === false) {
-    const errMsg = json?.description || `telegram_webhook_error_${resp.status}`;
-    throw new Error(errMsg);
-  }
-
-  return json;
 };
 
-export const ensureTelegramWebhook = async ({ debug }, botToken, webhookUrl) => {
+export const ensureTelegramWebhook = async (options, botToken, webhookUrl) => {
   if (!botToken || !webhookUrl) return false;
   const cached = webhookCache.get(botToken);
-  if (cached === webhookUrl) return false;
-  await setTelegramWebhook({ debug }, botToken, webhookUrl);
-  webhookCache.set(botToken, webhookUrl);
+  const cacheValue = `${webhookUrl}\0${options?.secretToken || ''}`;
+  if (cached === cacheValue) return false;
+  await setTelegramWebhook(options, botToken, webhookUrl);
+  webhookCache.set(botToken, cacheValue);
   return true;
 };
 
-export const answerCallback = async (botToken, callbackQueryId, text) => {
-  await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+export const answerCallback = async (botToken, callbackQueryId, text) =>
+  telegramRequest(
+    botToken,
+    'answerCallbackQuery',
+    {
       callback_query_id: callbackQueryId,
       text,
       show_alert: false,
-    }),
-  });
-};
+    },
+    { errorPrefix: 'telegram_callback_error' }
+  );
 
-export const clearInlineKeyboard = async (botToken, chatId, messageId) => {
-  await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+export const clearInlineKeyboard = async (botToken, chatId, messageId) =>
+  telegramRequest(
+    botToken,
+    'editMessageReplyMarkup',
+    {
       chat_id: chatId,
       message_id: messageId,
       reply_markup: { inline_keyboard: [] },
-    }),
-  });
-};
+    },
+    { errorPrefix: 'telegram_markup_error' }
+  );

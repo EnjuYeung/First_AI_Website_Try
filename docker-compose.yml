@@ -30,10 +30,8 @@ services:
       - ./server/.env
     volumes:
       - backend-data:/app/server/data
-    ports:
-      # Exposing backend port to host is useful for debugging but should be limited/removed in strict production.
-      # Internal communication happens via 'appnet' network on port 3001.
-      - "3003:3001" 
+    expose:
+      - "3001"
     networks:
       - appnet
     healthcheck:

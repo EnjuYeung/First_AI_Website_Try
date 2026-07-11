@@ -1,5 +1,9 @@
 import { renderReminderTemplate, DEFAULT_REMINDER_TEMPLATE_STRING } from '../../../shared/reminderTemplate.js';
-import { sendTelegramMessage, ensureTelegramWebhook } from '../telegram.js';
+import {
+  createTelegramWebhookSecret,
+  sendTelegramMessage,
+  ensureTelegramWebhook,
+} from '../telegram.js';
 
 const normalizeBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 
@@ -24,9 +28,12 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
         return res.status(400).json({ ok: false, message: 'telegram_webhook_url_missing' });
       }
       await ensureTelegramWebhook(
-        { debug: config.debugTelegram },
+        {
+          debug: config.debugTelegram,
+          secretToken: createTelegramWebhookSecret(config.jwtSecret, botToken),
+        },
         botToken,
-        `${baseUrl}/api/telegram/webhook/${botToken}`
+        `${baseUrl}/api/telegram/webhook`
       );
       const template = req.body?.template || settings.notifications.rules.template;
       const message = renderReminderTemplate(template || DEFAULT_REMINDER_TEMPLATE_STRING, {

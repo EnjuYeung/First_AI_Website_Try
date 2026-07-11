@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
+import speakeasy from 'speakeasy';
 
 import { createAuth } from '../lib/auth.js';
 import { registerAuthRoutes } from '../lib/routes/authRoutes.js';
@@ -129,4 +130,232 @@ test('login is rate limited and sensitive auth changes require stronger checks',
   );
   assert.equal(reauth.statusCode, 401);
   assert.equal(reauth.body.message, 'reauthentication_required');
+});
+
+const createLoginHarness = () => {
+  const handlers = new Map();
+  let passwordChecks = 0;
+  const app = {
+    post(route, ...routeHandlers) { handlers.set(route, routeHandlers.at(-1)); },
+    get() {},
+  };
+  const auth = {
+    getAdminUsername: () => 'admin',
+    verifyAdminPassword: async () => { passwordChecks += 1; return false; },
+    authMiddleware() {},
+    clearAuthCookie() {},
+  };
+  registerAuthRoutes({ app, auth, storage: {} });
+  return {
+    login: handlers.get('/api/login'),
+    passwordChecks: () => passwordChecks,
+  };
+};
+
+const loginRequest = (ip, username = 'admin', extraBody = {}) => ({
+  ip,
+  socket: { remoteAddress: '172.20.0.2' },
+  body: { username, password: 'wrong', ...extraBody },
+});
+
+test('login limiting keys attempts by the trusted client IP instead of the proxy socket', async () => {
+  const { login } = createLoginHarness();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const res = response();
+    await login(loginRequest('198.51.100.10'), res);
+    assert.equal(res.statusCode, 401);
+  }
+
+  const otherClient = response();
+  await login(loginRequest('198.51.100.11'), otherClient);
+  assert.equal(otherClient.statusCode, 401);
+});
+
+test('login rejects oversized or unexpected fields before password verification', async () => {
+  const { login, passwordChecks } = createLoginHarness();
+  const emptyOptionalCode = response();
+  await login(loginRequest('198.51.100.20', 'admin', { code: '' }), emptyOptionalCode);
+  assert.equal(emptyOptionalCode.statusCode, 401);
+
+  const oversizedUsername = response();
+  await login(loginRequest('198.51.100.20', 'x'.repeat(129)), oversizedUsername);
+  assert.equal(oversizedUsername.statusCode, 400);
+  assert.equal(oversizedUsername.body.message, 'invalid_login_request');
+
+  const oversizedKey = response();
+  await login(loginRequest('198.51.100.20', 'admin', { ['x'.repeat(129)]: true }), oversizedKey);
+  assert.equal(oversizedKey.statusCode, 400);
+  assert.equal(oversizedKey.body.message, 'invalid_login_request');
+  assert.equal(passwordChecks(), 1);
+});
+
+test('login limiter has a hard entry cap and evicts the oldest state', async () => {
+  const { login } = createLoginHarness();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const res = response();
+    await login(loginRequest('198.51.100.30'), res);
+    assert.equal(res.statusCode, 401);
+  }
+  for (let index = 0; index < 1000; index += 1) {
+    const res = response();
+    await login(loginRequest(`203.0.${Math.floor(index / 250)}.${index % 250}`), res);
+    assert.equal(res.statusCode, 401);
+  }
+
+  const evictedClient = response();
+  await login(loginRequest('198.51.100.30'), evictedClient);
+  assert.equal(evictedClient.statusCode, 401);
+});
+
+test('dedicated 2FA routes still initialize, verify, and disable TOTP', async () => {
+  const handlers = new Map();
+  const app = {
+    post(route, ...routeHandlers) { handlers.set(route, routeHandlers.at(-1)); },
+    get() {},
+  };
+  let data = {
+    settings: {
+      security: {
+        twoFactorEnabled: false,
+        twoFactorSecret: '',
+        pendingTwoFactorSecret: '',
+        lastPasswordChange: '2026-01-01T00:00:00.000Z',
+      },
+    },
+  };
+  const storage = {
+    async loadUserData() { return structuredClone(data); },
+    async updateUserData(_username, updater) {
+      data = await updater(structuredClone(data));
+      return structuredClone(data);
+    },
+  };
+  const auth = {
+    getAdminUsername: () => 'admin',
+    verifyAdminPassword: async (password) => password === 'Current-password-1!',
+    authMiddleware() {},
+    clearAuthCookie() {},
+  };
+  registerAuthRoutes({ app, auth, storage });
+  const request = (body) => ({ body, user: { username: 'admin' } });
+
+  const initialized = response();
+  await handlers.get('/api/2fa/init')(
+    request({ currentPassword: 'Current-password-1!', code: '' }),
+    initialized
+  );
+  assert.equal(initialized.statusCode, 200);
+  assert.match(initialized.body.secret, /^[A-Z2-7]+$/);
+  assert.equal(data.settings.security.pendingTwoFactorSecret, initialized.body.secret);
+
+  const code = speakeasy.totp({ secret: initialized.body.secret, encoding: 'base32' });
+  const verified = response();
+  await handlers.get('/api/2fa/verify')(request({ code }), verified);
+  assert.deepEqual(verified.body, { success: true });
+  assert.equal(data.settings.security.twoFactorEnabled, true);
+  assert.equal(data.settings.security.twoFactorSecret, initialized.body.secret);
+  assert.equal(data.settings.security.pendingTwoFactorSecret, '');
+
+  const disabled = response();
+  await handlers.get('/api/2fa/disable')(
+    request({ currentPassword: 'Current-password-1!', code }),
+    disabled
+  );
+  assert.deepEqual(disabled.body, { success: true });
+  assert.deepEqual(data.settings.security, {
+    twoFactorEnabled: false,
+    twoFactorSecret: '',
+    pendingTwoFactorSecret: '',
+    lastPasswordChange: '2026-01-01T00:00:00.000Z',
+  });
+});
+
+test('password changes update the server-managed password-change timestamp', async () => {
+  const handlers = new Map();
+  const app = {
+    post(route, ...routeHandlers) { handlers.set(route, routeHandlers.at(-1)); },
+    get() {},
+  };
+  let data = {
+    settings: {
+      security: {
+        twoFactorEnabled: false,
+        twoFactorSecret: '',
+        pendingTwoFactorSecret: '',
+        lastPasswordChange: '2026-01-01T00:00:00.000Z',
+      },
+    },
+  };
+  let changedPassword = '';
+  let cookieCleared = false;
+  const storage = {
+    async updateUserData(_username, updater) {
+      data = await updater(structuredClone(data));
+      return structuredClone(data);
+    },
+  };
+  const auth = {
+    getAdminUsername: () => 'admin',
+    verifyAdminPassword: async (password) => password === 'Current-password-1!',
+    changeAdminPassword: async (password) => { changedPassword = password; },
+    authMiddleware() {},
+    clearAuthCookie: () => { cookieCleared = true; },
+  };
+  registerAuthRoutes({ app, auth, storage });
+  const res = response();
+
+  await handlers.get('/api/change-password')(
+    {
+      body: {
+        currentPassword: 'Current-password-1!',
+        newPassword: 'Next-password-2!',
+      },
+      user: { username: 'admin' },
+    },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(changedPassword, 'Next-password-2!');
+  assert.equal(cookieCleared, true);
+  assert.equal(data.settings.security.lastPasswordChange, res.body.lastPasswordChange);
+  assert.equal(Number.isFinite(Date.parse(res.body.lastPasswordChange)), true);
+  assert.notEqual(res.body.lastPasswordChange, '2026-01-01T00:00:00.000Z');
+});
+
+test('password metadata failure does not report an already-committed password change as failed', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const handlers = new Map();
+  const app = {
+    post(route, ...routeHandlers) { handlers.set(route, routeHandlers.at(-1)); },
+    get() {},
+  };
+  let changedPassword = '';
+  let cookieCleared = false;
+  const auth = {
+    getAdminUsername: () => 'admin',
+    verifyAdminPassword: async () => true,
+    changeAdminPassword: async (password) => { changedPassword = password; },
+    authMiddleware() {},
+    clearAuthCookie: () => { cookieCleared = true; },
+  };
+  const storage = {
+    async updateUserData() { throw new Error('metadata disk failure'); },
+  };
+  registerAuthRoutes({ app, auth, storage });
+  const res = response();
+
+  await handlers.get('/api/change-password')({
+    body: {
+      currentPassword: 'Current-password-1!',
+      newPassword: 'Next-password-2!',
+    },
+    user: { username: 'admin' },
+  }, res);
+
+  assert.equal(changedPassword, 'Next-password-2!');
+  assert.equal(cookieCleared, true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
 });

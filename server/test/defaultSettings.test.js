@@ -11,7 +11,12 @@ test('server and shared code use the same default settings factory', () => {
   const shared = createDefaultSettings();
   const server = defaultSettings();
   shared.customCategories.push('Mutated');
-  assert.deepEqual(server, defaultSettings());
+  const freshServer = defaultSettings();
+  assert.equal(Number.isFinite(Date.parse(server.security.lastPasswordChange)), true);
+  assert.equal(Number.isFinite(Date.parse(freshServer.security.lastPasswordChange)), true);
+  server.security.lastPasswordChange = '<generated-at-runtime>';
+  freshServer.security.lastPasswordChange = '<generated-at-runtime>';
+  assert.deepEqual(server, freshServer);
   assert.notDeepEqual(shared.customCategories, server.customCategories);
 });
 

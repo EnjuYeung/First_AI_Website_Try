@@ -1,6 +1,12 @@
 export class UnauthorizedError extends Error {
   name = 'UnauthorizedError';
+
+  constructor(message = 'unauthorized', public readonly sessionExpired = true) {
+    super(message);
+  }
 }
+
+export const SESSION_EXPIRED_EVENT = 'subm:session-expired';
 
 export const authHeaderOnly = (): Record<string, string> => ({});
 
@@ -11,7 +17,13 @@ export const authJsonHeaders = (): Record<string, string> => ({
 export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const resp = await fetch(input, { credentials: 'include', ...init });
   if (resp.status === 401) {
-    throw new UnauthorizedError('unauthorized');
+    const payload = await resp.clone().json().catch(() => ({} as Record<string, unknown>));
+    const message = typeof payload?.message === 'string' ? payload.message : 'unauthorized';
+    const sessionExpired = message === 'Missing token' || message === 'Invalid token' || message === 'unauthorized';
+    if (sessionExpired && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+    throw new UnauthorizedError(message, sessionExpired);
   }
   return resp;
 };
@@ -28,4 +40,3 @@ export const apiFetchJson = async <T>(
   }
   return json as T;
 };
-

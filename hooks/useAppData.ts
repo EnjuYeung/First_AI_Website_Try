@@ -31,11 +31,29 @@ export const useAppData = (
   const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [lastMutationError, setLastMutationError] = useState<unknown>(null);
   const onUnauthorizedRef = useRef<(() => void) | undefined>(onUnauthorized);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const revisionsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
+  const mutationVersionsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
+  const subscriptionsRef = useRef<Subscription[]>(subscriptions);
+  const settingsRef = useRef<AppSettings>(settings);
+  const notificationsRef = useRef<NotificationRecord[]>(notifications);
   const isLoadingRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
+
+  const applySubscriptions = useCallback((value: Subscription[]) => {
+    subscriptionsRef.current = value;
+    setSubscriptions(value);
+  }, []);
+  const applySettings = useCallback((value: AppSettings) => {
+    settingsRef.current = value;
+    setSettings(value);
+  }, []);
+  const applyNotifications = useCallback((value: NotificationRecord[]) => {
+    notificationsRef.current = value;
+    setNotifications(value);
+  }, []);
 
   useEffect(() => {
     onUnauthorizedRef.current = onUnauthorized;
@@ -50,14 +68,14 @@ export const useAppData = (
     setIsDataLoading(true);
     try {
       const data = await fetchAllData();
-      setSubscriptions(data.subscriptions);
-      setSettings(data.settings);
-      setNotifications(data.notifications || []);
+      applySubscriptions(data.subscriptions);
+      applySettings(data.settings);
+      applyNotifications(data.notifications || []);
       revisionsRef.current = data.revisions;
       lastLoadedAtRef.current = Date.now();
       return { ok: true };
     } catch (err) {
-      if (err instanceof UnauthorizedError) {
+      if (err instanceof UnauthorizedError && err.sessionExpired) {
         onUnauthorizedRef.current?.();
       }
       console.error('Failed to load data', err);
@@ -66,7 +84,7 @@ export const useAppData = (
       isLoadingRef.current = false;
       setIsDataLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, applyNotifications, applySettings, applySubscriptions]);
 
   const loadRemoteData = useCallback(async (): Promise<DataRefreshResult> => {
     // A refresh must not replace an optimistic local update with the older
@@ -104,7 +122,13 @@ export const useAppData = (
     operation: (revision: number) => Promise<{ data: T; revision: number }>,
     apply: (data: T) => void
   ) => {
-    const save = async () => {
+    const mutationVersion = mutationVersionsRef.current[feature] + 1;
+    mutationVersionsRef.current = {
+      ...mutationVersionsRef.current,
+      [feature]: mutationVersion,
+    };
+
+    const save = async (): Promise<boolean> => {
       try {
         let result: { data: T; revision: number };
         try {
@@ -127,58 +151,77 @@ export const useAppData = (
           result = await operation(revisionsRef.current[feature]);
         }
         revisionsRef.current = { ...revisionsRef.current, [feature]: result.revision };
-        apply(result.data);
-      } catch (err) {
-        if (err instanceof UnauthorizedError) onUnauthorizedRef.current?.();
-        else {
-          console.error('Failed to persist data', err);
-          // Do not call loadRemoteData here: this save is itself part of the
-          // queue that loadRemoteData waits for.
-          await fetchRemoteData();
+        if (mutationVersionsRef.current[feature] === mutationVersion) {
+          apply(result.data);
         }
+        return true;
+      } catch (err) {
+        setLastMutationError(err);
+        if (err instanceof UnauthorizedError && err.sessionExpired) {
+          onUnauthorizedRef.current?.();
+        } else {
+          console.error('Failed to persist data', err);
+          // Reconcile only the failed feature. Refreshing all state here could
+          // overwrite optimistic changes queued for another feature.
+          try {
+            const latest = await fetchAllData();
+            revisionsRef.current = latest.revisions;
+            if (mutationVersionsRef.current[feature] === mutationVersion) {
+              if (feature === 'subscriptions') apply(latest.subscriptions as T);
+              else if (feature === 'settings') apply(latest.settings as T);
+              else apply((latest.notifications || []) as T);
+            }
+          } catch (refreshError) {
+            console.error('Failed to reconcile data after save failure', refreshError);
+          }
+        }
+        return false;
       }
     };
-    saveQueueRef.current = saveQueueRef.current.then(save, save);
-    return saveQueueRef.current;
+    const result = saveQueueRef.current.then(save, save);
+    saveQueueRef.current = result.then(() => undefined, () => undefined);
+    return result;
   };
 
   const updateSettings = (newSettings: AppSettings) => {
-    setSettings(newSettings);
-    void persistFeature('settings', (revision) => replaceSettings(newSettings, revision), setSettings);
+    applySettings(newSettings);
+    return persistFeature('settings', (revision) => replaceSettings(newSettings, revision), applySettings);
   };
 
   const saveSubscription = (sub: Subscription, isEditing: boolean) => {
     let updated: Subscription[];
     if (isEditing) {
-      updated = subscriptions.map(s => s.id === sub.id ? sub : s);
+      updated = subscriptionsRef.current.map(s => s.id === sub.id ? sub : s);
     } else {
-      updated = [...subscriptions, sub];
+      updated = [...subscriptionsRef.current, sub];
     }
-    setSubscriptions(updated);
-    void persistFeature(
+    applySubscriptions(updated);
+    return persistFeature(
       'subscriptions',
       (revision) => isEditing
         ? updateSubscription(sub, revision)
         : createSubscription(sub, revision),
-      setSubscriptions
+      applySubscriptions
     );
   };
 
   const deleteSubscription = (id: string) => {
      if (window.confirm(t('confirm_delete'))) {
-      const updated = subscriptions.filter(s => s.id !== id);
-      setSubscriptions(updated);
-      void persistFeature('subscriptions', (revision) => removeSubscription(id, revision), setSubscriptions);
+      const updated = subscriptionsRef.current.filter(s => s.id !== id);
+      applySubscriptions(updated);
+      return persistFeature('subscriptions', (revision) => removeSubscription(id, revision), applySubscriptions);
     }
+    return Promise.resolve(false);
   };
 
   const batchDeleteSubscriptions = (ids: string[]) => {
     const message = t('confirm_batch_delete').replace('{count}', ids.length.toString());
     if (window.confirm(message)) {
-      const updated = subscriptions.filter(s => !ids.includes(s.id));
-      setSubscriptions(updated);
-      void persistFeature('subscriptions', (revision) => removeSubscriptions(ids, revision), setSubscriptions);
+      const updated = subscriptionsRef.current.filter(s => !ids.includes(s.id));
+      applySubscriptions(updated);
+      return persistFeature('subscriptions', (revision) => removeSubscriptions(ids, revision), applySubscriptions);
     }
+    return Promise.resolve(false);
   };
 
   const duplicateSubscription = (sub: Subscription) => {
@@ -196,20 +239,20 @@ export const useAppData = (
       name: newName,
     };
 
-    const updated = [...subscriptions, newSub];
-    setSubscriptions(updated);
-    void persistFeature('subscriptions', (revision) => createSubscription(newSub, revision), setSubscriptions);
+    const updated = [...subscriptionsRef.current, newSub];
+    applySubscriptions(updated);
+    return persistFeature('subscriptions', (revision) => createSubscription(newSub, revision), applySubscriptions);
   };
 
   const deleteNotification = (id: string) => {
-    const updated = notifications.filter(n => n.id !== id);
-    setNotifications(updated);
-    void persistFeature('notifications', (revision) => removeNotification(id, revision), setNotifications);
+    const updated = notificationsRef.current.filter(n => n.id !== id);
+    applyNotifications(updated);
+    return persistFeature('notifications', (revision) => removeNotification(id, revision), applyNotifications);
   };
 
   const clearNotifications = () => {
-    setNotifications([]);
-    void persistFeature('notifications', clearNotificationHistory, setNotifications);
+    applyNotifications([]);
+    return persistFeature('notifications', clearNotificationHistory, applyNotifications);
   };
 
   return {
@@ -217,6 +260,8 @@ export const useAppData = (
     settings,
     notifications,
     isDataLoading,
+    lastMutationError,
+    clearMutationError: () => setLastMutationError(null),
     loadRemoteData,
     updateSettings,
     saveSubscription,
