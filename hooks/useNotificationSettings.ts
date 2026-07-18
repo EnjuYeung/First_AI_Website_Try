@@ -30,6 +30,8 @@ export const useNotificationSettings = (
     } catch (err: any) {
       const message = err?.message === 'telegram_not_configured'
         ? 'Please enable Telegram notifications and fill Bot Token + Chat ID first.'
+        : err?.message === 'telegram_webhook_https_required'
+          ? 'Telegram 回调需要公开可访问的 HTTPS 地址，请配置 PUBLIC_BASE_URL。'
         : err?.message === 'invalid_template'
           ? '模板格式错误，请输入包含 lines 数组的 JSON。'
           : err?.message || 'Telegram test failed. Check your settings.';

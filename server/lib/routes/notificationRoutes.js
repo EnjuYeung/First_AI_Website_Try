@@ -7,11 +7,38 @@ import {
 
 const normalizeBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 
+const normalizeHttpsBaseUrl = (value) => {
+  const normalized = normalizeBaseUrl(value);
+  if (!normalized) return '';
+  try {
+    const parsed = new URL(normalized);
+    if (
+      parsed.protocol !== 'https:' ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== '/' ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return '';
+    }
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+};
+
 const resolveWebhookBaseUrl = (req, config) => {
-  if (config.publicBaseUrl) return normalizeBaseUrl(config.publicBaseUrl);
-  const host = req.get('x-forwarded-host') || req.get('host');
-  const proto = (req.get('x-forwarded-proto') || req.protocol || '').split(',')[0].trim();
-  return host && proto ? normalizeBaseUrl(`${proto}://${host}`) : '';
+  if (config.publicBaseUrl) return normalizeHttpsBaseUrl(config.publicBaseUrl);
+  const host = req.get('host');
+  const proto = String(req.protocol || '').trim();
+  const inferred = host && proto ? normalizeHttpsBaseUrl(`${proto}://${host}`) : '';
+  if (!inferred) return '';
+  if (!Array.isArray(config.allowedOrigins) || !config.allowedOrigins.includes(inferred)) {
+    return '';
+  }
+  return inferred;
 };
 
 export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
@@ -25,7 +52,7 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
       }
       const baseUrl = resolveWebhookBaseUrl(req, config);
       if (!baseUrl) {
-        return res.status(400).json({ ok: false, message: 'telegram_webhook_url_missing' });
+        return res.status(400).json({ ok: false, message: 'telegram_webhook_https_required' });
       }
       await ensureTelegramWebhook(
         {

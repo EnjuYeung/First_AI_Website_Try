@@ -20,6 +20,25 @@ const redact = (value, botToken) => {
   return safe;
 };
 
+const requireHttpsWebhookUrl = (value) => {
+  try {
+    const parsed = new URL(String(value || ''));
+    if (
+      parsed.protocol !== 'https:' ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error('invalid_webhook_url');
+    }
+    return parsed.toString();
+  } catch {
+    throw new Error('telegram_webhook_https_required');
+  }
+};
+
 const telegramRequest = async (
   botToken,
   method,
@@ -108,8 +127,9 @@ export const setTelegramWebhook = async (
   botToken,
   webhookUrl
 ) => {
+  const validatedWebhookUrl = requireHttpsWebhookUrl(webhookUrl);
   const payload = {
-    url: webhookUrl,
+    url: validatedWebhookUrl,
     allowed_updates: ['callback_query'],
     ...(secretToken ? { secret_token: secretToken } : {}),
   };

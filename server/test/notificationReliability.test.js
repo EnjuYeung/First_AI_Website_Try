@@ -10,6 +10,7 @@ import {
 import { registerTelegramWebhookRoutes } from '../lib/routes/telegramWebhookRoutes.js';
 import {
   createTelegramWebhookSecret,
+  ensureTelegramWebhook,
   sendTelegramMessage,
   setTelegramWebhook,
 } from '../lib/telegram.js';
@@ -433,13 +434,18 @@ test('deprecated callbacks use the configured timezone for cancellation dates', 
 
 test('same-name subscriptions with different IDs each receive a reminder', async (t) => {
   const sentPayloads = [];
+  const telegramMethods = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
-    if (String(url).endsWith('/sendMessage')) sentPayloads.push(JSON.parse(options.body));
+    const method = String(url).split('/').at(-1);
+    telegramMethods.push(method);
+    if (method === 'sendMessage') sentPayloads.push(JSON.parse(options.body));
     return telegramOk();
   });
   const today = formatDateInTimeZone('UTC');
+  const settings = baseSettings('UTC');
+  settings.notifications.telegram.botToken = '201:same-name-reminder-token';
   const initial = {
-    settings: baseSettings('UTC'),
+    settings,
     subscriptions: [
       subscription({ id: 'sub-1', nextBillingDate: today, startDate: today }),
       subscription({ id: 'sub-2', nextBillingDate: today, startDate: today }),
@@ -450,7 +456,8 @@ test('same-name subscriptions with different IDs each receive a reminder', async
   const reminders = createReminders({
     config: {
       adminUser: 'admin',
-      publicBaseUrl: '',
+      publicBaseUrl: 'https://same-name.example.test',
+      jwtSecret: JWT_SECRET,
       debugTelegram: false,
       notifyIntervalMs: 60_000,
     },
@@ -461,6 +468,7 @@ test('same-name subscriptions with different IDs each receive a reminder', async
   await reminders.processRenewalReminders();
 
   assert.equal(sentPayloads.length, 2);
+  assert.deepEqual(telegramMethods, ['setWebhook', 'sendMessage', 'sendMessage']);
   assert.equal(holder.value.notifications.length, 2);
   assert.deepEqual(
     new Set(holder.value.notifications.map((record) => record.details.subscriptionId)),
@@ -475,6 +483,130 @@ test('same-name subscriptions with different IDs each receive a reminder', async
     )
   );
   assert.ok(callbacks.every((value) => Buffer.byteLength(value, 'utf8') <= 64));
+});
+
+test('reminders omit action buttons when no webhook URL is configured', async (t) => {
+  const sentPayloads = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.match(String(url), /\/sendMessage$/);
+    sentPayloads.push(JSON.parse(options.body));
+    return telegramOk();
+  });
+  const today = formatDateInTimeZone('UTC');
+  const settings = baseSettings('UTC');
+  settings.notifications.telegram.botToken = '202:missing-webhook-token';
+  const { holder, storage } = memoryStorage({
+    settings,
+    subscriptions: [subscription({ nextBillingDate: today, startDate: today })],
+    notifications: [],
+  });
+  const reminders = createReminders({
+    config: {
+      adminUser: 'admin',
+      publicBaseUrl: '',
+      jwtSecret: JWT_SECRET,
+      debugTelegram: false,
+    },
+    storage,
+    email: { async sendEmailMessage() {} },
+  });
+
+  await reminders.processRenewalReminders();
+
+  assert.equal(sentPayloads.length, 1);
+  assert.equal(Object.hasOwn(sentPayloads[0], 'reply_markup'), false);
+  assert.equal(holder.value.notifications[0].status, 'success');
+  assert.equal(holder.value.notifications[0].details.deliveryState, 'delivered');
+});
+
+test('webhook registration failure sends a text reminder without dead buttons', async (t) => {
+  const sentPayloads = [];
+  const webhookPayloads = [];
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const payload = JSON.parse(options.body);
+    if (String(url).endsWith('/setWebhook')) {
+      webhookPayloads.push(payload);
+      return {
+        ok: false,
+        status: 400,
+        async json() {
+          return { ok: false, description: 'webhook_registration_failed' };
+        },
+      };
+    }
+    sentPayloads.push(payload);
+    return telegramOk();
+  });
+  const today = formatDateInTimeZone('UTC');
+  const settings = baseSettings('UTC');
+  settings.notifications.telegram.botToken = '203:failed-webhook-token';
+  const { holder, storage } = memoryStorage({
+    settings,
+    subscriptions: [subscription({ nextBillingDate: today, startDate: today })],
+    notifications: [],
+  });
+  const reminders = createReminders({
+    config: {
+      adminUser: 'admin',
+      publicBaseUrl: 'https://failed-webhook.example.test',
+      jwtSecret: JWT_SECRET,
+      debugTelegram: false,
+    },
+    storage,
+    email: { async sendEmailMessage() {} },
+  });
+
+  await reminders.processRenewalReminders();
+
+  assert.equal(webhookPayloads.length, 1);
+  assert.equal(sentPayloads.length, 1);
+  assert.equal(Object.hasOwn(sentPayloads[0], 'reply_markup'), false);
+  assert.equal(holder.value.notifications[0].status, 'success');
+  assert.equal(holder.value.notifications[0].details.deliveryState, 'delivered');
+});
+
+test('a cached successful webhook is still treated as ready for reminder buttons', async (t) => {
+  const telegramMethods = [];
+  const sentPayloads = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const method = String(url).split('/').at(-1);
+    telegramMethods.push(method);
+    if (method === 'sendMessage') sentPayloads.push(JSON.parse(options.body));
+    return telegramOk();
+  });
+  const botToken = '205:cached-webhook-token';
+  const publicBaseUrl = 'https://cached-webhook.example.test';
+  const secretToken = createTelegramWebhookSecret(JWT_SECRET, botToken);
+  await ensureTelegramWebhook(
+    { secretToken },
+    botToken,
+    `${publicBaseUrl}/api/telegram/webhook`
+  );
+  const today = formatDateInTimeZone('UTC');
+  const settings = baseSettings('UTC');
+  settings.notifications.telegram.botToken = botToken;
+  const { storage } = memoryStorage({
+    settings,
+    subscriptions: [subscription({ nextBillingDate: today, startDate: today })],
+    notifications: [],
+  });
+  const reminders = createReminders({
+    config: {
+      adminUser: 'admin',
+      publicBaseUrl,
+      jwtSecret: JWT_SECRET,
+      debugTelegram: false,
+    },
+    storage,
+    email: { async sendEmailMessage() {} },
+  });
+
+  await reminders.processRenewalReminders();
+
+  assert.deepEqual(telegramMethods, ['setWebhook', 'sendMessage']);
+  assert.equal(sentPayloads.length, 1);
+  assert.equal(Object.hasOwn(sentPayloads[0], 'reply_markup'), true);
 });
 
 test('scheduler startup replaces legacy token-bearing webhook URLs', async (t) => {
@@ -674,6 +806,30 @@ test('Telegram webhook registration keeps the bot token out of the public callba
   assert.equal(requestBody.url, 'https://example.test/api/telegram/webhook');
   assert.equal(requestBody.url.includes(BOT_TOKEN), false);
   assert.equal(requestBody.secret_token, WEBHOOK_SECRET);
+});
+
+test('Telegram webhook registration rejects unsafe URLs before making a request', async (t) => {
+  let fetchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCalls += 1;
+    return telegramOk();
+  });
+
+  for (const webhookUrl of [
+    'http://subm.example.test/api/telegram/webhook',
+    'https://subm.example.test/api/telegram/webhook?source=test',
+    'https://subm.example.test/api/telegram/webhook#callback',
+  ]) {
+    await assert.rejects(
+      setTelegramWebhook(
+        { secretToken: WEBHOOK_SECRET },
+        '204:invalid-webhook-url-token',
+        webhookUrl
+      ),
+      { message: 'telegram_webhook_https_required' }
+    );
+  }
+  assert.equal(fetchCalls, 0);
 });
 
 test('Telegram debug and error messages never contain the bot token', async (t) => {

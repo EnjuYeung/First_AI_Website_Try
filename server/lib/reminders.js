@@ -118,10 +118,14 @@ export const createReminders = ({ config, storage, email }) => {
     const reminderDays = Number(settings.notifications?.rules?.reminderDays ?? 3);
     const ruleChannels = settings.notifications?.rules?.channels;
     const webhookBaseUrl = normalizeBaseUrl(config.publicBaseUrl);
+    const telegramWebhookUrl = webhookBaseUrl
+      ? `${webhookBaseUrl}/api/telegram/webhook`
+      : '';
     const timeZone = settings.timezone;
 
     const telegramConfig = settings.notifications?.telegram || {};
-    if (webhookBaseUrl && telegramConfig.enabled && telegramConfig.botToken) {
+    let telegramWebhookReady = false;
+    if (telegramWebhookUrl && telegramConfig.enabled && telegramConfig.botToken) {
       const secretToken = createTelegramWebhookSecret(
         config.jwtSecret,
         telegramConfig.botToken
@@ -130,8 +134,9 @@ export const createReminders = ({ config, storage, email }) => {
         await ensureTelegramWebhook(
           { debug: config.debugTelegram, secretToken },
           telegramConfig.botToken,
-          `${webhookBaseUrl}/api/telegram/webhook`
+          telegramWebhookUrl
         );
+        telegramWebhookReady = true;
       } catch (err) {
         console.error(
           'Failed to ensure Telegram webhook',
@@ -254,23 +259,9 @@ export const createReminders = ({ config, storage, email }) => {
         try {
           if (channel === 'telegram') {
             const { botToken, chatId } = settings.notifications.telegram;
-            if (webhookBaseUrl) {
-              const webhookUrl = `${webhookBaseUrl}/api/telegram/webhook`;
-              const secretToken = createTelegramWebhookSecret(config.jwtSecret, botToken);
-              try {
-                await ensureTelegramWebhook(
-                  { debug: config.debugTelegram, secretToken },
-                  botToken,
-                  webhookUrl
-                );
-              } catch (err) {
-                console.error(
-                  'Failed to ensure Telegram webhook',
-                  safeErrorMessage(err, botToken)
-                );
-              }
-            }
-            const replyMarkup = buildInlineKeyboard(recordBase.id, dateLabel);
+            const replyMarkup = telegramWebhookReady
+              ? buildInlineKeyboard(recordBase.id, dateLabel)
+              : null;
             await sendTelegramMessage(
               { debug: config.debugTelegram },
               botToken,
