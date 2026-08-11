@@ -1,15 +1,20 @@
 import React, { useMemo } from 'react';
-import { Subscription, AppSettings } from '../types';
-import { DollarSign, TrendingUp, Activity, CheckCircle, Clock, LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  CalendarCheck2,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
+  TrendingUp,
+} from 'lucide-react';
+import { AppSettings, Subscription } from '../types';
 import { getT } from '../services/i18n';
-import { CategoryGlyph } from './ui/glyphs';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { daysUntilYMD, formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
 import { addBillingCycleYMD } from '../shared/billingDate.js';
 import { formatCurrency } from '../services/currency';
 import DashboardAnalytics from './DashboardAnalytics';
-
-// --- Types ---
+import RenewalRail, { RenewalRailEvent } from './RenewalRail';
 
 interface Props {
   subscriptions: Subscription[];
@@ -32,9 +37,8 @@ interface DashboardStats {
   cancelledCount: number;
   recentPayments: BillingEvent[];
   upcomingRenewals: BillingEvent[];
+  monthlyEvents: RenewalRailEvent[];
 }
-
-// --- Utils (Pure Functions) ---
 
 const convertToUSD = (amount: number, currency: string, rates: Record<string, number> | undefined): number => {
   if (!Number.isFinite(amount) || amount < 0) return 0;
@@ -44,138 +48,20 @@ const convertToUSD = (amount: number, currency: string, rates: Record<string, nu
   return amount / rate;
 };
 
-const getDaysRemaining = (date: Date, timeZone: string): number =>
-  daysUntilYMD(formatLocalYMD(date), timeZone);
-
-// --- Sub-Components (UI) ---
-
-const StatCard: React.FC<{
-  title: string;
-  primaryValue: number;
-  secondaryValue?: number;
-  icon: LucideIcon;
-  iconColorClass: string;
-  progressColorClass: string;
-  isCount?: boolean;
-}> = ({ title, primaryValue, secondaryValue, icon: Icon, iconColorClass, progressColorClass, isCount }) => {
-  const total = primaryValue + (secondaryValue || 0);
-  // Prevent division by zero
-  const percentage = total > 0 ? (primaryValue / total) * 100 : 0;
-
-  return (
-    <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group [container-type:inline-size]">
-      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <Icon size={80} className={iconColorClass} />
-      </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400 font-medium z-10 truncate">{title}</p>
-
-      <div className="flex flex-nowrap items-baseline gap-x-2 mt-2 z-10 min-w-0 whitespace-nowrap">
-        <h3 className="shrink-0 text-[clamp(1.125rem,8cqw,1.875rem)] leading-none font-bold text-gray-900 dark:text-white tabular-nums">
-          {isCount ? primaryValue : formatCurrency(primaryValue, 'USD')}
-        </h3>
-        {secondaryValue !== undefined && (
-          <div className="flex shrink-0 items-baseline gap-2 text-[clamp(0.75rem,5cqw,1.25rem)] leading-none font-semibold text-gray-400 tabular-nums">
-            <span>{isCount ? '|' : '/'}</span>
-            <span>
-              {isCount ? secondaryValue : formatCurrency(secondaryValue, 'USD')}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 w-full bg-gray-100 dark:bg-slate-700 h-1.5 rounded-full z-10 overflow-hidden">
-        {secondaryValue !== undefined ? (
-          <div
-            className={`h-full ${progressColorClass} rounded-full`}
-            style={{ width: `${percentage}%` }}
-          />
-        ) : (
-          <div className="h-full opacity-0" />
-        )}
-      </div>
-    </div>
-  );
-};
-
-const PaymentRow: React.FC<{
-  item: BillingEvent;
-  lang: 'en' | 'zh';
-  timeZone: string;
-  showDaysRemaining?: boolean;
-}> = ({ item, lang, timeZone, showDaysRemaining }) => {
-  const t = getT(lang);
-  const days = showDaysRemaining ? getDaysRemaining(item.date, timeZone) : 0;
-
-  return (
-    <tr className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-        <div className="flex items-center gap-2 min-w-0">
-          {item.sub.iconUrl ? (
-            <img
-              src={item.sub.iconUrl}
-              alt={item.sub.name}
-              className="w-5 h-5 object-contain flex-shrink-0"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span className="w-5 h-5 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {String(item.sub.name || 'S').charAt(0).toUpperCase()}
-            </span>
-          )}
-          <span className="truncate max-w-[120px]">{item.sub.name}</span>
-        </div>
-      </td>
-      <td className="px-5 py-3 text-gray-500 dark:text-gray-400">
-        <div className="flex items-center gap-2">
-          <CategoryGlyph category={item.sub.category} containerSize={18} size={12} />
-          <span className="truncate max-w-[100px]">{displayCategoryLabel(item.sub.category, lang)}</span>
-        </div>
-      </td>
-      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-        {formatCurrency(item.cost, item.sub.currency)}
-      </td>
-      <td className="px-5 py-3 text-right text-gray-500 dark:text-gray-400">
-        {showDaysRemaining ? (
-          days <= 3 ? (
-            <span className="px-2 py-0.5 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold rounded-full">
-              {days} {t('days_left')}
-            </span>
-          ) : (
-            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 text-xs font-bold rounded-full">
-              {days} {t('days_left')}
-            </span>
-          )
-        ) : (
-          formatLocalYMD(item.date)
-        )}
-      </td>
-    </tr>
-  );
-};
-
-// --- Custom Hook (Logic Extraction) ---
-
 const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings): DashboardStats => {
   return useMemo(() => {
-    // 1. Initialize Dates
     const today = parseLocalYMD(getTodayYMD(settings.timezone));
-
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
-
     const monthStart = new Date(currentYear, currentMonth, 1);
     const monthEnd = new Date(currentYear, currentMonth + 1, 0);
     const yearStart = new Date(currentYear, 0, 1);
     const yearEnd = new Date(currentYear, 11, 31);
-
-    // Recent & Upcoming windows
     const last7DaysStart = new Date(today);
     last7DaysStart.setDate(today.getDate() - 7);
     const next7DaysEnd = new Date(today);
     next7DaysEnd.setDate(today.getDate() + 7);
 
-    // 2. Initialize Accumulator
     const stats: DashboardStats = {
       monthlyPaid: 0,
       monthlyPending: 0,
@@ -184,88 +70,71 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
       activeCount: 0,
       cancelledCount: 0,
       recentPayments: [],
-      upcomingRenewals: []
+      upcomingRenewals: [],
+      monthlyEvents: [],
     };
 
-    const MAX_ITERATIONS = 5000; // Security: DoS Protection
+    const MAX_ITERATIONS = 5000;
 
-    // 3. Single Pass Loop over Subscriptions
     for (const sub of subscriptions) {
       const isCancelled = sub.status === 'cancelled';
-
-      // Status Counts
-      if (isCancelled) stats.cancelledCount++;
-      else stats.activeCount++;
-
+      if (isCancelled) stats.cancelledCount += 1;
+      else stats.activeCount += 1;
       if (!sub.startDate) continue;
 
       const usdCost = convertToUSD(sub.price, sub.currency, settings.exchangeRates);
       const persistedNextBilling = parseLocalYMD(sub.nextBillingDate);
       const hasPersistedNextBilling = Number.isFinite(persistedNextBilling.getTime());
+      const loopEnd = new Date(Math.max(yearEnd.getTime(), next7DaysEnd.getTime()));
+      let actualEnd = loopEnd;
 
-      // Determine Iteration Range
-      // We iterate from startDate until we cover all relevant future ranges (upto year end or next 7 days)
-      const loopEndData = new Date(Math.max(yearEnd.getTime(), next7DaysEnd.getTime()));
-
-      // If cancelled, stop at cancellation date
-      let actualEnd = loopEndData;
       if (isCancelled && sub.cancelledAt) {
-        const cDate = parseLocalYMD(sub.cancelledAt);
-        if (!isNaN(cDate.getTime()) && cDate < loopEndData) {
-          actualEnd = cDate;
-        }
+        const cancelledDate = parseLocalYMD(sub.cancelledAt);
+        if (!Number.isNaN(cancelledDate.getTime()) && cancelledDate < loopEnd) actualEnd = cancelledDate;
       }
 
       let currentDate = parseLocalYMD(sub.startDate);
-      if (isNaN(currentDate.getTime())) continue;
-
+      if (Number.isNaN(currentDate.getTime())) continue;
       let iterations = 0;
 
-      // 4. Date Iteration (Bucket Strategy)
       while (currentDate <= actualEnd) {
-        iterations++;
-        // Safety Break
+        iterations += 1;
         if (iterations > MAX_ITERATIONS) {
           console.warn(`[Dashboard] Max iterations exceeded for sub: ${sub.name}`);
           break;
         }
 
-        const dateObj = new Date(currentDate); // Copy for storage
+        const date = new Date(currentDate);
         const isSupersededFutureCycle =
           !isCancelled &&
           currentDate > today &&
           hasPersistedNextBilling &&
           currentDate < persistedNextBilling;
 
-        // A. Monthly
         if (currentDate >= monthStart && currentDate <= monthEnd) {
-          if (currentDate <= today) stats.monthlyPaid += usdCost;
-          else if (!isCancelled && !isSupersededFutureCycle) stats.monthlyPending += usdCost;
+          if (currentDate <= today) {
+            stats.monthlyPaid += usdCost;
+            stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'paid' });
+          } else if (!isCancelled && !isSupersededFutureCycle) {
+            stats.monthlyPending += usdCost;
+            stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'pending' });
+          }
         }
 
-        // B. Yearly
         if (currentDate >= yearStart && currentDate <= yearEnd) {
           if (currentDate <= today) stats.yearlyPaid += usdCost;
           else if (!isCancelled && !isSupersededFutureCycle) stats.yearlyPending += usdCost;
         }
 
-        // C. Recent Payments (Last 7 Days)
         if (currentDate >= last7DaysStart && currentDate <= today) {
-          stats.recentPayments.push({ sub, date: dateObj, cost: sub.price });
+          stats.recentPayments.push({ sub, date, cost: sub.price });
         }
 
-        const nextYmd = addBillingCycleYMD(
-          formatLocalYMD(currentDate),
-          sub.frequency,
-          sub.startDate
-        );
+        const nextYmd = addBillingCycleYMD(formatLocalYMD(currentDate), sub.frequency, sub.startDate);
         if (!nextYmd) break;
         currentDate = parseLocalYMD(nextYmd);
       }
 
-      // The persisted date is the authoritative next unpaid cycle. It may have
-      // been advanced early by the Telegram renewal flow, so do not reconstruct
-      // this list from startDate.
       if (
         !isCancelled &&
         hasPersistedNextBilling &&
@@ -276,117 +145,136 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
       }
     }
 
-    // 5. Final Sorts
     stats.recentPayments.sort((a, b) => b.date.getTime() - a.date.getTime());
     stats.upcomingRenewals.sort((a, b) => a.date.getTime() - b.date.getTime());
-
+    stats.monthlyEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
     return stats;
   }, [subscriptions, settings.exchangeRates, settings.timezone]);
 };
 
-// --- Main Layout ---
+const ServiceAvatar = ({ sub }: { sub: Subscription }) => (
+  <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--surface-raised)] text-sm font-semibold text-[var(--rail-teal)]">
+    {sub.iconUrl ? (
+      <img src={sub.iconUrl} alt="" className="h-full w-full object-contain" loading="lazy" referrerPolicy="no-referrer" />
+    ) : (
+      sub.name.charAt(0).toUpperCase()
+    )}
+  </div>
+);
+
+const PaymentList: React.FC<{
+  title: string;
+  emptyText: string;
+  events: BillingEvent[];
+  lang: 'en' | 'zh';
+  timeZone: string;
+  upcoming?: boolean;
+}> = ({ title, emptyText, events, lang, timeZone, upcoming }) => {
+  const t = getT(lang);
+
+  return (
+    <section className="statement-card overflow-hidden">
+      <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--line)' }}>
+        <div className="flex items-center gap-2.5">
+          {upcoming ? <Clock3 size={17} className="text-[var(--due-amber)]" /> : <CheckCircle2 size={17} className="text-[var(--rail-teal)]" />}
+          <h3 className="font-display text-base font-semibold tracking-[-0.02em] text-[var(--ink)]">{title}</h3>
+        </div>
+        <span className="font-data text-xs text-[var(--muted)]">{String(events.length).padStart(2, '0')}</span>
+      </div>
+
+      {events.length > 0 ? (
+        <div className="divide-y divide-[var(--line)]">
+          {events.map((item, index) => {
+            const days = daysUntilYMD(formatLocalYMD(item.date), timeZone);
+            return (
+              <div key={`${item.sub.id}-${formatLocalYMD(item.date)}-${index}`} className="statement-row flex items-center gap-3 px-5 py-3.5">
+                <ServiceAvatar sub={item.sub} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-[var(--ink)]">{item.sub.name}</div>
+                  <div className="mt-0.5 truncate text-xs text-[var(--muted)]">{displayCategoryLabel(item.sub.category, lang)}</div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="font-data text-sm font-medium text-[var(--ink)]">{formatCurrency(item.cost, item.sub.currency)}</div>
+                  <div className={`mt-0.5 text-[11px] ${upcoming && days <= 3 ? 'text-[var(--alert-coral)]' : 'text-[var(--muted)]'}`}>
+                    {upcoming
+                      ? days === 0
+                        ? t('today')
+                        : `${days} ${t('days_left')}`
+                      : formatLocalYMD(item.date)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="px-5 py-12 text-center text-sm text-[var(--muted)]">{emptyText}</div>
+      )}
+    </section>
+  );
+};
 
 const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
   const t = getT(lang);
   const data = useDashboardStats(subscriptions, settings);
+  const today = parseLocalYMD(getTodayYMD(settings.timezone));
+  const monthLabel = new Intl.DateTimeFormat(lang === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+  }).format(today);
+
+  const metrics = [
+    { label: t('paid'), value: formatCurrency(data.monthlyPaid, 'USD'), icon: CircleDollarSign },
+    { label: t('pending'), value: formatCurrency(data.monthlyPending, 'USD'), icon: CalendarCheck2 },
+    { label: t('yearly_paid_pending'), value: formatCurrency(data.yearlyPaid + data.yearlyPending, 'USD'), icon: TrendingUp },
+    { label: t('active_cancelled_title'), value: `${data.activeCount} / ${data.cancelledCount}`, icon: Activity },
+  ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard
-          title={t('monthly_paid_pending')}
-          primaryValue={data.monthlyPaid}
-          secondaryValue={data.monthlyPending}
-          icon={DollarSign}
-          iconColorClass="text-primary-500"
-          progressColorClass="bg-primary-500"
-        />
-        <StatCard
-          title={t('yearly_paid_pending')}
-          primaryValue={data.yearlyPaid}
-          secondaryValue={data.yearlyPending}
-          icon={TrendingUp}
-          iconColorClass="text-blue-500"
-          progressColorClass="bg-blue-500"
-        />
-        <StatCard
-          title={t('active_cancelled_title')}
-          primaryValue={data.activeCount}
-          secondaryValue={data.cancelledCount}
-          icon={Activity}
-          iconColorClass="text-green-500"
-          progressColorClass="bg-green-500"
-          isCount
-        />
-      </div>
-
-      {/* Tables Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Recent Payments */}
-        <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
-          <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-700/30">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="text-green-500" size={18} />
-              <h3 className="font-bold text-gray-800 dark:text-white">{t('recent_payments')}</h3>
-            </div>
-          </div>
-          <div className="overflow-y-auto flex-1" style={{ maxHeight: 240 }}>
-            {data.recentPayments.length > 0 ? (
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-slate-700/50">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">{t('service')}</th>
-                    <th className="px-5 py-3 font-medium">{t('category')}</th>
-                    <th className="px-5 py-3 font-medium">{t('cost')}</th>
-                    <th className="px-5 py-3 font-medium text-right">{t('payment_date')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {data.recentPayments.map((item, idx) => (
-                    <PaymentRow key={`${item.sub.id}-${idx}`} item={item} lang={lang} timeZone={settings.timezone} />
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-8 text-center text-gray-400 text-sm">{t('no_recent_payments')}</div>
-            )}
-          </div>
+    <div className="animate-fade-in space-y-6 pb-8">
+      <header className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="eyebrow mb-3">{t('schedule_overview')}</div>
+          <h1 className="page-title">{monthLabel}</h1>
         </div>
+        <p className="page-copy max-w-md text-sm sm:text-right">{t('overview_text')}</p>
+      </header>
 
-        {/* Upcoming Renewals */}
-        <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
-          <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-slate-700/30">
-            <div className="flex items-center gap-2">
-              <Clock className="text-orange-500" size={18} />
-              <h3 className="font-bold text-gray-800 dark:text-white">{t('upcoming_renewals')}</h3>
+      <RenewalRail
+        events={data.monthlyEvents}
+        monthlyTotal={data.monthlyPaid + data.monthlyPending}
+        lang={lang}
+        timeZone={settings.timezone}
+      />
+
+      <section className="statement-card grid grid-cols-2 overflow-hidden md:grid-cols-4" aria-label={t('monthly_statement')}>
+        {metrics.map(({ label, value, icon: Icon }) => (
+          <div key={label} className="metric-cell p-4 sm:p-5">
+            <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+              <Icon size={15} aria-hidden="true" />
+              <span className="truncate">{label}</span>
             </div>
+            <div className="data-value mt-3 truncate text-lg font-medium sm:text-xl">{value}</div>
           </div>
-          <div className="overflow-y-auto flex-1" style={{ maxHeight: 240 }}>
-            {data.upcomingRenewals.length > 0 ? (
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-slate-700/50">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">{t('service')}</th>
-                    <th className="px-5 py-3 font-medium">{t('category')}</th>
-                    <th className="px-5 py-3 font-medium">{t('cost')}</th>
-                    <th className="px-5 py-3 font-medium text-right">{t('days_remaining')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {data.upcomingRenewals.map((item, idx) => (
-                    <PaymentRow key={`${item.sub.id}-${idx}`} item={item} lang={lang} timeZone={settings.timezone} showDaysRemaining />
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-8 text-center text-gray-400 text-sm">{t('no_upcoming_renewals')}</div>
-            )}
-          </div>
-        </div>
+        ))}
+      </section>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <PaymentList
+          title={t('recent_payments')}
+          emptyText={t('no_recent_payments')}
+          events={data.recentPayments}
+          lang={lang}
+          timeZone={settings.timezone}
+        />
+        <PaymentList
+          title={t('attention_queue')}
+          emptyText={t('no_upcoming_renewals')}
+          events={data.upcomingRenewals}
+          lang={lang}
+          timeZone={settings.timezone}
+          upcoming
+        />
       </div>
 
       <DashboardAnalytics subscriptions={subscriptions} settings={settings} lang={lang} />

@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 import { AppSettings, Subscription } from '../types';
 import { formatCurrency } from '../services/currency';
 import { formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
@@ -69,7 +70,7 @@ const DistributionLabel = ({
     <text
       x={centerX}
       y={labelY}
-      fill="#6b7280"
+      fill="var(--muted)"
       fontSize={11}
       fontWeight={600}
       textAnchor="middle"
@@ -151,48 +152,54 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
   }, [lang, settings.exchangeRates, settings.timezone, subscriptions]);
 
   return (
-    <div className="animate-fade-in pb-10">
-      <div className="mac-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-[460px] flex flex-col">
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+    <div className="animate-fade-in pb-4">
+      <section className="statement-card flex h-[430px] flex-col overflow-hidden">
+        <div className="flex items-end justify-between border-b px-5 py-4 sm:px-6" style={{ borderColor: 'var(--line)' }}>
+          <div>
+            <div className="eyebrow mb-2 flex items-center gap-2">
+              <BarChart3 size={14} aria-hidden="true" />
+              {t('monthly_statement')}
+            </div>
+            <h3 className="font-display text-lg font-semibold tracking-[-0.025em] text-[var(--ink)]">
             {t('payment_distribution')}
-          </h3>
-          <p className="text-xs text-gray-400 mt-1">{monthLabel}</p>
+            </h3>
+          </div>
+          <p className="font-data text-xs text-[var(--muted)]">{monthLabel}</p>
         </div>
 
-        <div className="flex-1 w-full min-h-0 overflow-x-auto">
+        <div className="min-h-0 w-full flex-1 overflow-x-auto px-2 pb-3 pt-1 sm:px-4">
           <div className="h-full" style={{ minWidth: distributionChartMinWidth }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={distributionData}
-                margin={{ top: 90, right: 24, left: 8, bottom: 4 }}
+                margin={{ top: 72, right: 24, left: 8, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="2 5" vertical={false} stroke="var(--line)" />
                 <XAxis
                   dataKey="day"
                   axisLine={false}
                   tickLine={false}
                   interval={0}
-                  tick={{ fontSize: 11, fill: '#9ca3af' }}
+                  tick={{ fontSize: 11, fill: 'var(--muted)', fontFamily: 'IBM Plex Mono' }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 10, fill: '#9ca3af' }}
+                  tick={{ fontSize: 10, fill: 'var(--muted)', fontFamily: 'IBM Plex Mono' }}
                   tickFormatter={(value) => formatCurrency(value as number, 'USD', {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
                   })}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
+                  cursor={{ fill: 'color-mix(in srgb, var(--rail-teal) 8%, transparent)' }}
                   content={({ label, payload }) => {
                     if (!payload?.length) return null;
                     const point = payload[0]?.payload as DistributionPoint | undefined;
                     if (!point || point.count === 0) return null;
                     return (
-                      <div className="chart-tooltip p-3 rounded-xl text-sm text-gray-700 dark:text-gray-200 space-y-1">
-                        <div className="font-semibold text-gray-900 dark:text-gray-100">
+                      <div className="chart-tooltip space-y-1 rounded-xl p-3 text-sm">
+                        <div className="font-semibold text-[var(--ink)]">
                           {lang === 'zh' ? `${label}日` : `Day ${label}`}
                         </div>
                         <div>{`${t('sub_count')}: ${point.count}`}</div>
@@ -203,9 +210,9 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
                 />
                 <Bar
                   dataKey="amount"
-                  fill="#10b981"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={22}
+                  fill="var(--rail-teal)"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={20}
                 >
                   <LabelList dataKey="amount" content={<DistributionLabel />} />
                 </Bar>
@@ -213,7 +220,7 @@ const DashboardAnalytics: React.FC<Props> = ({ subscriptions, lang, settings }) 
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
+import { ArrowRight, Globe, Lock, Repeat2, ShieldCheck, User } from 'lucide-react';
 import { getT } from '../services/i18n';
-import { Lock, User, Globe, ArrowRight } from 'lucide-react';
 
 interface Props {
   onLogin: () => void;
@@ -15,143 +14,173 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
   const t = getT(lang);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-        const resp = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ username, password, code })
-        });
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password, code }),
+      });
 
-        if (resp.status === 403) {
-            setError('需要输入双重验证码');
-            return;
-        }
+      if (response.status === 403) {
+        setError(lang === 'zh' ? '请输入双重验证码后重试。' : 'Enter your two-factor code and try again.');
+        return;
+      }
 
-        if (!resp.ok) {
-            setError(t('invalid_credentials'));
-            return;
-        }
+      if (!response.ok) {
+        setError(t('invalid_credentials'));
+        return;
+      }
 
-        await resp.json().catch(() => ({}));
-        onLogin();
-    } catch (err) {
-        console.error('Login error:', err);
-        setError(t('connection_failed') || 'Network error');
+      await response.json().catch(() => ({}));
+      onLogin();
+    } catch (loginError) {
+      console.error('Login error:', loginError);
+      setError(t('connection_failed') || 'Network error');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col justify-center items-center p-6 relative overflow-hidden">
-      
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 rounded-full blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[100px]"></div>
-      </div>
-
-      {/* Language Toggle */}
-      <div className="absolute top-6 right-6 z-20">
-         <button 
-            onClick={toggleLanguage}
-            className="flex items-center gap-2 px-4 py-2 mac-surface rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-600 dark:text-gray-300"
-         >
-             <Globe size={16} />
-             <span>{lang === 'en' ? 'English' : '中文'}</span>
-         </button>
-      </div>
-
-      <div className="w-full max-w-md mac-surface rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden relative z-10 animate-pop-in">
-        
-        {/* Header */}
-        <div className="mac-surface-soft p-8 pb-6 text-center">
-            <div className="w-16 h-16 bg-primary-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                <span className="text-3xl font-bold text-white">S</span>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('login_title')}</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">{t('login_subtitle')}</p>
+    <main className="login-shell min-h-screen p-3 sm:p-4 lg:grid lg:grid-cols-[1.08fr_0.92fr] lg:gap-4">
+      <section className="login-story hidden min-h-[calc(100vh-2rem)] flex-col justify-between rounded-[26px] p-10 lg:flex xl:p-14" aria-label="Subm overview">
+        <div className="relative z-10 flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/20 bg-white/10"><Repeat2 size={20} /></span>
+          <span className="font-display text-xl font-semibold tracking-[-0.04em]">Subm</span>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-8 pt-0 space-y-5">
-            
+        <div className="relative z-10 max-w-2xl py-12">
+          <div className="mb-4 font-mono text-xs uppercase tracking-[0.16em] text-[#84cbc4]">
+            {lang === 'zh' ? '周期支出 · 清晰可见' : 'Recurring costs · clearly scheduled'}
+          </div>
+          <h1 className="font-display text-5xl font-semibold leading-[0.98] tracking-[-0.06em] xl:text-7xl">
+            {lang === 'zh' ? '在扣费之前，先看见它。' : 'See every charge before it arrives.'}
+          </h1>
+          <p className="mt-6 max-w-lg text-base leading-7 text-white/66">
+            {lang === 'zh'
+              ? '把订阅放回时间轴：今天在哪里、下一笔何时发生、本月还需要多少，一眼就能确认。'
+              : 'Place every subscription back on a timeline—where today sits, what comes next, and what the month still needs.'}
+          </p>
+
+          <div className="login-mini-rail mt-12 max-w-xl" aria-hidden="true">
+            <i className="login-mini-stop left-[8%]"><span>05 · Music</span></i>
+            <i className="login-mini-stop left-[38%]"><span>14 · Cloud</span></i>
+            <i className="login-mini-stop left-[70%]"><span>23 · AI</span></i>
+            <i className="login-mini-stop left-[94%]"><span>30 · Video</span></i>
+          </div>
+        </div>
+
+        <div className="relative z-10 flex items-center gap-2 text-sm text-white/58">
+          <ShieldCheck size={17} />
+          <span>{lang === 'zh' ? '自托管数据，仅由你掌控' : 'Self-hosted data, controlled by you'}</span>
+        </div>
+      </section>
+
+      <section className="relative flex min-h-[calc(100vh-1.5rem)] items-center justify-center px-3 py-16 sm:px-8 lg:min-h-0 lg:px-12">
+        <button
+          type="button"
+          onClick={toggleLanguage}
+          className="icon-control absolute right-2 top-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium sm:right-4 sm:top-4"
+        >
+          <Globe size={16} />
+          <span>{lang === 'en' ? 'English' : '中文'}</span>
+        </button>
+
+        <div className="w-full max-w-[430px]">
+          <div className="mb-10 lg:hidden">
+            <div className="flex items-center gap-2.5">
+              <span className="brand-mark"><Repeat2 size={19} /></span>
+              <span className="brand-wordmark">Subm</span>
+            </div>
+          </div>
+
+          <div className="eyebrow mb-3">{t('welcome_back')}</div>
+          <h2 className="font-display text-4xl font-semibold tracking-[-0.055em] text-[var(--ink)] sm:text-5xl">{t('login_title')}</h2>
+          <p className="page-copy mt-3 text-sm">{t('login_subtitle')}</p>
+
+          <form onSubmit={handleSubmit} className="mt-9 space-y-5">
             {error && (
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-center gap-2 animate-pulse">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                    {error}
-                </div>
+              <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--alert-coral)] bg-[var(--alert-coral-soft)] px-4 py-3 text-sm text-[var(--alert-coral)]">
+                <span className="status-dot mt-1.5 shrink-0" />
+                <span>{error}</span>
+              </div>
             )}
 
-            <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">{t('username')}</label>
-                <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                        type="text" 
-                        value={username}
-                        onChange={e => setUsername(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
-                    />
-                </div>
-            </div>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold text-[var(--ink-soft)]">{t('username')}</span>
+              <span className="relative block">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={18} />
+                <input
+                  type="text"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  className="w-full rounded-xl border py-3 pl-11 pr-4 outline-none transition"
+                  required
+                />
+              </span>
+            </label>
 
-            <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">{t('password')}</label>
-                <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                        type="password" 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
-                    />
-                </div>
-            </div>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold text-[var(--ink-soft)]">{t('password')}</span>
+              <span className="relative block">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={18} />
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full rounded-xl border py-3 pl-11 pr-4 outline-none transition"
+                  required
+                />
+              </span>
+            </label>
 
-            <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">2FA</label>
-                <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                        type="text" 
-                        value={code}
-                        onChange={e => setCode(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white transition-all"
-                        placeholder="6-digit code (2FA, 如已启用)"
-                    />
-                </div>
-            </div>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold text-[var(--ink-soft)]">2FA</span>
+              <span className="relative block">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={18} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  className="w-full rounded-xl border py-3 pl-11 pr-4 font-mono tracking-[0.18em] outline-none transition"
+                  placeholder={lang === 'zh' ? '已启用时输入 6 位验证码' : '6-digit code, when enabled'}
+                />
+              </span>
+            </label>
 
-            <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4"
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="primary-action flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
             >
-                {isLoading ? (
-                    <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>{t('logging_in')}</span>
-                    </>
-                ) : (
-                    <>
-                        <span>{t('login_button')}</span>
-                        <ArrowRight size={20} />
-                    </>
-                )}
+              {isLoading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white" />
+                  <span>{t('logging_in')}</span>
+                </>
+              ) : (
+                <>
+                  <span>{t('login_button')}</span>
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
-        </form>
-      </div>
-    </div>
+          </form>
+        </div>
+      </section>
+    </main>
   );
 };
 

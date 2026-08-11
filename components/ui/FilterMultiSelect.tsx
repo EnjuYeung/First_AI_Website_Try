@@ -53,14 +53,14 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
                 aria-controls={listboxId}
-                className={`flex items-center justify-between gap-2 px-3 py-2 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors ${selectedValues.length > 0 ? 'text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                className={`flex items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm transition-colors hover:border-[var(--line-strong)] ${selectedValues.length > 0 ? 'font-medium text-[var(--rail-teal)]' : 'text-[var(--ink-soft)]'}`}
             >
                 <span>{label} {selectedValues.length > 0 && `(${selectedValues.length})`}</span>
                 <ChevronDown size={14} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
-                <div id={listboxId} role="listbox" aria-multiselectable="true" aria-label={label} className="absolute z-50 mt-2 w-56 mac-surface rounded-xl shadow-lg border border-gray-100 dark:border-gray-600 overflow-hidden animate-fade-in">
+                <div id={listboxId} role="listbox" aria-multiselectable="true" aria-label={label} className="dialog-panel absolute z-50 mt-2 w-56 overflow-hidden rounded-xl animate-fade-in">
                     <div className="p-2 max-h-60 overflow-y-auto space-y-1">
                         {options.map((opt) => (
                             <button
@@ -69,10 +69,10 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
                                 aria-selected={selectedValues.includes(opt.value)}
                                 key={opt.value}
                                 onClick={() => toggleOption(opt.value)}
-                                className="flex w-full items-center gap-2 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg cursor-pointer text-left text-sm text-gray-700 dark:text-gray-200"
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[var(--ink-soft)] hover:bg-[var(--surface-soft)]"
                             >
                                 {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
-                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedValues.includes(opt.value) ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 dark:border-gray-500'}`}>
+                                <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${selectedValues.includes(opt.value) ? 'border-[var(--rail-teal)] bg-[var(--rail-teal)] text-white' : 'border-[var(--line-strong)]'}`}>
                                     {selectedValues.includes(opt.value) && <Check size={10} strokeWidth={3} />}
                                 </div>
                                 <span className="truncate">{opt.label}</span>
@@ -80,10 +80,10 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
                         ))}
                     </div>
                     {selectedValues.length > 0 && (
-                        <div className="border-t border-gray-100 dark:border-gray-700 p-2">
+                        <div className="border-t border-[var(--line)] p-2">
                             <button
                                 onClick={() => { onChange([]); setIsOpen(false); }}
-                                className="w-full py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                                className="w-full rounded-lg bg-[var(--surface-soft)] py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
                             >
                                 {resetText}
                             </button>

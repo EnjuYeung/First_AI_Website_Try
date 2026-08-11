@@ -186,7 +186,7 @@ const SubscriptionList: React.FC<Props> = ({
       return (
         <div className="flex items-center">
           <span>{dateStr}</span>
-          <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full whitespace-nowrap shadow-sm">
+          <span className="ml-2 whitespace-nowrap rounded-md bg-[var(--alert-coral-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--alert-coral)]">
             {days < 0 ? t('overdue') : days === 0 ? t('today') : `${days} ${t('days_left')}`}
           </span>
         </div>
@@ -195,7 +195,7 @@ const SubscriptionList: React.FC<Props> = ({
       return (
         <div className="flex items-center">
           <span>{dateStr}</span>
-          <span className="ml-2 px-2 py-0.5 bg-yellow-400 text-gray-900 text-[10px] font-bold rounded-full whitespace-nowrap shadow-sm">
+          <span className="ml-2 whitespace-nowrap rounded-md bg-[var(--due-amber-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--due-amber)]">
             {days} {t('days_left')}
           </span>
         </div>
@@ -208,8 +208,15 @@ const SubscriptionList: React.FC<Props> = ({
 
   if (subscriptions.length === 0 && !searchTerm && selectedCategories.length === 0) {
     return (
-      <div className="mac-surface rounded-2xl p-10 text-center border border-dashed border-gray-300 dark:border-gray-600">
-        <p className="text-gray-500 dark:text-gray-400">{t('manage_text')}</p>
+      <div className="animate-fade-in space-y-6">
+        <header>
+          <div className="eyebrow mb-3">{t('subscriptions_library')}</div>
+          <h1 className="page-title">{t('subscriptions')}</h1>
+          <p className="page-copy mt-3 text-sm">{t('manage_text')}</p>
+        </header>
+        <div className="statement-card border-dashed p-12 text-center">
+          <p className="text-sm text-[var(--muted)]">{t('manage_text')}</p>
+        </div>
       </div>
     );
   }
@@ -223,7 +230,17 @@ const SubscriptionList: React.FC<Props> = ({
     selectedStatuses.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="animate-fade-in space-y-5">
+      <header className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="eyebrow mb-3">{t('subscriptions_library')}</div>
+          <h1 className="page-title">{t('subscriptions')}</h1>
+          <p className="page-copy mt-3 text-sm">{t('manage_text')}</p>
+        </div>
+        <div className="font-data text-sm text-[var(--muted)]">
+          {String(filteredSubscriptions.length).padStart(2, '0')} / {String(subscriptions.length).padStart(2, '0')}
+        </div>
+      </header>
       <SubscriptionToolbar
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}

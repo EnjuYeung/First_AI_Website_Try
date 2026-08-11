@@ -14,9 +14,9 @@ interface MobileNavProps {
 
 export const MobileNav: React.FC<MobileNavProps> = ({ navTabs, activeTab, setActiveTab }) => {
     return (
-        <nav className="fixed bottom-0 inset-x-0 z-30 md:hidden">
-            <div className="px-4 pb-[env(safe-area-inset-bottom)]">
-                <div className="mac-surface border border-white/40 dark:border-white/10 rounded-2xl shadow-mac-sm backdrop-blur-xl">
+        <nav className="fixed inset-x-0 bottom-0 z-30 md:hidden" aria-label="Mobile navigation">
+            <div className="border-t bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl" style={{ borderColor: 'var(--line)' }}>
+                <div className="mx-auto max-w-lg">
                     <div className="grid grid-cols-4">
                         {navTabs.map(tab => {
                             const isActive = activeTab === tab.id;
@@ -24,11 +24,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navTabs, activeTab, setAct
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${isActive
-                                            ? 'text-primary-600 dark:text-primary-400'
-                                            : 'text-gray-500 dark:text-gray-400'
-                                        }`}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className={`relative flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-medium transition-colors ${isActive ? 'text-[var(--rail-teal)]' : 'text-[var(--muted)]'}`}
                                 >
+                                    {isActive && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-[var(--rail-teal)]" />}
                                     <tab.icon size={18} />
                                     <span className="leading-none">{tab.label}</span>
                                 </button>

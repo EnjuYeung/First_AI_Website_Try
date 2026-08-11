@@ -1,142 +1,105 @@
 import React from 'react';
-import { Subscription, Frequency } from '../../types';
-import { Edit2, Copy, Trash2 } from 'lucide-react';
+import { Copy, Edit2, Trash2 } from 'lucide-react';
+import { Frequency, Subscription } from '../../types';
 import { CategoryGlyph, PaymentGlyph } from '../ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../../services/displayLabels';
 import { formatCurrency } from '../../services/currency';
 
 interface SubscriptionGridViewProps {
-    subscriptions: Subscription[];
-    selectedIds: Set<string>;
-    onSelectOne: (id: string) => void;
-
-    onEdit: (sub: Subscription) => void;
-    onDuplicate: (sub: Subscription) => void;
-    onDelete: (id: string) => void;
-
-    renderDateBadge: (dateStr: string, sub: Subscription) => React.ReactNode;
-
-    lang: 'en' | 'zh';
-    t: (key: any) => string;
+  subscriptions: Subscription[];
+  selectedIds: Set<string>;
+  onSelectOne: (id: string) => void;
+  onEdit: (sub: Subscription) => void;
+  onDuplicate: (sub: Subscription) => void;
+  onDelete: (id: string) => void;
+  renderDateBadge: (dateStr: string, sub: Subscription) => React.ReactNode;
+  lang: 'en' | 'zh';
+  t: (key: any) => string;
 }
 
 export const SubscriptionGridView: React.FC<SubscriptionGridViewProps> = ({
-    subscriptions,
-    selectedIds,
-    onSelectOne,
-    onEdit,
-    onDuplicate,
-    onDelete,
-    renderDateBadge,
-    lang,
-    t
+  subscriptions,
+  selectedIds,
+  onSelectOne,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  renderDateBadge,
+  lang,
+  t,
 }) => {
-    if (subscriptions.length === 0) {
-        return (
-            <div className="col-span-full py-12 text-center text-gray-500 dark:text-gray-400 mac-surface rounded-2xl border border-dashed border-gray-200">
-                {t('no_subscriptions')}
-            </div>
-        );
+  if (subscriptions.length === 0) {
+    return <div className="statement-card border-dashed py-12 text-center text-[var(--muted)]">{t('no_subscriptions')}</div>;
+  }
+
+  const frequencySuffix = (frequency: Frequency) => {
+    if (lang === 'zh') {
+      if (frequency === Frequency.MONTHLY) return '月';
+      if (frequency === Frequency.YEARLY) return '年';
+      return '周期';
     }
+    if (frequency === Frequency.MONTHLY) return 'mo';
+    if (frequency === Frequency.YEARLY) return 'yr';
+    return 'cycle';
+  };
 
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {subscriptions.map(sub => (
-                <div
-                    key={sub.id}
-                    className={`mac-surface rounded-2xl p-5 shadow-sm border transition-all relative group ${selectedIds.has(sub.id)
-                            ? 'border-primary-500 ring-1 ring-primary-500'
-                            : 'border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-primary-200 dark:hover:border-gray-600'
-                        }`}
-                >
-                    {/* Checkbox (Absolute) */}
-                    <div className="absolute top-4 left-4 z-10">
-                        <input
-                            type="checkbox"
-                            className="w-5 h-5 text-primary-600 rounded border-gray-300 focus:ring-primary-500 dark:bg-slate-800 dark:border-gray-600 cursor-pointer"
-                            checked={selectedIds.has(sub.id)}
-                            onChange={() => onSelectOne(sub.id)}
-                        />
-                    </div>
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {subscriptions.map((sub) => (
+        <article
+          key={sub.id}
+          className={`subscription-card group relative overflow-hidden p-5 ${selectedIds.has(sub.id) ? 'ring-2 ring-[var(--rail-teal)] ring-offset-2 ring-offset-[var(--canvas)]' : ''}`}
+          style={{ borderTopColor: sub.status === 'cancelled' ? 'var(--alert-coral)' : 'var(--rail-teal)', borderTopWidth: 3 }}
+        >
+          <div className="mb-5 flex items-center justify-between">
+            <input
+              type="checkbox"
+              aria-label={`${lang === 'zh' ? '选择' : 'Select'} ${sub.name}`}
+              className="h-4 w-4 cursor-pointer rounded border-[var(--line-strong)] text-primary-600 focus:ring-primary-500"
+              checked={selectedIds.has(sub.id)}
+              onChange={() => onSelectOne(sub.id)}
+            />
+            <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+              <button aria-label={t('edit_subscription')} title={t('edit_subscription')} onClick={() => onEdit(sub)} className="icon-control rounded-lg p-1.5"><Edit2 size={14} /></button>
+              <button aria-label={t('duplicate')} title={t('duplicate')} onClick={() => onDuplicate(sub)} className="icon-control rounded-lg p-1.5"><Copy size={14} /></button>
+              <button aria-label={t('remove')} title={t('remove')} onClick={() => onDelete(sub.id)} className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--alert-coral-soft)] hover:text-[var(--alert-coral)]"><Trash2 size={14} /></button>
+            </div>
+          </div>
 
-                    {/* Actions (Absolute) */}
-                    <div className="absolute top-3 right-3 flex space-x-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button
-                            aria-label={t('edit_subscription')}
-                            onClick={(e) => { e.stopPropagation(); onEdit(sub); }}
-                            className="p-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-white hover:text-primary-600 rounded-md text-gray-500 shadow-sm transition-colors"
-                        >
-                            <Edit2 size={14} />
-                        </button>
-                        <button
-                            aria-label={t('duplicate')}
-                            onClick={(e) => { e.stopPropagation(); onDuplicate(sub); }}
-                            className="p-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-white hover:text-blue-600 rounded-md text-gray-500 shadow-sm transition-colors"
-                        >
-                            <Copy size={14} />
-                        </button>
-                        <button
-                            aria-label={t('remove')}
-                            onClick={(e) => { e.stopPropagation(); onDelete(sub.id); }}
-                            className="p-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-white hover:text-red-600 rounded-md text-gray-500 shadow-sm transition-colors"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                    </div>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] text-lg font-semibold text-[var(--rail-teal)]">
+              {sub.iconUrl ? <img src={sub.iconUrl} alt="" className="h-full w-full object-contain" loading="lazy" referrerPolicy="no-referrer" /> : sub.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate font-display text-lg font-semibold tracking-[-0.025em] text-[var(--ink)]">{sub.name}</h3>
+              <div className="mt-1 flex items-center gap-2 text-xs text-[var(--muted)]">
+                <CategoryGlyph category={sub.category} containerSize={18} size={12} />
+                <span className="truncate">{displayCategoryLabel(sub.category, lang)}</span>
+              </div>
+            </div>
+            {sub.status === 'cancelled' && <span className="rounded-md bg-[var(--alert-coral-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--alert-coral)]">{t('cancelled')}</span>}
+          </div>
 
-                    {/* Card Content */}
-                    <div className="flex flex-col items-center text-center mt-2">
-                        {sub.iconUrl ? (
-                            <div className="w-14 h-14 mb-3 relative flex items-center justify-center">
-                                <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain" loading="lazy" referrerPolicy="no-referrer" />
-                                {sub.status === 'cancelled' && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="w-14 h-14 rounded-2xl bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-xl mb-3 relative">
-                                {sub.name.charAt(0).toUpperCase()}
-                                {sub.status === 'cancelled' && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
-                                )}
-                            </div>
-                        )}
+          <div className="mt-6 flex items-baseline gap-2">
+            <span className={`data-value text-2xl font-medium ${sub.status === 'cancelled' ? 'opacity-45' : ''}`}>{formatCurrency(sub.price, sub.currency)}</span>
+            <span className="text-xs text-[var(--muted)]">/ {frequencySuffix(sub.frequency)}</span>
+          </div>
 
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate w-full px-2">{sub.name}</h3>
-                        <div className="mb-3 flex flex-col items-center justify-center gap-2">
-                            <div className="flex items-center justify-center gap-2">
-                                <CategoryGlyph category={sub.category} containerSize={18} size={12} />
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{displayCategoryLabel(sub.category, lang)}</p>
-                            </div>
-                            <div className="flex items-center justify-center gap-2">
-                                <PaymentGlyph method={sub.paymentMethod || 'Credit Card'} containerSize={18} size={12} />
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{displayPaymentMethodLabel(sub.paymentMethod || 'Credit Card', lang)}</p>
-                            </div>
-                            {sub.status === 'cancelled' && (
-                                <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full font-medium">
-                                    {t('cancelled')}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="flex items-baseline mb-4">
-                            <span className={`text-2xl font-bold mr-1 ${sub.status === 'cancelled' ? 'text-gray-400 dark:text-gray-500 decoration-slate-400' : 'text-gray-900 dark:text-white'}`}>
-                                {formatCurrency(sub.price, sub.currency)}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                                / {lang === 'zh' ? (sub.frequency === Frequency.MONTHLY ? '月' : sub.frequency === Frequency.YEARLY ? '年' : '周期') : (sub.frequency === Frequency.MONTHLY ? 'mo' : sub.frequency === Frequency.YEARLY ? 'yr' : 'cycle')}
-                            </span>
-                        </div>
-
-                        <div className="w-full border-t border-gray-100 dark:border-gray-700 pt-3 mt-auto flex justify-between items-center text-xs">
-                            <span className="text-gray-400">{t('next_bill')}</span>
-                            <div className="font-medium text-gray-700 dark:text-gray-200">
-                                {renderDateBadge(sub.nextBillingDate, sub)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
+          <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4 text-xs">
+            <div className="min-w-0">
+              <dt className="mb-1.5 text-[var(--muted)]">{t('payment')}</dt>
+              <dd className="flex items-center gap-2 truncate font-medium text-[var(--ink-soft)]">
+                <PaymentGlyph method={sub.paymentMethod || 'Credit Card'} containerSize={18} size={12} />
+                <span className="truncate">{displayPaymentMethodLabel(sub.paymentMethod || 'Credit Card', lang)}</span>
+              </dd>
+            </div>
+            <div className="min-w-0 text-right">
+              <dt className="mb-1.5 text-[var(--muted)]">{t('next_bill')}</dt>
+              <dd className="font-data truncate text-[var(--ink-soft)]">{renderDateBadge(sub.nextBillingDate, sub)}</dd>
+            </div>
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
 };

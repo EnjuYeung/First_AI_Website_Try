@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Plus, Home, CreditCard, BellRing, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Home, CreditCard, BellRing, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
 import { AppSettings, Subscription } from './types';
 import { getT } from './services/i18n';
 import LoginPage from './components/LoginPage';
@@ -174,26 +174,12 @@ const App: React.FC = () => {
         toggleLanguage={toggleLanguage}
         toggleTheme={toggleTheme}
         onLogoutClick={() => setIsLogoutModalOpen(true)}
+        onAddSubscription={openAddModal}
         t={t}
       />
 
       {/* Main Content */}
-      <main className="flex-1 p-5 pb-24 sm:p-6 sm:pb-6 lg:p-10 lg:pb-10 overflow-x-hidden max-w-7xl mx-auto w-full">
-
-        {/* Helper Action (Add Button) - Only visible on Dashboard/List */}
-        <div className="flex justify-between items-center mb-8 min-h-[44px]">
-          <div></div>
-          {(activeTab === 'dashboard' || activeTab === 'list') && (
-            <button
-              onClick={openAddModal}
-              className="flex items-center space-x-2 bg-primary-600/90 hover:bg-primary-600 text-white px-5 py-2.5 rounded-2xl shadow-mac-sm transition-transform active:scale-[0.98] backdrop-blur-md"
-            >
-              <Plus size={20} />
-              <span className="hidden sm:inline">{t('add_new')}</span>
-            </button>
-          )}
-        </div>
-
+      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 pb-28 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:px-8 lg:pt-10">
         <Suspense fallback={<div className="py-16 text-center text-gray-500">{language === 'zh' ? '加载中…' : 'Loading…'}</div>}>
         <div className="animate-fade-in">
           {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={language} settings={clientSettings} />}
@@ -245,8 +231,8 @@ const App: React.FC = () => {
 
       {/* Global Modals */}
       {visibleAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
-          <div className="mac-surface rounded-2xl shadow-xl w-full max-w-lg overflow-hidden p-6 text-center animate-pop-in">
+        <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="dialog-panel w-full max-w-lg overflow-hidden rounded-[18px] p-6 text-center animate-pop-in">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
               visibleAlert.type === 'success'
                 ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
@@ -276,8 +262,8 @@ const App: React.FC = () => {
       )}
 
       {isLogoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
-          <div className="mac-surface rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center animate-pop-in">
+        <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="dialog-panel w-full max-w-sm overflow-hidden rounded-[18px] p-6 text-center animate-pop-in">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
               <LogOut size={32} />
             </div>

@@ -261,18 +261,21 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
-      <div ref={dialogRef} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby="subscription-form-title" className="mac-surface rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto my-8 animate-pop-in">
-        <div className="flex justify-between items-center p-8 border-b border-gray-100 dark:border-gray-700">
-          <h2 id="subscription-form-title" className="text-xl font-bold text-gray-800 dark:text-white">
+    <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 animate-fade-in sm:p-4">
+      <div ref={dialogRef} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby="subscription-form-title" className="dialog-panel my-6 max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[20px] animate-pop-in">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] p-5 sm:p-7">
+          <div>
+            <div className="eyebrow mb-2">Subm / {t('subscriptions')}</div>
+            <h2 id="subscription-form-title" className="font-display text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
             {initialData ? t('edit_subscription') : t('add_subscription')}
-          </h2>
-          <button aria-label={t('close')} onClick={closeAndDiscardUploads} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+            </h2>
+          </div>
+          <button aria-label={t('close')} onClick={closeAndDiscardUploads} className="icon-control rounded-xl p-2 transition-colors">
             <X size={24} />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="subscription-form space-y-5 p-5 sm:p-7">
           {/* 服务名称 */}
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/40 shadow-sm">
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">{t('service_name')}</label>
@@ -524,7 +527,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           <button
             type="submit"
             disabled={isIconUploading || isSubmitting}
-            className="w-full py-4 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-600/60 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 mt-2"
+            className="primary-action mt-2 w-full rounded-xl py-4 font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting
               ? (lang === 'zh' ? '保存中…' : 'Saving…')

@@ -45,9 +45,9 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
 }) => {
     const renderStatusBadge = (status: 'active' | 'cancelled') => {
         if (status === 'cancelled') {
-            return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">{t('cancelled')}</span>
+            return <span className="rounded-md bg-[var(--alert-coral-soft)] px-2 py-1 text-xs font-medium text-[var(--alert-coral)]">{t('cancelled')}</span>
         }
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">{t('active')}</span>
+        return <span className="rounded-md bg-[var(--rail-teal-soft)] px-2 py-1 text-xs font-medium text-[var(--rail-teal)]">{t('active')}</span>
     };
 
     const renderSortHeader = (key: string, label: string) => (
@@ -67,11 +67,11 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
     );
 
     return (
-        <div className="mac-surface rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden relative z-0">
+        <div className="statement-card relative z-0 overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full text-left align-middle">
+                <table className="ledger-table w-full text-left align-middle">
                     <thead>
-                        <tr className="bg-gray-50 dark:bg-slate-700 border-b border-gray-100 dark:border-gray-700">
+                        <tr className="border-b border-[var(--line)] bg-[var(--surface-soft)]">
                             <th className="px-5 py-4 w-12">
                                 <div className="flex items-center">
                                     <input
@@ -97,7 +97,8 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                         {subscriptions.map((sub) => (
                             <tr
                                 key={sub.id}
-                                className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${selectedIds.has(sub.id) ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''}`}
+                                data-status={sub.status}
+                                className={`transition-colors hover:bg-[var(--surface-soft)] ${selectedIds.has(sub.id) ? 'bg-[var(--rail-teal-soft)]' : ''}`}
                             >
                                 <td className="px-5 py-4">
                                     <div className="flex items-center">
@@ -117,7 +118,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                                 <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain" loading="lazy" referrerPolicy="no-referrer" />
                                             </div>
                                         ) : (
-                                            <div className="w-10 h-10 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] border border-[var(--line)] bg-[var(--surface-soft)] text-lg font-bold text-[var(--rail-teal)]">
                                                 {sub.name.charAt(0).toUpperCase()}
                                             </div>
                                         )}
@@ -148,9 +149,9 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                     <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(sub.price, sub.currency)}</span>
                                 </td>
                                 <td className="px-5 py-4 whitespace-nowrap">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${sub.frequency === Frequency.MONTHLY ? 'bg-blue-100 text-blue-800' :
-                                            sub.frequency === Frequency.YEARLY ? 'bg-purple-100 text-purple-800' :
-                                                'bg-orange-100 text-orange-800'
+                                    <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${sub.frequency === Frequency.MONTHLY ? 'bg-[var(--rail-teal-soft)] text-[var(--rail-teal)]' :
+                                            sub.frequency === Frequency.YEARLY ? 'bg-[var(--due-amber-soft)] text-[var(--due-amber)]' :
+                                                'bg-[var(--surface-soft)] text-[var(--ink-soft)]'
                                         }`}>
                                         {displayFrequencyLabel(sub.frequency, lang)}
                                     </span>

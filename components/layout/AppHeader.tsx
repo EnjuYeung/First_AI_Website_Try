@@ -1,80 +1,110 @@
 import React from 'react';
-import { WalletCards, RefreshCcw, Globe, Moon, Sun, LogOut, Monitor } from 'lucide-react';
+import { Globe, LogOut, Monitor, Moon, Plus, RefreshCcw, Repeat2, Sun } from 'lucide-react';
 import { AppSettings } from '../../types';
 
 interface NavTab {
-    id: string;
-    icon: React.ElementType;
-    label: string;
+  id: string;
+  icon: React.ElementType;
+  label: string;
 }
 
 interface AppHeaderProps {
-    navTabs: readonly NavTab[]; // or NavTab[]
-    activeTab: string;
-    setActiveTab: (id: any) => void;
-
-    isDataLoading: boolean;
-    loadRemoteData: () => void;
-
-    settings: AppSettings;
-    toggleLanguage: () => void;
-    toggleTheme: () => void;
-    onLogoutClick: () => void;
-
-    t: (key: string) => string;
+  navTabs: readonly NavTab[];
+  activeTab: string;
+  setActiveTab: (id: any) => void;
+  isDataLoading: boolean;
+  loadRemoteData: () => void;
+  settings: AppSettings;
+  toggleLanguage: () => void;
+  toggleTheme: () => void;
+  onLogoutClick: () => void;
+  onAddSubscription: () => void;
+  t: (key: string) => string;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
-    navTabs,
-    activeTab,
-    setActiveTab,
-    isDataLoading,
-    loadRemoteData,
-    settings,
-    toggleLanguage,
-    toggleTheme,
-    onLogoutClick,
-    t
+  navTabs,
+  activeTab,
+  setActiveTab,
+  isDataLoading,
+  loadRemoteData,
+  settings,
+  toggleLanguage,
+  toggleTheme,
+  onLogoutClick,
+  onAddSubscription,
+  t,
 }) => {
-    return (
-        <header className="px-4 sm:px-6 h-16 flex items-center justify-between sticky top-0 z-20 bg-white/70 dark:bg-slate-950/50 backdrop-blur-xl border-b border-white/30 dark:border-white/10 shadow-mac-sm">
-            <div className="flex items-center gap-4 sm:gap-8">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-primary-600/90 to-indigo-500/90 text-white shadow-mac-sm ring-1 ring-white/30">
-                        <WalletCards size={18} />
-                    </div>
-                    <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-gray-900 dark:text-white">Subm</h1>
-                </div>
+  const canAdd = activeTab === 'dashboard' || activeTab === 'list';
 
-                <nav className="hidden md:flex items-center gap-1 ml-4">
-                    {navTabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/60 ${activeTab === tab.id ? 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                        >
-                            <tab.icon size={18} />
-                            <span>{tab.label}</span>
-                        </button>
-                    ))}
-                </nav>
-            </div>
+  return (
+    <header className="app-header sticky top-0 z-40">
+      <div className="mx-auto flex h-[72px] w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-5 lg:gap-8">
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            className="flex shrink-0 items-center gap-2.5 rounded-xl text-left"
+            aria-label={t('dashboard')}
+          >
+            <span className="brand-mark"><Repeat2 size={19} strokeWidth={2.2} /></span>
+            <span className="brand-wordmark">Subm</span>
+          </button>
 
-            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-200">
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+            {navTabs.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
                 <button
-                    onClick={loadRemoteData}
-                    className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
-                    title="Sync from server"
-                    disabled={isDataLoading}
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className="nav-tab flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+                  data-active={active}
+                  aria-current={active ? 'page' : undefined}
                 >
-                    <RefreshCcw size={18} className={isDataLoading ? 'animate-spin' : ''} />
+                  <tab.icon size={16} />
+                  <span>{tab.label}</span>
                 </button>
-                <button onClick={toggleLanguage} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('language')}><Globe size={18} /></button>
-                <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('appearance')}>
-                    {settings.theme === 'dark' ? <Moon size={18} /> : settings.theme === 'system' ? <Monitor size={18} /> : <Sun size={18} />}
-                </button>
-                <button onClick={onLogoutClick} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors" title={t('logout')}><LogOut size={18} /></button>
-            </div>
-        </header>
-    );
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={loadRemoteData}
+            className="icon-control rounded-xl p-2.5 transition-colors disabled:opacity-45"
+            title={t('refresh_rates')}
+            aria-label={t('refresh_rates')}
+            disabled={isDataLoading}
+          >
+            <RefreshCcw size={17} className={isDataLoading ? 'animate-spin' : ''} />
+          </button>
+          <button type="button" onClick={toggleLanguage} className="icon-control rounded-xl p-2.5 transition-colors" title={t('language')} aria-label={t('language')}>
+            <Globe size={17} />
+          </button>
+          <button type="button" onClick={toggleTheme} className="icon-control rounded-xl p-2.5 transition-colors" title={t('appearance')} aria-label={t('appearance')}>
+            {settings.theme === 'dark' ? <Moon size={17} /> : settings.theme === 'system' ? <Monitor size={17} /> : <Sun size={17} />}
+          </button>
+
+          {canAdd && (
+            <button
+              type="button"
+              onClick={onAddSubscription}
+              className="primary-action ml-1 flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition sm:px-4"
+            >
+              <Plus size={17} />
+              <span className="hidden sm:inline">{t('add_new')}</span>
+            </button>
+          )}
+
+          <button type="button" onClick={onLogoutClick} className="icon-control ml-0.5 rounded-xl p-2.5 transition-colors" title={t('logout')} aria-label={t('logout')}>
+            <LogOut size={17} />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
 };

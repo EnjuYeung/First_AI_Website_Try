@@ -65,14 +65,14 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
   const getStatusBadge = (status: NotificationStatus) => {
     if (status === 'success') {
       return (
-        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-900">
+        <span className="flex items-center gap-1.5 rounded-md bg-[var(--rail-teal-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--rail-teal)]">
           <CheckCircle2 size={12} strokeWidth={3} />
           {t('notif_status_success')}
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-900">
+      <span className="flex items-center gap-1.5 rounded-md bg-[var(--alert-coral-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--alert-coral)]">
         <XCircle size={12} strokeWidth={3} />
         {t('notif_status_failed')}
       </span>
@@ -100,27 +100,32 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
+      <header>
+        <div className="eyebrow mb-3">{t('notification_delivery')}</div>
+        <h1 className="page-title">{t('notifications_history')}</h1>
+        <p className="page-copy mt-3 text-sm">{t('notifications_text')}</p>
+      </header>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="statement-card grid grid-cols-2 overflow-hidden lg:grid-cols-4">
         {[
-          { label: t('notif_total'), value: stats.total, icon: <BarChart3 size={18} />, color: 'text-gray-900 dark:text-white', subColor: 'text-gray-500' },
-          { label: t('notif_sent'), value: stats.sent, icon: <CheckCircle2 size={18} />, color: 'text-green-600 dark:text-green-400', subColor: 'text-green-600/70' },
-          { label: t('notif_failed'), value: stats.failed, icon: <XCircle size={18} />, color: 'text-red-600 dark:text-red-400', subColor: 'text-red-600/70' },
-          { label: t('notif_success_rate'), value: `${stats.rate}%`, icon: <BarChart3 size={18} />, color: 'text-blue-600 dark:text-blue-400', subColor: 'text-blue-600/70' },
+          { label: t('notif_total'), value: stats.total, icon: <BarChart3 size={16} />, color: 'text-[var(--ink)]' },
+          { label: t('notif_sent'), value: stats.sent, icon: <CheckCircle2 size={16} />, color: 'text-[var(--rail-teal)]' },
+          { label: t('notif_failed'), value: stats.failed, icon: <XCircle size={16} />, color: 'text-[var(--alert-coral)]' },
+          { label: t('notif_success_rate'), value: `${stats.rate}%`, icon: <BarChart3 size={16} />, color: 'text-[var(--due-amber)]' },
         ].map((stat, i) => (
-          <div key={i} className="mac-surface p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between h-28 relative overflow-hidden">
-             <div className="flex justify-between items-start z-10">
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{stat.label}</span>
-                <div className={`p-1.5 rounded-lg bg-gray-50 dark:bg-slate-700 ${stat.subColor}`}>{stat.icon}</div>
+          <div key={i} className="metric-cell relative flex h-28 flex-col justify-between overflow-hidden p-5">
+             <div className="z-10 flex items-start justify-between">
+                <span className="text-sm font-medium text-[var(--muted)]">{stat.label}</span>
+                <div className={stat.color}>{stat.icon}</div>
              </div>
-             <div className={`text-3xl font-bold z-10 ${stat.color}`}>{stat.value}</div>
+             <div className={`font-data z-10 text-3xl font-medium ${stat.color}`}>{stat.value}</div>
           </div>
         ))}
       </div>
 
       {/* Filter Bar */}
-      <div className="mac-surface p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm space-y-4">
+      <div className="statement-card space-y-4 p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3 mb-1">
              <div className="flex items-center gap-2">
                 <Search size={18} className="text-gray-400" />
@@ -142,7 +147,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                 placeholder={t('notif_search_placeholder')}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white text-sm"
+                className="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none"
               />
               
               <div className="flex gap-2 overflow-x-auto pb-1 xl:pb-0">
@@ -150,7 +155,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                       <select 
                         value={statusFilter} 
                         onChange={e => setStatusFilter(e.target.value as any)}
-                        className="w-full appearance-none px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-600 rounded-xl outline-none dark:text-white text-sm pr-8 cursor-pointer"
+                        className="w-full cursor-pointer appearance-none rounded-xl border py-2.5 pl-4 pr-8 text-sm outline-none"
                       >
                           <option value="all">{t('notif_filter_status')}</option>
                           <option value="success">{t('notif_status_success')}</option>
@@ -163,7 +168,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                       <select 
                         value={channelFilter} 
                         onChange={e => setChannelFilter(e.target.value as any)}
-                        className="w-full appearance-none px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-600 rounded-xl outline-none dark:text-white text-sm pr-8 cursor-pointer"
+                        className="w-full cursor-pointer appearance-none rounded-xl border py-2.5 pl-4 pr-8 text-sm outline-none"
                       >
                           <option value="all">{t('notif_filter_channel')}</option>
                           <option value="telegram">Telegram</option>
@@ -188,7 +193,8 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
                  return (
                      <div 
                         key={notif.id} 
-                        className="mac-surface border rounded-2xl overflow-hidden border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors relative"
+                        className="subscription-card relative overflow-hidden"
+                        style={{ borderLeftWidth: 3, borderLeftColor: notif.status === 'success' ? 'var(--rail-teal)' : 'var(--alert-coral)' }}
                      >
                          <div className="p-5 pr-12">
                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
@@ -228,7 +234,7 @@ const NotificationHistory: React.FC<Props> = ({ lang, notifications, onDeleteNot
              })}
              
              {filteredNotifications.length === 0 && (
-                 <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-2xl">
+                 <div className="statement-card border-dashed py-12 text-center text-[var(--muted)]">
                      {t('no_records')}
                  </div>
              )}

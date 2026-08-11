@@ -84,15 +84,15 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
     t
 }) => {
     return (
-        <div className="mac-surface p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between relative z-30 overflow-visible">
+        <div className="statement-card relative z-30 flex flex-col items-start justify-between gap-3 overflow-visible p-3 xl:flex-row xl:items-center">
 
             {/* Search */}
-            <div className="relative w-full xl:w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <div className="relative w-full xl:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} />
                 <input
                     type="text"
                     placeholder={t('search_placeholder')}
-                    className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white text-sm"
+                    className="w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm outline-none"
                     value={searchTerm}
                     onChange={(e) => onSearchChange(e.target.value)}
                 />
@@ -159,17 +159,17 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
                     </button>
                 )}
 
-                <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1 border border-gray-200 dark:border-gray-600">
+                <div className="flex rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-1">
                     <button
                         onClick={() => onViewModeChange('list')}
-                        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                        className={`rounded-md p-1.5 transition-all ${viewMode === 'list' ? 'bg-[var(--surface-raised)] text-[var(--rail-teal)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
                         title={t('view_list')}
                     >
                         <List size={18} />
                     </button>
                     <button
                         onClick={() => onViewModeChange('grid')}
-                        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                        className={`rounded-md p-1.5 transition-all ${viewMode === 'grid' ? 'bg-[var(--surface-raised)] text-[var(--rail-teal)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
                         title={t('view_grid')}
                     >
                         <LayoutGrid size={18} />
