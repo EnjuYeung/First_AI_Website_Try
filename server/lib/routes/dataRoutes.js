@@ -196,6 +196,7 @@ export const registerDataRoutes = ({
       const {
         language: _language,
         theme: _theme,
+        colorTheme: _colorTheme,
         timezone: _timezone,
         security: _security,
         ...serverSettings
@@ -211,6 +212,7 @@ export const registerDataRoutes = ({
         // values only to keep the persisted settings schema compatible.
         language: currentSettings.language,
         theme: currentSettings.theme,
+        colorTheme: currentSettings.colorTheme,
         // Timezone is deployment-wide and controlled exclusively by TIMEZONE.
         timezone: timeZone,
         // Exchange-rate credentials, rates, and scheduler state are server-managed.

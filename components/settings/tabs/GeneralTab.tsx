@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Globe, Image, Link2, Plus, Trash2, Upload, X as XIcon } from 'lucide-react';
+import { Check, Globe, Image, Link2, Palette, Plus, Trash2, Upload, X as XIcon } from 'lucide-react';
 import { AppSettings } from '../../../types';
 import { CategoryGlyph, PaymentGlyph } from '../../ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../../../services/displayLabels';
@@ -116,7 +116,8 @@ const GeneralTab: React.FC<Props> = ({
   const commitWallpaperControls = () => {
     if (
       wallpaperDraft.blur === settings.wallpaper.blur &&
-      wallpaperDraft.overlay === settings.wallpaper.overlay
+      wallpaperDraft.overlay === settings.wallpaper.overlay &&
+      wallpaperDraft.panelOpacity === settings.wallpaper.panelOpacity
     ) return;
     void saveWallpaper(wallpaperDraft);
   };
@@ -155,6 +156,49 @@ const GeneralTab: React.FC<Props> = ({
         </div>
       </section>
 
+      <section>
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-[var(--ink)]">{t('color_theme')}</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">{t('color_theme_hint')}</p>
+          </div>
+          <Palette className="mt-1 shrink-0 text-[var(--rail-teal)]" size={20} />
+        </div>
+        <div className="theme-choice-grid" role="group" aria-label={t('color_theme')}>
+          {([
+            { id: 'default', swatches: ['#267a76', '#d7a33d', '#d65f50'] },
+            { id: 'blue', swatches: ['#2563eb', '#60a5fa', '#dbeafe'] },
+            { id: 'violet', swatches: ['#7c3aed', '#a78bfa', '#ede9fe'] },
+            { id: 'rose', swatches: ['#e11d48', '#fb7185', '#ffe4e6'] },
+          ] as const).map(({ id, swatches }) => {
+            const selected = settings.colorTheme === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className="theme-choice"
+                data-active={selected}
+                aria-pressed={selected}
+                onClick={() => onUpdateSettings({ ...settings, colorTheme: id })}
+              >
+                <span className="theme-choice-preview" data-theme-preview={id} aria-hidden="true">
+                  <i />
+                  <b />
+                  <em />
+                </span>
+                <span className="theme-choice-label">
+                  <span>{t(`color_theme_${id}`)}</span>
+                  {selected && <Check size={15} aria-label={t('selected')} />}
+                </span>
+                <span className="theme-choice-swatches" aria-hidden="true">
+                  {swatches.map((color) => <i key={color} style={{ background: color }} />)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="wallpaper-settings">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
@@ -174,6 +218,15 @@ const GeneralTab: React.FC<Props> = ({
           />
           <div className="wallpaper-preview-mask" style={{ opacity: wallpaperDraft.overlay / 100 }} />
           {!wallpaperDraft.url && <span>{t('wallpaper_empty')}</span>}
+          <div
+            className="wallpaper-preview-panel"
+            style={{
+              background: `color-mix(in srgb, var(--surface-solid) ${wallpaperDraft.panelOpacity}%, transparent)`,
+            }}
+            aria-hidden="true"
+          >
+            <i /><span /><span />
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -213,11 +266,12 @@ const GeneralTab: React.FC<Props> = ({
 
         {wallpaperError && <p role="alert" className="mt-2 text-sm text-[var(--alert-coral)]">{wallpaperError}</p>}
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <label className="wallpaper-control">
             <span><b>{t('background_blur')}</b><i>{wallpaperDraft.blur}px</i></span>
             <input
               type="range" min="0" max="30" step="1" value={wallpaperDraft.blur}
+              aria-label={t('background_blur')}
               onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, blur: Number(event.target.value) })}
               onPointerUp={commitWallpaperControls} onKeyUp={commitWallpaperControls} onBlur={commitWallpaperControls}
             />
@@ -226,7 +280,17 @@ const GeneralTab: React.FC<Props> = ({
             <span><b>{t('background_overlay')}</b><i>{wallpaperDraft.overlay}%</i></span>
             <input
               type="range" min="0" max="90" step="1" value={wallpaperDraft.overlay}
+              aria-label={t('background_overlay')}
               onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, overlay: Number(event.target.value) })}
+              onPointerUp={commitWallpaperControls} onKeyUp={commitWallpaperControls} onBlur={commitWallpaperControls}
+            />
+          </label>
+          <label className="wallpaper-control">
+            <span><b>{t('settings_panel_opacity')}</b><i>{wallpaperDraft.panelOpacity}%</i></span>
+            <input
+              type="range" min="35" max="100" step="1" value={wallpaperDraft.panelOpacity}
+              aria-label={t('settings_panel_opacity')}
+              onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, panelOpacity: Number(event.target.value) })}
               onPointerUp={commitWallpaperControls} onKeyUp={commitWallpaperControls} onBlur={commitWallpaperControls}
             />
           </label>

@@ -6,7 +6,7 @@ import { getDefaultSettings } from '../services/storageService';
 import { getT } from '../services/i18n';
 
 describe('General settings', () => {
-  it('removes timezone and theme controls and applies a wallpaper URL', async () => {
+  it('updates the palette, wallpaper URL, and panel opacity', async () => {
     const settings = getDefaultSettings();
     settings.language = 'en';
     const onUpdateSettings = vi.fn().mockResolvedValue(true);
@@ -38,7 +38,11 @@ describe('General settings', () => {
 
     expect(screen.queryByText('Timezone')).toBeNull();
     expect(screen.queryByText('Appearance')).toBeNull();
+    expect(screen.getByText('Color theme')).toBeTruthy();
     expect(screen.getByText('Wallpaper')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Blue' }));
+    expect(onUpdateSettings).toHaveBeenCalledWith(expect.objectContaining({ colorTheme: 'blue' }));
 
     fireEvent.change(screen.getByPlaceholderText('https://example.com/wallpaper.jpg'), {
       target: { value: 'https://images.example.test/background.webp' },
@@ -49,6 +53,13 @@ describe('General settings', () => {
       wallpaper: expect.objectContaining({
         url: 'https://images.example.test/background.webp',
       }),
+    }));
+
+    const panelOpacity = screen.getByLabelText('Panel opacity');
+    fireEvent.change(panelOpacity, { target: { value: '68' } });
+    fireEvent.blur(panelOpacity);
+    expect(onUpdateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      wallpaper: expect.objectContaining({ panelOpacity: 68 }),
     }));
   });
 });

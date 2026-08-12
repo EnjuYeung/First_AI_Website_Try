@@ -13,6 +13,7 @@ describe('Notification settings', () => {
     settings.notifications.rules.monthlySummary = true;
     settings.notifications.telegram.enabled = true;
     const onUpdateSettings = vi.fn().mockResolvedValue(true);
+    const handleTestMonthlySummaryTemplate = vi.fn();
 
     render(
       <NotificationsTab
@@ -26,7 +27,9 @@ describe('Notification settings', () => {
         handleSaveTemplate={vi.fn()}
         handleSaveMonthlySummaryTemplate={vi.fn()}
         handleTestTemplate={vi.fn()}
+        handleTestMonthlySummaryTemplate={handleTestMonthlySummaryTemplate}
         isTestingTelegram={false}
+        isTestingMonthlySummary={false}
         handleTestTelegram={vi.fn()}
         toggleReminderChannel={vi.fn()}
         toggleMonthlySummaryChannel={vi.fn()}
@@ -36,6 +39,10 @@ describe('Notification settings', () => {
     expect(screen.getByLabelText('Renewal Reminder · JSON template')).toBeTruthy();
     expect(screen.getByLabelText('Monthly summary · JSON template')).toBeTruthy();
     expect(screen.getByText('Statistics with a zero value are omitted automatically.')).toBeTruthy();
+    const testButtons = screen.getAllByRole('button', { name: 'Test template' });
+    expect(testButtons).toHaveLength(2);
+    fireEvent.click(testButtons[1]);
+    expect(handleTestMonthlySummaryTemplate).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Monthly summary' }));
     expect(onUpdateSettings).toHaveBeenCalledWith(expect.objectContaining({

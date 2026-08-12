@@ -3,6 +3,7 @@ import { AppSettings } from '../types';
 
 const LANGUAGE_KEY = 'subm.language';
 const THEME_KEY = 'subm.theme';
+const COLOR_THEME_KEY = 'subm.colorTheme';
 
 const readLanguage = (): AppSettings['language'] => {
   if (typeof window === 'undefined') return 'zh';
@@ -24,9 +25,20 @@ const readTheme = (): AppSettings['theme'] => {
   }
 };
 
+const readColorTheme = (): AppSettings['colorTheme'] => {
+  if (typeof window === 'undefined') return 'default';
+  try {
+    const value = window.localStorage.getItem(COLOR_THEME_KEY);
+    return value === 'blue' || value === 'violet' || value === 'rose' ? value : 'default';
+  } catch {
+    return 'default';
+  }
+};
+
 export const useClientPreferences = () => {
   const [language, setLanguage] = useState<AppSettings['language']>(readLanguage);
   const [theme, setTheme] = useState<AppSettings['theme']>(readTheme);
+  const [colorTheme, setColorTheme] = useState<AppSettings['colorTheme']>(readColorTheme);
 
   useEffect(() => {
     try {
@@ -45,5 +57,13 @@ export const useClientPreferences = () => {
     }
   }, [theme]);
 
-  return { language, setLanguage, theme, setTheme };
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(COLOR_THEME_KEY, colorTheme);
+    } catch {
+      // Keep the preference in memory if storage is unavailable.
+    }
+  }, [colorTheme]);
+
+  return { language, setLanguage, theme, setTheme, colorTheme, setColorTheme };
 };

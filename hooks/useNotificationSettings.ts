@@ -21,6 +21,7 @@ export const useNotificationSettings = (
     settings.notifications.rules.monthlySummaryTemplate,
   );
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+  const [isTestingMonthlySummary, setIsTestingMonthlySummary] = useState(false);
   useEffect(() => setTemplateText(settings.notifications.rules.template), [settings.notifications.rules.template]);
   useEffect(
     () => setMonthlySummaryTemplateText(settings.notifications.rules.monthlySummaryTemplate),
@@ -34,10 +35,10 @@ export const useNotificationSettings = (
       await apiFetchJson('/api/notifications/test-telegram', {
         method: 'POST', headers: authJsonHeaders(), body: JSON.stringify({ template: templateText }),
       });
-      setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: 'Message sent successfully! Check your Telegram.' });
+      setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: t('test_message_sent') });
     } catch (err: any) {
       const message = err?.message === 'telegram_not_configured'
-        ? 'Please enable Telegram notifications and fill Bot Token + Chat ID first.'
+        ? t('telegram_not_configured')
         : err?.message === 'telegram_webhook_https_required'
           ? 'Telegram 回调需要公开可访问的 HTTPS 地址，请配置 PUBLIC_BASE_URL。'
         : err?.message === 'invalid_template'
@@ -46,6 +47,33 @@ export const useNotificationSettings = (
       setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
     } finally {
       setIsTestingTelegram(false);
+    }
+  };
+
+  const handleTestMonthlySummaryTemplate = async () => {
+    setIsTestingMonthlySummary(true);
+    try {
+      assertTemplate(monthlySummaryTemplateText);
+      await apiFetchJson('/api/notifications/test-telegram', {
+        method: 'POST',
+        headers: authJsonHeaders(),
+        body: JSON.stringify({
+          template: monthlySummaryTemplateText,
+          templateType: 'monthlySummary',
+        }),
+      });
+      setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: t('test_message_sent') });
+    } catch (err: any) {
+      const message = err?.message === 'telegram_not_configured'
+        ? t('telegram_not_configured')
+        : err?.message === 'telegram_webhook_https_required'
+          ? 'Telegram 回调需要公开可访问的 HTTPS 地址，请配置 PUBLIC_BASE_URL。'
+          : err?.message === 'invalid_template'
+            ? t('template_json_error')
+            : err?.message || 'Monthly summary test failed.';
+      setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
+    } finally {
+      setIsTestingMonthlySummary(false);
     }
   };
 
@@ -129,8 +157,9 @@ export const useNotificationSettings = (
   return {
     templateText, setTemplateText,
     monthlySummaryTemplateText, setMonthlySummaryTemplateText,
-    isTestingTelegram,
+    isTestingTelegram, isTestingMonthlySummary,
     handleTestTelegram, handleTestTemplate: handleTestTelegram, handleSaveTemplate,
+    handleTestMonthlySummaryTemplate,
     handleSaveMonthlySummaryTemplate,
     toggleReminderChannel, toggleMonthlySummaryChannel,
   };

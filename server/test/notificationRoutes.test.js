@@ -60,9 +60,9 @@ const registerTestRoute = ({ config, botToken }) => {
   return handler;
 };
 
-const request = ({ protocol = 'http', host = 'internal.example.test' } = {}) => ({
+const request = ({ protocol = 'http', host = 'internal.example.test', body = {} } = {}) => ({
   user: { username: 'admin' },
-  body: {},
+  body,
   protocol,
   get(name) {
     return String(name).toLowerCase() === 'host' ? host : undefined;
@@ -108,6 +108,30 @@ test('trusted HTTPS request origin can be used when public base URL is unset', a
 
   assert.equal(res.statusCode, 200);
   assert.equal(calls[0].body.url, 'https://subm.example.test/api/telegram/webhook');
+});
+
+test('monthly summary template tests render the monthly sample payload', async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url: String(url), body: JSON.parse(options.body) });
+    return telegramOk();
+  });
+  const handler = registerTestRoute({
+    botToken: '106:monthly-summary-token',
+    config: { publicBaseUrl: 'https://subm.example.test' },
+  });
+  const res = response();
+
+  await handler(request({
+    body: {
+      templateType: 'monthlySummary',
+      template: JSON.stringify({ lines: ['SUMMARY {{month}} / {{activeSubscriptions}}'] }),
+    },
+  }), res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].body.text, /SUMMARY 2026年7月 \/ 8/);
 });
 
 test('HTTP and untrusted inferred origins are rejected before calling Telegram', async (t) => {

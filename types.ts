@@ -111,10 +111,12 @@ export interface AppSettings {
   language: 'zh' | 'en';
   timezone: string;
   theme: 'light' | 'dark' | 'system';
+  colorTheme: 'default' | 'blue' | 'violet' | 'rose';
   wallpaper: {
     url: string;
     blur: number;
     overlay: number;
+    panelOpacity: number;
   };
   customCategories: string[];
   customPaymentMethods: string[];

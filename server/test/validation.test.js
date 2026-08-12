@@ -79,4 +79,11 @@ test('validateSettings bounds reminder days', () => {
     }),
     'invalid_wallpaper_settings'
   );
+  assert.equal(
+    validateSettings({
+      ...validSettings,
+      wallpaper: { ...validSettings.wallpaper, panelOpacity: 34 },
+    }),
+    'invalid_wallpaper_settings'
+  );
 });

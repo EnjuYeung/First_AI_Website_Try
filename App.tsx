@@ -21,7 +21,7 @@ import { MobileNav } from './components/layout/MobileNav';
 
 const App: React.FC = () => {
   const { isAuthenticated, isLoadingAuth, login, logout } = useAuth();
-  const { language, setLanguage, theme, setTheme } = useClientPreferences();
+  const { language, setLanguage, theme, setTheme, colorTheme, setColorTheme } = useClientPreferences();
   const {
     subscriptions, settings, notifications, serverClock, isDataLoading,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
@@ -29,9 +29,9 @@ const App: React.FC = () => {
     lastMutationError, clearMutationError
   } = useAppData(isAuthenticated, logout, language);
 
-  const clientSettings: AppSettings = { ...settings, language, theme };
+  const clientSettings: AppSettings = { ...settings, language, theme, colorTheme };
 
-  useTheme(theme);
+  useTheme(theme, colorTheme);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'settings'>(() => {
     if (typeof window === 'undefined') return 'dashboard';
@@ -90,9 +90,20 @@ const App: React.FC = () => {
   const handleSettingsUpdate = (nextSettings: AppSettings) => {
     if (nextSettings.language !== language) setLanguage(nextSettings.language);
     if (nextSettings.theme !== theme) setTheme(nextSettings.theme);
+    if (nextSettings.colorTheme !== colorTheme) setColorTheme(nextSettings.colorTheme);
 
-    const { language: _nextLanguage, theme: _nextTheme, ...nextServerSettings } = nextSettings;
-    const { language: _language, theme: _theme, ...currentServerSettings } = settings;
+    const {
+      language: _nextLanguage,
+      theme: _nextTheme,
+      colorTheme: _nextColorTheme,
+      ...nextServerSettings
+    } = nextSettings;
+    const {
+      language: _language,
+      theme: _theme,
+      colorTheme: _colorTheme,
+      ...currentServerSettings
+    } = settings;
     if (JSON.stringify(nextServerSettings) === JSON.stringify(currentServerSettings)) {
       return Promise.resolve(true);
     }
@@ -101,6 +112,7 @@ const App: React.FC = () => {
       ...nextSettings,
       language: settings.language,
       theme: settings.theme,
+      colorTheme: settings.colorTheme,
     });
   };
 
@@ -160,7 +172,10 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="app-shell min-h-screen bg-transparent flex flex-col transition-colors duration-200">
+    <div
+      className="app-shell min-h-screen bg-transparent flex flex-col transition-colors duration-200"
+      style={{ '--panel-opacity': `${clientSettings.wallpaper.panelOpacity}%` } as React.CSSProperties}
+    >
 
       {clientSettings.wallpaper.url && (
         <div className="app-wallpaper" aria-hidden="true">

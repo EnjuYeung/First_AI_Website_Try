@@ -13,7 +13,9 @@ type Props = {
   handleSaveTemplate: () => void;
   handleSaveMonthlySummaryTemplate: () => void;
   handleTestTemplate: () => void;
+  handleTestMonthlySummaryTemplate: () => void;
   isTestingTelegram: boolean;
+  isTestingMonthlySummary: boolean;
   handleTestTelegram: () => void;
   toggleReminderChannel: (channel: NotificationChannel, checked: boolean) => void;
   toggleMonthlySummaryChannel: (channel: NotificationChannel, checked: boolean) => void;
@@ -113,7 +115,9 @@ const NotificationsTab: React.FC<Props> = ({
   handleSaveTemplate,
   handleSaveMonthlySummaryTemplate,
   handleTestTemplate,
+  handleTestMonthlySummaryTemplate,
   isTestingTelegram,
+  isTestingMonthlySummary,
   handleTestTelegram,
   toggleReminderChannel,
   toggleMonthlySummaryChannel,
@@ -227,6 +231,9 @@ const NotificationsTab: React.FC<Props> = ({
                   hint={<>{t('monthly_summary_tokens')} {'{{month}} · {{totalPaidUsd}} · {{activeSubscriptions}} · {{newSubscriptions}} · {{cancelledSubscriptions}}'}</>}
                   label={t('monthly_summary')}
                   t={t}
+                  canTest
+                  onTest={handleTestMonthlySummaryTemplate}
+                  testing={isTestingMonthlySummary}
                 />
                 <p className="notification-zero-note">{t('monthly_summary_zero_note')}</p>
               </div>

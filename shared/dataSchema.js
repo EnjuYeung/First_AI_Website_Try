@@ -92,12 +92,13 @@ export const validateSubscriptions = (subscriptions) => {
 export const validateSettings = (settings) => {
   if (!isPlainObject(settings)) return 'settings_must_be_object';
   if (!hasOnlyKeys(settings, [
-    'language', 'timezone', 'theme', 'wallpaper', 'customCategories', 'customPaymentMethods',
+    'language', 'timezone', 'theme', 'colorTheme', 'wallpaper', 'customCategories', 'customPaymentMethods',
     'customCurrencies', 'exchangeRates', 'lastRatesUpdate', 'exchangeRateApi',
     'notifications', 'security',
   ])) return 'unknown_settings_field';
   if (!['zh', 'en'].includes(settings.language)) return 'invalid_language';
   if (!['light', 'dark', 'system'].includes(settings.theme)) return 'invalid_theme';
+  if (!['default', 'blue', 'violet', 'rose'].includes(settings.colorTheme)) return 'invalid_color_theme';
   if (!isBoundedString(settings.timezone, 1, 100)) {
     return 'invalid_timezone';
   }
@@ -109,12 +110,13 @@ export const validateSettings = (settings) => {
   const wallpaper = settings.wallpaper;
   if (
     !isPlainObject(wallpaper) ||
-    !hasOnlyKeys(wallpaper, ['url', 'blur', 'overlay']) ||
+    !hasOnlyKeys(wallpaper, ['url', 'blur', 'overlay', 'panelOpacity']) ||
     typeof wallpaper.url !== 'string' ||
     wallpaper.url.length > 2048 ||
     !isValidWallpaperUrl(wallpaper.url) ||
     !Number.isInteger(wallpaper.blur) || wallpaper.blur < 0 || wallpaper.blur > 30 ||
-    !Number.isInteger(wallpaper.overlay) || wallpaper.overlay < 0 || wallpaper.overlay > 90
+    !Number.isInteger(wallpaper.overlay) || wallpaper.overlay < 0 || wallpaper.overlay > 90 ||
+    !Number.isInteger(wallpaper.panelOpacity) || wallpaper.panelOpacity < 35 || wallpaper.panelOpacity > 100
   ) return 'invalid_wallpaper_settings';
   const validStringList = (value) =>
     Array.isArray(value) &&

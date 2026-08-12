@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AppSettings } from '../types';
 
-export const useTheme = (theme: AppSettings['theme']) => {
+export const useTheme = (theme: AppSettings['theme'], colorTheme: AppSettings['colorTheme']) => {
   useEffect(() => {
     const apply = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -13,6 +13,7 @@ export const useTheme = (theme: AppSettings['theme']) => {
     };
 
     apply();
+    document.documentElement.dataset.colorTheme = colorTheme;
 
     // Listen for system changes if theme is system
     if (theme === 'system') {
@@ -21,5 +22,5 @@ export const useTheme = (theme: AppSettings['theme']) => {
       mediaQuery.addEventListener('change', handler);
       return () => mediaQuery.removeEventListener('change', handler);
     }
-  }, [theme]);
+  }, [theme, colorTheme]);
 };

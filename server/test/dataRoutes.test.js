@@ -177,6 +177,7 @@ test('general settings updates cannot modify or return server-managed 2FA fields
     url: 'https://images.example.test/background.webp',
     blur: 8,
     overlay: 42,
+    panelOpacity: 76,
   };
   incoming.notifications.rules.channels = {
     0: 'telegram',

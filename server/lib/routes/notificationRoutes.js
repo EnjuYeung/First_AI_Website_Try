@@ -1,5 +1,9 @@
 import { renderReminderTemplate, DEFAULT_REMINDER_TEMPLATE_STRING } from '../../../shared/reminderTemplate.js';
 import {
+  DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+  renderMonthlySummaryTemplate,
+} from '../../../shared/monthlySummaryTemplate.js';
+import {
   createTelegramWebhookSecret,
   sendTelegramMessage,
   ensureTelegramWebhook,
@@ -62,14 +66,28 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
         botToken,
         `${baseUrl}/api/telegram/webhook`
       );
-      const template = req.body?.template || settings.notifications.rules.template;
-      const message = renderReminderTemplate(template || DEFAULT_REMINDER_TEMPLATE_STRING, {
-        name: '测试订阅',
-        nextBillingDate: new Date().toISOString().slice(0, 10),
-        price: '0.00',
-        currency: '',
-        paymentMethod: '测试支付方式',
-      });
+      const templateType = req.body?.templateType === 'monthlySummary'
+        ? 'monthlySummary'
+        : 'renewalReminder';
+      const template = req.body?.template;
+      const message = templateType === 'monthlySummary'
+        ? renderMonthlySummaryTemplate(
+            template || settings.notifications.rules.monthlySummaryTemplate || DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+            {
+              month: '2026年7月',
+              totalPaidUsd: 42.5,
+              activeSubscriptions: 8,
+              newSubscriptions: '月付 2 个',
+              cancelledSubscriptions: 1,
+            },
+          )
+        : renderReminderTemplate(template || settings.notifications.rules.template || DEFAULT_REMINDER_TEMPLATE_STRING, {
+            name: '测试订阅',
+            nextBillingDate: new Date().toISOString().slice(0, 10),
+            price: '0.00',
+            currency: '',
+            paymentMethod: '测试支付方式',
+          });
       await sendTelegramMessage({ debug: config.debugTelegram }, botToken, chatId, message, null);
       res.json({ ok: true });
     } catch (err) {

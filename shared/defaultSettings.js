@@ -30,10 +30,12 @@ export const createDefaultSettings = () => ({
   language: 'zh',
   timezone: 'Asia/Shanghai',
   theme: 'system',
+  colorTheme: 'default',
   wallpaper: {
     url: '',
     blur: 0,
     overlay: 36,
+    panelOpacity: 100,
   },
   customCategories: [...DEFAULT_CATEGORIES],
   customPaymentMethods: [...DEFAULT_PAYMENT_METHODS],
