@@ -178,6 +178,11 @@ test('general settings updates cannot modify or return server-managed 2FA fields
     blur: 8,
     overlay: 42,
   };
+  incoming.notifications.rules.channels = {
+    0: 'telegram',
+    renewalReminder: ['telegram'],
+    monthlySummary: ['email'],
+  };
   incoming.security = {
     twoFactorEnabled: false,
     twoFactorSecret: '',
@@ -198,6 +203,10 @@ test('general settings updates cannot modify or return server-managed 2FA fields
   assert.equal(response.statusCode, 200);
   assert.equal(savedSettings.timezone, 'Asia/Shanghai');
   assert.deepEqual(savedSettings.wallpaper, incoming.wallpaper);
+  assert.deepEqual(savedSettings.notifications.rules.channels, {
+    renewalReminder: ['telegram'],
+    monthlySummary: ['email'],
+  });
   assert.deepEqual(savedSettings.security, currentSettings.security);
   assert.deepEqual(response.body.data.security, {
     twoFactorEnabled: true,

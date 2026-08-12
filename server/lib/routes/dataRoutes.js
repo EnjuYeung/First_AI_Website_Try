@@ -7,6 +7,7 @@ import {
   validateSubscriptions,
 } from '../../../shared/dataSchema.js';
 import { formatDateInTimeZone } from '../dates.js';
+import { normalizeRuleChannels } from '../../../shared/constants.js';
 
 const uploadedIconFilename = (url) =>
   /^\/api\/uploads\/([a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
@@ -222,6 +223,15 @@ export const registerDataRoutes = ({
         // reauthenticated /api/2fa routes.
         security: currentSettings.security,
       };
+      if (nextSettings.notifications?.rules) {
+        nextSettings.notifications = {
+          ...nextSettings.notifications,
+          rules: {
+            ...nextSettings.notifications.rules,
+            channels: normalizeRuleChannels(nextSettings.notifications.rules.channels),
+          },
+        };
+      }
       const error = validateSettings(nextSettings);
       if (error) {
         const validationError = new Error(error);

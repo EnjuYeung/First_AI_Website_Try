@@ -776,7 +776,15 @@ textarea {
 .rail-node-trigger {
   padding: 0;
   cursor: pointer;
+  touch-action: manipulation;
   transition: transform 160ms ease, filter 160ms ease;
+}
+
+.rail-node-trigger::before {
+  position: absolute;
+  inset: -8px;
+  border-radius: 999px;
+  content: "";
 }
 
 .rail-node-trigger:hover {
@@ -823,12 +831,12 @@ textarea {
 }
 
 .rail-event-popover[data-align="start"] {
-  left: -8px;
+  left: 50%;
   transform: none;
 }
 
 .rail-event-popover[data-align="end"] {
-  right: -8px;
+  right: 50%;
   left: auto;
   transform: none;
 }

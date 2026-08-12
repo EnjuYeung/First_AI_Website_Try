@@ -47,4 +47,22 @@ describe('persisted settings normalization', () => {
     expect(data.settings.customPaymentMethods).toEqual(['Cash only']);
     expect(data.serverTime).toBe(1_786_080_000_000);
   });
+
+  it('migrates a legacy shared notification channel list to both rules', async () => {
+    const settings = getDefaultSettings();
+    (settings.notifications.rules as any).channels = ['telegram', 'invalid', 'telegram'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      subscriptions: [],
+      notifications: [],
+      settings,
+      revisions: { subscriptions: 1, settings: 1, notifications: 1 },
+      serverTime: 1_786_080_000_000,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    const data = await fetchAllData();
+    expect(data.settings.notifications.rules.channels).toEqual({
+      renewalReminder: ['telegram'],
+      monthlySummary: ['telegram'],
+    });
+  });
 });

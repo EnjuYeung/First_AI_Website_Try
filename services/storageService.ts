@@ -8,6 +8,7 @@ import {
   normalizeMonthlySummaryTemplateString,
 } from '../shared/monthlySummaryTemplate.js';
 import { createDefaultSettings, normalizeExchangeRates } from '../shared/defaultSettings.js';
+import { normalizeRuleChannels } from '../shared/constants.js';
 
 const API_BASE = '/api';
 
@@ -147,10 +148,10 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     reminderDays: parsedRules.reminderDays ?? DEFAULT_SETTINGS.notifications.rules.reminderDays,
     template: normalizedTemplate,
     monthlySummaryTemplate: normalizedMonthlySummaryTemplate,
-    channels: {
-      ...DEFAULT_SETTINGS.notifications.rules.channels,
-      ...(parsedRules.channels || {})
-    }
+    channels: normalizeRuleChannels(
+      parsedRules.channels,
+      DEFAULT_SETTINGS.notifications.rules.channels,
+    ),
   };
 
   const mergeStringList = (existing: any, defaults: string[], canonicalize: (v: string) => string) => {

@@ -14,7 +14,7 @@ import {
   userFeaturePath,
 } from './storagePaths.js';
 import { defaultSettings, defaultUserData } from './defaults.js';
-import { DEFAULT_RULE_CHANNELS } from '../../shared/constants.js';
+import { DEFAULT_RULE_CHANNELS, normalizeRuleChannels } from '../../shared/constants.js';
 import {
   DEFAULT_REMINDER_TEMPLATE_STRING,
   normalizeReminderTemplateString,
@@ -122,10 +122,7 @@ const mergeSettings = (incoming, timeZone = 'Asia/Shanghai') => {
     reminderDays: parsedRules.reminderDays ?? base.notifications.rules.reminderDays,
     template,
     monthlySummaryTemplate,
-    channels: {
-      ...DEFAULT_RULE_CHANNELS,
-      ...(parsedRules.channels || {}),
-    },
+    channels: normalizeRuleChannels(parsedRules.channels, DEFAULT_RULE_CHANNELS),
   };
 
   return {

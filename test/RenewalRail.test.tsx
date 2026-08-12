@@ -19,10 +19,10 @@ const makeSubscription = (id: string, name: string, price: number): Subscription
 });
 
 describe('RenewalRail grouped event details', () => {
-  it('opens grouped subscription details from the rail node without a count badge', () => {
+  it('opens grouped subscription details on the first day at the start edge', () => {
     const events: RenewalRailEvent[] = [
-      { sub: makeSubscription('one', 'Netflix', 15.49), date: new Date('2026-08-14T00:00:00Z'), cost: 15.49, state: 'pending' },
-      { sub: makeSubscription('two', 'Claude Pro', 20), date: new Date('2026-08-14T00:00:00Z'), cost: 20, state: 'pending' },
+      { sub: makeSubscription('one', 'Netflix', 15.49), date: new Date('2026-08-01T00:00:00Z'), cost: 15.49, state: 'paid' },
+      { sub: makeSubscription('two', 'Claude Pro', 20), date: new Date('2026-08-01T00:00:00Z'), cost: 20, state: 'paid' },
     ];
     const { container } = render(
       <RenewalRail
@@ -31,7 +31,7 @@ describe('RenewalRail grouped event details', () => {
         lang="en"
         timeZone="UTC"
         serverClock={{
-          serverTimeMs: Date.parse('2026-08-12T00:00:00Z'),
+          serverTimeMs: Date.parse('2026-08-01T00:00:00Z'),
           receivedAtMs: Date.now(),
         }}
       />,
@@ -43,6 +43,7 @@ describe('RenewalRail grouped event details', () => {
     fireEvent.click(screen.getByRole('button', { name: /Netflix \+1.*View Details/ }));
 
     const details = screen.getByRole('region', { name: 'View Details' });
+    expect(details.getAttribute('data-align')).toBe('start');
     expect(details.textContent).toContain('Netflix');
     expect(details.textContent).toContain('$15.49');
     expect(details.textContent).toContain('Claude Pro');
