@@ -4,46 +4,8 @@ import {
   renderMonthlySummaryTemplate,
 } from '../../../shared/monthlySummaryTemplate.js';
 import {
-  createTelegramWebhookSecret,
   sendTelegramMessage,
-  ensureTelegramWebhook,
 } from '../telegram.js';
-
-const normalizeBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
-
-const normalizeHttpsBaseUrl = (value) => {
-  const normalized = normalizeBaseUrl(value);
-  if (!normalized) return '';
-  try {
-    const parsed = new URL(normalized);
-    if (
-      parsed.protocol !== 'https:' ||
-      !parsed.hostname ||
-      parsed.username ||
-      parsed.password ||
-      parsed.pathname !== '/' ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return '';
-    }
-    return parsed.origin;
-  } catch {
-    return '';
-  }
-};
-
-const resolveWebhookBaseUrl = (req, config) => {
-  if (config.publicBaseUrl) return normalizeHttpsBaseUrl(config.publicBaseUrl);
-  const host = req.get('host');
-  const proto = String(req.protocol || '').trim();
-  const inferred = host && proto ? normalizeHttpsBaseUrl(`${proto}://${host}`) : '';
-  if (!inferred) return '';
-  if (!Array.isArray(config.allowedOrigins) || !config.allowedOrigins.includes(inferred)) {
-    return '';
-  }
-  return inferred;
-};
 
 export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
   app.post('/api/notifications/test-telegram', auth.authMiddleware, async (req, res) => {
@@ -54,18 +16,6 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
       if (!enabled || !botToken || !chatId) {
         return res.status(400).json({ ok: false, message: 'telegram_not_configured' });
       }
-      const baseUrl = resolveWebhookBaseUrl(req, config);
-      if (!baseUrl) {
-        return res.status(400).json({ ok: false, message: 'telegram_webhook_https_required' });
-      }
-      await ensureTelegramWebhook(
-        {
-          debug: config.debugTelegram,
-          secretToken: createTelegramWebhookSecret(config.jwtSecret, botToken),
-        },
-        botToken,
-        `${baseUrl}/api/telegram/webhook`
-      );
       const templateType = req.body?.templateType === 'monthlySummary'
         ? 'monthlySummary'
         : 'renewalReminder';

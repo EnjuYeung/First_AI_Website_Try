@@ -69,7 +69,7 @@ const request = ({ protocol = 'http', host = 'internal.example.test', body = {} 
   },
 });
 
-test('configured HTTPS public base URL is used behind an HTTP proxy hop', async (t) => {
+test('test notification sends a message without registering a webhook', async (t) => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push({ url: String(url), body: JSON.parse(options.body) });
@@ -85,14 +85,12 @@ test('configured HTTPS public base URL is used behind an HTTP proxy hop', async 
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { ok: true });
-  assert.equal(calls.length, 2);
-  assert.match(calls[0].url, /\/setWebhook$/);
-  assert.equal(calls[0].body.url, 'https://subm.example.test/api/telegram/webhook');
-  assert.equal(typeof calls[0].body.secret_token, 'string');
-  assert.match(calls[1].url, /\/sendMessage$/);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/sendMessage$/);
+  assert.equal(calls[0].body.chat_id, 'chat-1');
 });
 
-test('trusted HTTPS request origin can be used when public base URL is unset', async (t) => {
+test('test notification does not require a public HTTPS origin', async (t) => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push({ url: String(url), body: JSON.parse(options.body) });
@@ -100,14 +98,15 @@ test('trusted HTTPS request origin can be used when public base URL is unset', a
   });
   const handler = registerTestRoute({
     botToken: '102:inferred-route-token',
-    config: { allowedOrigins: ['https://subm.example.test'] },
+    config: { allowedOrigins: [] },
   });
   const res = response();
 
-  await handler(request({ protocol: 'https', host: 'SUBM.EXAMPLE.TEST:443' }), res);
+  await handler(request({ protocol: 'http', host: 'localhost:3001' }), res);
 
   assert.equal(res.statusCode, 200);
-  assert.equal(calls[0].body.url, 'https://subm.example.test/api/telegram/webhook');
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/sendMessage$/);
 });
 
 test('monthly summary template tests render the monthly sample payload', async (t) => {
@@ -130,47 +129,11 @@ test('monthly summary template tests render the monthly sample payload', async (
   }), res);
 
   assert.equal(res.statusCode, 200);
-  assert.equal(calls.length, 2);
-  assert.match(calls[1].body.text, /SUMMARY 2026年7月 \/ 8/);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].body.text, /SUMMARY 2026年7月 \/ 8/);
 });
 
-test('HTTP and untrusted inferred origins are rejected before calling Telegram', async (t) => {
-  let fetchCalls = 0;
-  t.mock.method(globalThis, 'fetch', async () => {
-    fetchCalls += 1;
-    return telegramOk();
-  });
-  const handler = registerTestRoute({
-    botToken: '103:rejected-route-token',
-    config: { allowedOrigins: ['https://subm.example.test'] },
-  });
-
-  for (const req of [
-    request({ protocol: 'http', host: 'subm.example.test' }),
-    request({ protocol: 'https', host: 'attacker.example.test' }),
-  ]) {
-    const res = response();
-    await handler(req, res);
-    assert.equal(res.statusCode, 400);
-    assert.deepEqual(res.body, {
-      ok: false,
-      message: 'telegram_webhook_https_required',
-    });
-  }
-  const missingAllowlistHandler = registerTestRoute({
-    botToken: '105:missing-allowlist-token',
-    config: { allowedOrigins: undefined },
-  });
-  const missingAllowlistResponse = response();
-  await missingAllowlistHandler(
-    request({ protocol: 'https', host: 'subm.example.test' }),
-    missingAllowlistResponse
-  );
-  assert.equal(missingAllowlistResponse.statusCode, 400);
-  assert.equal(fetchCalls, 0);
-});
-
-test('test message is not sent when webhook registration fails', async (t) => {
+test('Telegram send failures are returned by the test endpoint', async (t) => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push({ url: String(url), body: JSON.parse(options.body) });
@@ -178,7 +141,7 @@ test('test message is not sent when webhook registration fails', async (t) => {
       ok: false,
       status: 400,
       async json() {
-        return { ok: false, description: 'webhook_registration_failed' };
+        return { ok: false, description: 'telegram_send_failed' };
       },
     };
   });
@@ -191,7 +154,7 @@ test('test message is not sent when webhook registration fails', async (t) => {
   await handler(request(), res);
 
   assert.equal(res.statusCode, 400);
-  assert.deepEqual(res.body, { ok: false, message: 'webhook_registration_failed' });
+  assert.deepEqual(res.body, { ok: false, message: 'telegram_send_failed' });
   assert.equal(calls.length, 1);
-  assert.match(calls[0].url, /\/setWebhook$/);
+  assert.match(calls[0].url, /\/sendMessage$/);
 });
