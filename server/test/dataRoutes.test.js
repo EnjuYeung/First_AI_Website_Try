@@ -112,6 +112,8 @@ test('data responses expose 2FA status without exposing TOTP seeds', async () =>
     twoFactorEnabled: true,
     lastPasswordChange: '2026-01-01T00:00:00.000Z',
   });
+  assert.equal(typeof response.body.serverTime, 'number');
+  assert.ok(Number.isFinite(response.body.serverTime));
   assert.equal(stored.settings.security.twoFactorSecret, 'ACTIVE-TOTP-SEED');
   assert.equal(stored.settings.security.pendingTwoFactorSecret, 'PENDING-TOTP-SEED');
 });

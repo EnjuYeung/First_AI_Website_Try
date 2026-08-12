@@ -12,6 +12,7 @@ export interface PersistedData {
   settings: AppSettings;
   notifications: NotificationRecord[];
   revisions: DataRevisions;
+  serverTime: number;
 }
 
 export interface DataRevisions {
@@ -180,6 +181,7 @@ export const fetchAllData = async (): Promise<PersistedData> => {
         settings: Number(data.revisions?.settings || 0),
         notifications: Number(data.revisions?.notifications || 0),
       },
+      serverTime: Number.isFinite(data.serverTime) ? Number(data.serverTime) : Date.now(),
     };
   } catch (error: any) {
     if (error instanceof UnauthorizedError) {

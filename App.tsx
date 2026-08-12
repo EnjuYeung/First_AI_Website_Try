@@ -24,7 +24,7 @@ const App: React.FC = () => {
   const { isAuthenticated, isLoadingAuth, login, logout } = useAuth();
   const { language, setLanguage, theme, setTheme } = useClientPreferences();
   const {
-    subscriptions, settings, notifications, isDataLoading,
+    subscriptions, settings, notifications, serverClock, isDataLoading,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
     batchDeleteSubscriptions, duplicateSubscription, deleteNotification, clearNotifications,
     lastMutationError, clearMutationError
@@ -182,7 +182,14 @@ const App: React.FC = () => {
       <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 pb-28 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:px-8 lg:pt-10">
         <Suspense fallback={<div className="py-16 text-center text-gray-500">{language === 'zh' ? '加载中…' : 'Loading…'}</div>}>
         <div className="animate-fade-in">
-          {activeTab === 'dashboard' && <Dashboard subscriptions={subscriptions} lang={language} settings={clientSettings} />}
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              subscriptions={subscriptions}
+              lang={language}
+              settings={clientSettings}
+              serverClock={serverClock}
+            />
+          )}
 
           {activeTab === 'list' && (
             <SubscriptionList

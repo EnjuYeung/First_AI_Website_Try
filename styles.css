@@ -43,6 +43,8 @@
   --due-amber-soft: #f8edcf;
   --alert-coral: #d65f50;
   --alert-coral-soft: #fae4df;
+  --rail-count-bg: #183139;
+  --rail-count-ink: #ffffff;
   --shadow-panel: 0 1px 2px rgba(24, 49, 57, 0.04), 0 14px 38px rgba(24, 49, 57, 0.05);
   --shadow-float: 0 24px 70px rgba(15, 35, 41, 0.18);
 }
@@ -64,6 +66,8 @@
   --due-amber-soft: #46391f;
   --alert-coral: #ee8072;
   --alert-coral-soft: #4a2a28;
+  --rail-count-bg: #071316;
+  --rail-count-ink: #f6fbfa;
   --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 54px rgba(0, 0, 0, 0.16);
   --shadow-float: 0 28px 80px rgba(0, 0, 0, 0.45);
 }
@@ -332,15 +336,39 @@ textarea {
 
 .rail-canvas {
   position: relative;
-  min-width: 920px;
-  height: 230px;
+  min-width: 1120px;
+  height: 390px;
+}
+
+.rail-legend {
+  position: absolute;
+  top: 18px;
+  left: 48px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 6%, transparent);
+  font-size: 0.69rem;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.rail-track {
+  position: absolute;
+  inset: 0 48px;
 }
 
 .rail-line {
   position: absolute;
-  right: 34px;
+  right: 0;
   bottom: 72px;
-  left: 34px;
+  left: 0;
   height: 2px;
   border-radius: 99px;
   background: var(--line-strong);
@@ -352,6 +380,13 @@ textarea {
   width: 1px;
   height: 14px;
   background: var(--line-strong);
+}
+
+.rail-month-end {
+  bottom: -8px;
+  height: 18px;
+  background: var(--muted);
+  opacity: 0.65;
 }
 
 .rail-tick-label {
@@ -366,6 +401,7 @@ textarea {
 .rail-event {
   position: absolute;
   bottom: 73px;
+  z-index: 2;
   width: 94px;
   height: 16px;
   transform: translateX(-50%);
@@ -457,19 +493,24 @@ textarea {
   place-items: center;
   border: 2px solid var(--surface);
   border-radius: 999px;
-  color: #fff;
-  background: var(--ink);
+  color: var(--rail-count-ink);
+  background: var(--rail-count-bg);
   font-family: var(--font-mono);
   font-size: 0.62rem;
+  font-weight: 600;
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--rail-count-bg) 30%, transparent);
 }
 
 .today-marker {
   position: absolute;
-  top: 18px;
-  bottom: 47px;
+  top: 54px;
+  bottom: 72px;
+  z-index: 1;
   width: 1px;
   background: var(--alert-coral);
   animation: todayMarkerIn 650ms cubic-bezier(.2,.8,.2,1) both;
+  pointer-events: none;
+  transition: left 1s linear;
 }
 
 .today-marker span {
@@ -484,6 +525,17 @@ textarea {
   font-size: 0.62rem;
   white-space: nowrap;
   transform: translateX(-50%);
+}
+
+.today-marker[data-edge="start"] span {
+  left: 0;
+  transform: none;
+}
+
+.today-marker[data-edge="end"] span {
+  right: 0;
+  left: auto;
+  transform: none;
 }
 
 .statement-card {

@@ -7,19 +7,19 @@ import {
   Clock3,
   TrendingUp,
 } from 'lucide-react';
-import { AppSettings, Subscription } from '../types';
+import { AppSettings, ServerClock, Subscription } from '../types';
 import { getT } from '../services/i18n';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { daysUntilYMD, formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
 import { addBillingCycleYMD } from '../shared/billingDate.js';
 import { formatCurrency } from '../services/currency';
-import DashboardAnalytics from './DashboardAnalytics';
 import RenewalRail, { RenewalRailEvent } from './RenewalRail';
 
 interface Props {
   subscriptions: Subscription[];
   settings: AppSettings;
   lang: 'en' | 'zh';
+  serverClock: ServerClock;
 }
 
 interface BillingEvent {
@@ -48,9 +48,18 @@ const convertToUSD = (amount: number, currency: string, rates: Record<string, nu
   return amount / rate;
 };
 
-const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings): DashboardStats => {
+const useDashboardStats = (
+  subscriptions: Subscription[],
+  settings: AppSettings,
+  serverClock: ServerClock,
+): DashboardStats => {
+  const serverNow = new Date(
+    serverClock.serverTimeMs + Math.max(0, Date.now() - serverClock.receivedAtMs),
+  );
+  const serverTodayYmd = getTodayYMD(settings.timezone, serverNow);
+
   return useMemo(() => {
-    const today = parseLocalYMD(getTodayYMD(settings.timezone));
+    const today = parseLocalYMD(serverTodayYmd);
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
     const monthStart = new Date(currentYear, currentMonth, 1);
@@ -149,7 +158,7 @@ const useDashboardStats = (subscriptions: Subscription[], settings: AppSettings)
     stats.upcomingRenewals.sort((a, b) => a.date.getTime() - b.date.getTime());
     stats.monthlyEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
     return stats;
-  }, [subscriptions, settings.exchangeRates, settings.timezone]);
+  }, [serverTodayYmd, subscriptions, settings.exchangeRates]);
 };
 
 const ServiceAvatar = ({ sub }: { sub: Subscription }) => (
@@ -214,10 +223,13 @@ const PaymentList: React.FC<{
   );
 };
 
-const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
+const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings, serverClock }) => {
   const t = getT(lang);
-  const data = useDashboardStats(subscriptions, settings);
-  const today = parseLocalYMD(getTodayYMD(settings.timezone));
+  const data = useDashboardStats(subscriptions, settings, serverClock);
+  const serverNow = new Date(
+    serverClock.serverTimeMs + Math.max(0, Date.now() - serverClock.receivedAtMs),
+  );
+  const today = parseLocalYMD(getTodayYMD(settings.timezone, serverNow));
   const monthLabel = new Intl.DateTimeFormat(lang === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: 'long',
@@ -245,6 +257,7 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
         monthlyTotal={data.monthlyPaid + data.monthlyPending}
         lang={lang}
         timeZone={settings.timezone}
+        serverClock={serverClock}
       />
 
       <section className="statement-card grid grid-cols-2 overflow-hidden md:grid-cols-4" aria-label={t('monthly_statement')}>
@@ -276,8 +289,6 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings }) => {
           upcoming
         />
       </div>
-
-      <DashboardAnalytics subscriptions={subscriptions} settings={settings} lang={lang} />
     </div>
   );
 };

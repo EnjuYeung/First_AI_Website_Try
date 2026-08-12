@@ -39,10 +39,12 @@ describe('persisted settings normalization', () => {
       notifications: [],
       settings,
       revisions: { subscriptions: 1, settings: 1, notifications: 1 },
+      serverTime: 1_786_080_000_000,
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
 
     const data = await fetchAllData();
     expect(data.settings.customCategories).toEqual(['Custom only']);
     expect(data.settings.customPaymentMethods).toEqual(['Cash only']);
+    expect(data.serverTime).toBe(1_786_080_000_000);
   });
 });

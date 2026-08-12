@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Subscription, AppSettings, NotificationRecord } from '../types';
+import { Subscription, AppSettings, NotificationRecord, ServerClock } from '../types';
 import {
   clearNotificationHistory,
   createSubscription,
@@ -30,6 +30,10 @@ export const useAppData = (
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [serverClock, setServerClock] = useState<ServerClock>(() => {
+    const now = Date.now();
+    return { serverTimeMs: now, receivedAtMs: now };
+  });
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [lastMutationError, setLastMutationError] = useState<unknown>(null);
   const onUnauthorizedRef = useRef<(() => void) | undefined>(onUnauthorized);
@@ -68,9 +72,11 @@ export const useAppData = (
     setIsDataLoading(true);
     try {
       const data = await fetchAllData();
+      const receivedAtMs = Date.now();
       applySubscriptions(data.subscriptions);
       applySettings(data.settings);
       applyNotifications(data.notifications || []);
+      setServerClock({ serverTimeMs: data.serverTime, receivedAtMs });
       revisionsRef.current = data.revisions;
       lastLoadedAtRef.current = Date.now();
       return { ok: true };
@@ -259,6 +265,7 @@ export const useAppData = (
     subscriptions,
     settings,
     notifications,
+    serverClock,
     isDataLoading,
     lastMutationError,
     clearMutationError: () => setLastMutationError(null),

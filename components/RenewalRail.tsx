@@ -1,9 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarRange } from 'lucide-react';
-import { Subscription } from '../types';
+import { ServerClock, Subscription } from '../types';
 import { formatCurrency } from '../services/currency';
-import { formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
+import { daysUntilYMD, formatLocalYMD } from '../services/dateUtils';
 import { getT } from '../services/i18n';
+import {
+  assignRailLanes,
+  getDaysInRailMonth,
+  getZonedRailDateTimeParts,
+  railPositionForDay,
+  railPositionForInstant,
+} from '../services/renewalRail';
 
 export interface RenewalRailEvent {
   sub: Subscription;
@@ -17,6 +24,7 @@ interface Props {
   monthlyTotal: number;
   lang: 'en' | 'zh';
   timeZone: string;
+  serverClock: ServerClock;
 }
 
 interface RailGroup {
@@ -26,14 +34,35 @@ interface RailGroup {
   lane: number;
 }
 
-const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone }) => {
+const extrapolateServerNow = (clock: ServerClock): number => (
+  clock.serverTimeMs + Math.max(0, Date.now() - clock.receivedAtMs)
+);
+
+const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, serverClock }) => {
   const t = getT(lang);
-  const today = parseLocalYMD(getTodayYMD(timeZone));
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const [serverNowMs, setServerNowMs] = useState(() => extrapolateServerNow(serverClock));
+  const serverNow = new Date(serverNowMs);
+  const zonedNow = getZonedRailDateTimeParts(serverNowMs, timeZone);
+  const daysInMonth = getDaysInRailMonth(serverNowMs, timeZone);
   const monthLabel = new Intl.DateTimeFormat(lang === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: 'long',
-  }).format(today);
+    timeZone,
+  }).format(serverNow);
+  const liveTimeLabel = new Intl.DateTimeFormat(lang === 'zh' ? 'zh-CN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  }).format(serverNow);
+
+  useEffect(() => {
+    const updateNow = () => setServerNowMs(extrapolateServerNow(serverClock));
+    updateNow();
+    const timer = window.setInterval(updateNow, 1_000);
+    return () => window.clearInterval(timer);
+  }, [serverClock]);
 
   const groups = useMemo(() => {
     const byDay = new Map<number, RenewalRailEvent[]>();
@@ -42,28 +71,20 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone }) 
       byDay.set(day, [...(byDay.get(day) || []), event]);
     });
 
-    let previousDay = -10;
-    let previousLane = 0;
-    return [...byDay.entries()]
-      .sort(([dayA], [dayB]) => dayA - dayB)
-      .map(([day, groupedEvents]): RailGroup => {
-        const lane = day - previousDay < 4 ? (previousLane === 0 ? 1 : 0) : 0;
-        previousDay = day;
-        previousLane = lane;
+    const sortedEntries = [...byDay.entries()].sort(([dayA], [dayB]) => dayA - dayB);
+    const lanes = assignRailLanes(sortedEntries.map(([day]) => day));
+    return sortedEntries
+      .map(([day, groupedEvents], index): RailGroup => {
         return {
           day,
           events: groupedEvents,
           amount: groupedEvents.reduce((sum, event) => sum + event.cost, 0),
-          lane,
+          lane: lanes[index],
         };
       });
   }, [events]);
 
   const tickDays = Array.from({ length: daysInMonth }, (_, index) => index + 1);
-  const positionForDay = (day: number) => {
-    const ratio = daysInMonth <= 1 ? 0 : (day - 1) / (daysInMonth - 1);
-    return 3.8 + ratio * 92.4;
-  };
 
   return (
     <section className="renewal-rail-card" aria-labelledby="renewal-rail-title">
@@ -89,81 +110,89 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone }) 
 
       <div className="overflow-x-auto">
         <div className="rail-canvas" role="img" aria-label={`${monthLabel}: ${events.length} ${t('planned_charges')}`}>
-          <div className="absolute left-[34px] top-5 flex items-center gap-4 text-[11px] text-[var(--muted)]">
+          <div className="rail-legend">
             <span className="flex items-center gap-1.5 text-[var(--rail-teal)]"><i className="status-dot" />{t('paid')}</span>
             <span className="flex items-center gap-1.5 text-[var(--due-amber)]"><i className="status-dot" />{t('pending')}</span>
           </div>
 
-          {groups.map((group, index) => {
-            const first = group.events[0];
-            const daysUntil = Math.round((first.date.getTime() - today.getTime()) / 86400000);
-            const state = group.events.every((event) => event.state === 'paid')
-              ? 'paid'
-              : daysUntil <= 3
-                ? 'urgent'
-                : 'upcoming';
-            const serviceLabel = group.events.length > 1
-              ? `${first.sub.name} +${group.events.length - 1}`
-              : first.sub.name;
-            const title = group.events
-              .map((event) => `${event.sub.name} · ${formatCurrency(event.cost, 'USD')}`)
-              .join('\n');
-
-            return (
-              <div
-                key={group.day}
-                className="rail-event"
-                data-state={state}
-                title={title}
-                style={{
-                  left: `${positionForDay(group.day)}%`,
-                  '--rail-delay': `${140 + index * 65}ms`,
-                  '--rail-label-bottom': group.lane === 1 ? '72px' : '28px',
-                } as React.CSSProperties}
-              >
-                <div className="rail-event-label">
-                  <div className="rail-service-icon" aria-hidden="true">
-                    {first.sub.iconUrl ? (
-                      <img src={first.sub.iconUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
-                    ) : (
-                      <span>{first.sub.name.charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <strong>{serviceLabel}</strong>
-                  <span>{formatCurrency(group.amount, 'USD')}</span>
-                </div>
-                <span className="rail-node">
-                  {group.events.length > 1 && <span className="rail-count">{group.events.length}</span>}
-                </span>
-              </div>
-            );
-          })}
-
-          <div className="today-marker" style={{ left: `${positionForDay(today.getDate())}%` }}>
-            <span>{t('today')}</span>
-          </div>
-
-          <div className="rail-line">
-            {tickDays.map((day) => {
-              const position = ((day - 1) / Math.max(daysInMonth - 1, 1)) * 100;
-              const showLabel = day === 1 || day === daysInMonth || day % 5 === 0 || day === today.getDate();
+          <div className="rail-track">
+            {groups.map((group, index) => {
+              const first = group.events[0];
+              const daysUntil = daysUntilYMD(formatLocalYMD(first.date), timeZone, serverNow);
+              const state = group.events.every((event) => event.state === 'paid')
+                ? 'paid'
+                : daysUntil <= 3
+                  ? 'urgent'
+                  : 'upcoming';
+              const serviceLabel = group.events.length > 1
+                ? `${first.sub.name} +${group.events.length - 1}`
+                : first.sub.name;
+              const title = group.events
+                .map((event) => `${event.sub.name} · ${formatCurrency(event.cost, 'USD')}`)
+                .join('\n');
               return (
-                <React.Fragment key={day}>
-                  <i className="rail-tick" style={{ left: `${position}%` }} />
-                  {showLabel && <span className="rail-tick-label" style={{ left: `${position}%` }}>{String(day).padStart(2, '0')}</span>}
-                </React.Fragment>
+                <div
+                  key={group.day}
+                  className="rail-event"
+                  data-state={state}
+                  data-lane={group.lane}
+                  title={title}
+                  style={{
+                    left: `${railPositionForDay(group.day, daysInMonth)}%`,
+                    '--rail-delay': `${140 + index * 65}ms`,
+                    '--rail-label-bottom': `${28 + group.lane * 72}px`,
+                  } as React.CSSProperties}
+                >
+                  <div className="rail-event-label">
+                    <div className="rail-service-icon" aria-hidden="true">
+                      {first.sub.iconUrl ? (
+                        <img src={first.sub.iconUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span>{first.sub.name.charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <strong>{serviceLabel}</strong>
+                    <span>{formatCurrency(group.amount, 'USD')}</span>
+                  </div>
+                  <span className="rail-node">
+                    {group.events.length > 1 && <span className="rail-count">{group.events.length}</span>}
+                  </span>
+                </div>
               );
             })}
+
+            <div
+              className="today-marker"
+              data-edge={zonedNow.day === 1 ? 'start' : zonedNow.day === daysInMonth ? 'end' : undefined}
+              style={{ left: `${railPositionForInstant(serverNowMs, timeZone)}%` }}
+              title={`${t('today')} · ${liveTimeLabel}`}
+            >
+              <span>{t('today')} · {liveTimeLabel}</span>
+            </div>
+
+            <div className="rail-line">
+              {tickDays.map((day) => {
+                const position = railPositionForDay(day, daysInMonth);
+                const showLabel = day === 1 || day === daysInMonth || day % 5 === 0 || day === zonedNow.day;
+                return (
+                  <React.Fragment key={day}>
+                    <i className="rail-tick" style={{ left: `${position}%` }} />
+                    {showLabel && <span className="rail-tick-label" style={{ left: `${position}%` }}>{String(day).padStart(2, '0')}</span>}
+                  </React.Fragment>
+                );
+              })}
+              <i className="rail-tick rail-month-end" style={{ left: '100%' }} />
+            </div>
           </div>
 
           {events.length === 0 && (
-            <div className="absolute inset-x-0 top-[92px] text-center text-sm text-[var(--muted)]">
+            <div className="absolute inset-x-0 top-[185px] text-center text-sm text-[var(--muted)]">
               {t('rail_empty')}
             </div>
           )}
 
-          <span className="absolute bottom-5 left-[34px] font-mono text-[11px] text-[var(--muted)]">{monthLabel}</span>
-          <span className="absolute bottom-5 right-[34px] font-mono text-[11px] text-[var(--muted)]">
+          <span className="absolute bottom-5 left-[48px] font-mono text-[11px] text-[var(--muted)]">{monthLabel}</span>
+          <span className="absolute bottom-5 right-[48px] font-mono text-[11px] text-[var(--muted)]">
             {events.length} {t('planned_charges')}
           </span>
         </div>

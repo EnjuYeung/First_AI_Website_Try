@@ -84,6 +84,11 @@ export interface Subscription {
   notificationsEnabled: boolean;
 }
 
+export interface ServerClock {
+  serverTimeMs: number;
+  receivedAtMs: number;
+}
+
 // --- Settings Types ---
 
 export interface CurrencyConfig {

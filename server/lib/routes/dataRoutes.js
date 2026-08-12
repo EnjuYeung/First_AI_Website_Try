@@ -78,7 +78,10 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
   };
 
   app.get('/api/data', auth.authMiddleware, async (req, res) => {
-    res.json(clientUserData(await storage.loadUserData(req.user.username)));
+    res.json({
+      ...clientUserData(await storage.loadUserData(req.user.username)),
+      serverTime: Date.now(),
+    });
   });
 
   app.post('/api/subscriptions', auth.authMiddleware, async (req, res) => {
