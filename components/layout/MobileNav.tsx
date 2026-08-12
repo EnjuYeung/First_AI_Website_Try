@@ -17,7 +17,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ navTabs, activeTab, setAct
         <nav className="fixed inset-x-0 bottom-0 z-30 md:hidden" aria-label="Mobile navigation">
             <div className="border-t bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl" style={{ borderColor: 'var(--line)' }}>
                 <div className="mx-auto max-w-lg">
-                    <div className="grid grid-cols-4">
+                    <div
+                        className="grid"
+                        style={{ gridTemplateColumns: `repeat(${navTabs.length}, minmax(0, 1fr))` }}
+                    >
                         {navTabs.map(tab => {
                             const isActive = activeTab === tab.id;
                             return (

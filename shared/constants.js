@@ -1,5 +1,6 @@
 export const DEFAULT_RULE_CHANNELS = {
   renewalReminder: ['telegram', 'email'],
+  monthlySummary: ['telegram', 'email'],
 };
 
 export const DEFAULT_CATEGORIES = [
@@ -28,4 +29,3 @@ export const DEFAULT_PAYMENT_METHODS = [
   'PayPal',
   'Other',
 ];
-

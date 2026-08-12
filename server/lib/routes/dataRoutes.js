@@ -6,9 +6,13 @@ import {
   validateSettings,
   validateSubscriptions,
 } from '../../../shared/dataSchema.js';
+import { formatDateInTimeZone } from '../dates.js';
 
 const uploadedIconFilename = (url) =>
   /^\/api\/uploads\/([a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
+
+const uploadedWallpaperFilename = (url) =>
+  /^\/api\/uploads\/(wallpaper-[a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
 
 const removeLegacySettingsFields = (settings) => {
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
@@ -20,11 +24,12 @@ const removeLegacySettingsFields = (settings) => {
   return { ...settings, notifications: currentNotifications };
 };
 
-const clientSettings = (settings) => {
+const clientSettings = (settings, timeZone) => {
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
   const security = settings.security || {};
   return {
     ...settings,
+    ...(timeZone ? { timezone: timeZone } : {}),
     security: {
       twoFactorEnabled: Boolean(security.twoFactorEnabled),
       lastPasswordChange: security.lastPasswordChange,
@@ -32,13 +37,27 @@ const clientSettings = (settings) => {
   };
 };
 
-const clientUserData = (data) => ({
+const clientUserData = (data, timeZone) => ({
   ...data,
-  settings: clientSettings(data?.settings),
+  settings: clientSettings(data?.settings, timeZone),
 });
 
-export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconBytes }) => {
+export const registerDataRoutes = ({
+  app,
+  auth,
+  storage,
+  uploadsDir,
+  maxIconBytes,
+  maxWallpaperBytes = 8 * 1024 * 1024,
+  config,
+}) => {
+  const timeZone = config?.timeZone || 'Asia/Shanghai';
   const iconUpload = createIconUpload({ uploadsDir, maxIconBytes });
+  const wallpaperUpload = createIconUpload({
+    uploadsDir,
+    maxIconBytes: maxWallpaperBytes,
+    filenamePrefix: 'wallpaper-',
+  });
   const expectedRevision = (req) => {
     const raw = String(req.get('if-match') || '').replace(/^W\//, '').replaceAll('"', '');
     const revision = Number(raw);
@@ -65,7 +84,7 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
         }
       }
       res.setHeader('ETag', `"${result.revision}"`);
-      const responseData = feature === 'settings' ? clientSettings(result.data) : result.data;
+      const responseData = feature === 'settings' ? clientSettings(result.data, timeZone) : result.data;
       return res.json({ success: true, data: responseData, revision: result.revision });
     } catch (err) {
       const status = err?.statusCode || 500;
@@ -79,13 +98,16 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
 
   app.get('/api/data', auth.authMiddleware, async (req, res) => {
     res.json({
-      ...clientUserData(await storage.loadUserData(req.user.username)),
+      ...clientUserData(await storage.loadUserData(req.user.username), timeZone),
       serverTime: Date.now(),
     });
   });
 
   app.post('/api/subscriptions', auth.authMiddleware, async (req, res) => {
-    const subscription = req.body;
+    const subscription = {
+      ...req.body,
+      createdAt: formatDateInTimeZone(timeZone),
+    };
     const error = validateSubscriptions([subscription]);
     if (error) return res.status(400).json({ success: false, message: error });
     return updateFeature(req, res, 'subscriptions', (subscriptions) => {
@@ -99,7 +121,7 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
   });
 
   app.put('/api/subscriptions/:id', auth.authMiddleware, async (req, res) => {
-    const subscription = req.body;
+    const subscription = { ...req.body };
     if (subscription?.id !== req.params.id) {
       return res.status(400).json({ success: false, message: 'subscription_id_mismatch' });
     }
@@ -113,6 +135,7 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
         throw missing;
       }
       const previous = subscriptions.find((item) => item.id === subscription.id);
+      subscription.createdAt = previous?.createdAt;
       if (previous?.iconUrl !== subscription.iconUrl) {
         replacedIcon = uploadedIconFilename(previous?.iconUrl);
       }
@@ -167,13 +190,19 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
 
   app.put('/api/settings', auth.authMiddleware, async (req, res) => {
     const settings = removeLegacySettingsFields(req.body);
+    let replacedWallpaper = '';
     return updateFeature(req, res, 'settings', (currentSettings) => {
       const {
         language: _language,
         theme: _theme,
+        timezone: _timezone,
         security: _security,
         ...serverSettings
       } = settings || {};
+      const nextWallpaper = serverSettings.wallpaper || currentSettings.wallpaper;
+      if (currentSettings.wallpaper?.url !== nextWallpaper?.url) {
+        replacedWallpaper = uploadedWallpaperFilename(currentSettings.wallpaper?.url);
+      }
       const nextSettings = {
         ...currentSettings,
         ...serverSettings,
@@ -181,6 +210,8 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
         // values only to keep the persisted settings schema compatible.
         language: currentSettings.language,
         theme: currentSettings.theme,
+        // Timezone is deployment-wide and controlled exclusively by TIMEZONE.
+        timezone: timeZone,
         // Exchange-rate credentials, rates, and scheduler state are server-managed.
         // Replace them before validation so stale legacy metadata from a client
         // cannot block an unrelated preference update.
@@ -198,6 +229,11 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
         throw validationError;
       }
       return nextSettings;
+    }, async (savedSettings) => {
+      if (!replacedWallpaper || uploadedWallpaperFilename(savedSettings.wallpaper?.url) === replacedWallpaper) return;
+      await fs.unlink(path.join(uploadsDir, replacedWallpaper)).catch((err) => {
+        if (err?.code !== 'ENOENT') throw err;
+      });
     });
   });
 
@@ -222,6 +258,27 @@ export const registerDataRoutes = ({ app, auth, storage, uploadsDir, maxIconByte
       if (!req.file?.filename) return res.status(400).json({ ok: false, message: 'missing_file' });
       res.json({ ok: true, url: `/api/uploads/${req.file.filename}` });
     });
+  });
+  app.post('/api/wallpapers', auth.authMiddleware, async (req, res) => {
+    await storage.ensureDataDir();
+    wallpaperUpload.single('file')(req, res, (err) => {
+      if (err?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ ok: false, message: 'wallpaper_too_large' });
+      }
+      if (err) return res.status(400).json({ ok: false, message: err.message || 'upload_failed' });
+      if (!req.file?.filename) return res.status(400).json({ ok: false, message: 'missing_file' });
+      res.json({ ok: true, url: `/api/uploads/${req.file.filename}` });
+    });
+  });
+  app.delete('/api/wallpapers/:filename', auth.authMiddleware, async (req, res) => {
+    const filename = String(req.params.filename || '');
+    if (!/^wallpaper-[a-f0-9-]+\.(png|jpg|webp)$/i.test(filename) || path.basename(filename) !== filename) {
+      return res.status(400).json({ ok: false, message: 'invalid_wallpaper_filename' });
+    }
+    await fs.unlink(path.join(uploadsDir, filename)).catch((err) => {
+      if (err?.code !== 'ENOENT') throw err;
+    });
+    res.json({ ok: true });
   });
   app.delete('/api/icons/:filename', auth.authMiddleware, async (req, res) => {
     const filename = String(req.params.filename || '');

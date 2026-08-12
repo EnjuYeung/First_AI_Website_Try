@@ -72,8 +72,10 @@ HTTPS Origin 形式的 `PUBLIC_BASE_URL`（例如 `https://subm.example.com`，�
 - `TRUST_PROXY`
 - `PUBLIC_BASE_URL`（Telegram 回调所用的公开 HTTPS Origin）
 - `NOTIFY_INTERVAL_MS`（默认 `600000`）
+- `TIMEZONE`（IANA 时区，默认 `Asia/Shanghai`）
 - `JSON_BODY_LIMIT`（默认 `2mb`）
 - `MAX_ICON_BYTES`（默认 `1mb`）
+- `MAX_WALLPAPER_BYTES`（默认 `8mb`）
 - `SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASS`、`SMTP_FROM`
 - `DEBUG_TELEGRAM=1`（仅排障使用；日志会脱敏 token）
 

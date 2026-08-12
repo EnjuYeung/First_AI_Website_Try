@@ -1,14 +1,15 @@
-import React from 'react';
-import { Plus, Globe, Clock, Sun, Moon, Monitor, X as XIcon } from 'lucide-react';
-import { AppSettings, COMMON_TIMEZONES } from '../../../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { Globe, Image, Link2, Plus, Trash2, Upload, X as XIcon } from 'lucide-react';
+import { AppSettings } from '../../../types';
 import { CategoryGlyph, PaymentGlyph } from '../../ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../../../services/displayLabels';
+import { deleteUploadedWallpaper, uploadWallpaperFile } from '../../../services/storageService';
 
 type Props = {
   t: (key: any) => string;
   currentLanguage: 'en' | 'zh';
   settings: AppSettings;
-  onUpdateSettings: (settings: AppSettings) => void;
+  onUpdateSettings: (settings: AppSettings) => boolean | Promise<boolean>;
 
   newCategory: string;
   setNewCategory: React.Dispatch<React.SetStateAction<string>>;
@@ -53,8 +54,79 @@ const GeneralTab: React.FC<Props> = ({
   handlePaymentDragStart,
   handlePaymentDrop,
 }) => {
+  const wallpaperInputRef = useRef<HTMLInputElement>(null);
+  const [wallpaperDraft, setWallpaperDraft] = useState(settings.wallpaper);
+  const [isUploadingWallpaper, setIsUploadingWallpaper] = useState(false);
+  const [wallpaperError, setWallpaperError] = useState('');
+
+  useEffect(() => setWallpaperDraft(settings.wallpaper), [settings.wallpaper]);
+
+  const saveWallpaper = async (wallpaper: AppSettings['wallpaper']) => {
+    const saved = await onUpdateSettings({ ...settings, wallpaper });
+    if (saved !== false) setWallpaperDraft(wallpaper);
+    return saved !== false;
+  };
+
+  const applyWallpaperUrl = async () => {
+    const url = wallpaperDraft.url.trim();
+    if (url && !/^\/api\/uploads\/wallpaper-[a-f0-9-]+\.(?:png|jpg|webp)$/i.test(url)) {
+      try {
+        const parsed = new URL(url);
+        if (
+          !['http:', 'https:'].includes(parsed.protocol) ||
+          !parsed.hostname || parsed.username || parsed.password
+        ) throw new Error('invalid_protocol');
+      } catch {
+        setWallpaperError(t('wallpaper_url_invalid'));
+        return;
+      }
+    }
+    setWallpaperError('');
+    await saveWallpaper({ ...wallpaperDraft, url });
+  };
+
+  const handleWallpaperUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setWallpaperError(t('wallpaper_type_error'));
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setWallpaperError(t('wallpaper_size_error'));
+      return;
+    }
+
+    setIsUploadingWallpaper(true);
+    setWallpaperError('');
+    let uploadedUrl = '';
+    try {
+      uploadedUrl = await uploadWallpaperFile(file);
+      const saved = await saveWallpaper({ ...wallpaperDraft, url: uploadedUrl });
+      if (!saved) await deleteUploadedWallpaper(uploadedUrl).catch(() => undefined);
+    } catch {
+      if (uploadedUrl) await deleteUploadedWallpaper(uploadedUrl).catch(() => undefined);
+      setWallpaperError(t('wallpaper_upload_failed'));
+    } finally {
+      setIsUploadingWallpaper(false);
+    }
+  };
+
+  const commitWallpaperControls = () => {
+    if (
+      wallpaperDraft.blur === settings.wallpaper.blur &&
+      wallpaperDraft.overlay === settings.wallpaper.overlay
+    ) return;
+    void saveWallpaper(wallpaperDraft);
+  };
+
+  const wallpaperImage = wallpaperDraft.url
+    ? `url(${JSON.stringify(wallpaperDraft.url)})`
+    : undefined;
+
   return (
-    <div className="space-y-8 max-w-2xl">
+    <div className="max-w-2xl space-y-8">
       <section>
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('language')}</h3>
         <div className="flex space-x-4">
@@ -83,51 +155,92 @@ const GeneralTab: React.FC<Props> = ({
         </div>
       </section>
 
-      <section>
-        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('timezone')}</h3>
-        <div className="flex items-center space-x-2 max-w-xs">
-          <Clock className="text-gray-500" size={20} />
-          <select
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none"
-            value={settings.timezone}
-            onChange={(e) => onUpdateSettings({ ...settings, timezone: e.target.value })}
-          >
-            {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ))}
-            {!COMMON_TIMEZONES.includes(settings.timezone) && (
-              <option value={settings.timezone}>{settings.timezone}</option>
-            )}
-          </select>
+      <section className="wallpaper-settings">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-[var(--ink)]">{t('wallpaper')}</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">{t('wallpaper_hint')}</p>
+          </div>
+          <Image className="mt-1 shrink-0 text-[var(--rail-teal)]" size={20} />
         </div>
-      </section>
 
-      <section>
-        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('appearance')}</h3>
-        <div className="flex space-x-4">
-          {(['light', 'dark', 'system'] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => onUpdateSettings({ ...settings, theme: mode })}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-                settings.theme === mode
-                  ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white'
-                  : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              {mode === 'light' && <Sun size={16} />}
-              {mode === 'dark' && <Moon size={16} />}
-              {mode === 'system' && <Monitor size={16} />}
-              <span className="capitalize">
-                {mode === 'light' && t('theme_light')}
-                {mode === 'dark' && t('theme_dark')}
-                {mode === 'system' && t('theme_system')}
-              </span>
-            </button>
-          ))}
+        <div className="wallpaper-preview" data-empty={!wallpaperDraft.url}>
+          <div
+            className="wallpaper-preview-image"
+            style={{
+              backgroundImage: wallpaperImage,
+              filter: `blur(${wallpaperDraft.blur}px)`,
+            }}
+          />
+          <div className="wallpaper-preview-mask" style={{ opacity: wallpaperDraft.overlay / 100 }} />
+          {!wallpaperDraft.url && <span>{t('wallpaper_empty')}</span>}
         </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={16} />
+            <input
+              type="url"
+              value={wallpaperDraft.url}
+              onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, url: event.target.value })}
+              onKeyDown={(event) => { if (event.key === 'Enter') void applyWallpaperUrl(); }}
+              placeholder={t('wallpaper_url_placeholder')}
+              className="w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm outline-none"
+            />
+          </div>
+          <button type="button" onClick={() => void applyWallpaperUrl()} className="secondary-action rounded-xl px-4 py-2.5 text-sm font-semibold">
+            {t('apply')}
+          </button>
+          <button
+            type="button"
+            onClick={() => wallpaperInputRef.current?.click()}
+            disabled={isUploadingWallpaper}
+            className="secondary-action flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            <Upload size={16} />
+            {isUploadingWallpaper ? t('uploading') : t('upload_wallpaper')}
+          </button>
+          <input
+            ref={wallpaperInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleWallpaperUpload}
+          />
+        </div>
+
+        {wallpaperError && <p role="alert" className="mt-2 text-sm text-[var(--alert-coral)]">{wallpaperError}</p>}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="wallpaper-control">
+            <span><b>{t('background_blur')}</b><i>{wallpaperDraft.blur}px</i></span>
+            <input
+              type="range" min="0" max="30" step="1" value={wallpaperDraft.blur}
+              onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, blur: Number(event.target.value) })}
+              onPointerUp={commitWallpaperControls} onKeyUp={commitWallpaperControls} onBlur={commitWallpaperControls}
+            />
+          </label>
+          <label className="wallpaper-control">
+            <span><b>{t('background_overlay')}</b><i>{wallpaperDraft.overlay}%</i></span>
+            <input
+              type="range" min="0" max="90" step="1" value={wallpaperDraft.overlay}
+              onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, overlay: Number(event.target.value) })}
+              onPointerUp={commitWallpaperControls} onKeyUp={commitWallpaperControls} onBlur={commitWallpaperControls}
+            />
+          </label>
+        </div>
+
+        {wallpaperDraft.url && (
+          <button
+            type="button"
+            onClick={() => void saveWallpaper({ ...wallpaperDraft, url: '' })}
+            className="mt-4 flex items-center gap-2 text-sm font-medium text-[var(--alert-coral)]"
+          >
+            <Trash2 size={15} />{t('remove_wallpaper')}
+          </button>
+        )}
       </section>
 
       <section>

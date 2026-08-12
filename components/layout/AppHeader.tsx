@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, LogOut, Monitor, Moon, Plus, RefreshCcw, Repeat2, Sun } from 'lucide-react';
+import { Globe, LogOut, Monitor, Moon, Plus, RefreshCcw, Sun } from 'lucide-react';
 import { AppSettings } from '../../types';
 
 interface NavTab {
@@ -39,37 +39,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <header className="app-header sticky top-0 z-40">
-      <div className="mx-auto flex h-[72px] w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-5 lg:gap-8">
-          <button
-            type="button"
-            onClick={() => setActiveTab('dashboard')}
-            className="flex shrink-0 items-center gap-2.5 rounded-xl text-left"
-            aria-label={t('dashboard')}
-          >
-            <span className="brand-mark"><Repeat2 size={19} strokeWidth={2.2} /></span>
-            <span className="brand-wordmark">Subm</span>
-          </button>
-
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
-            {navTabs.map((tab) => {
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className="nav-tab flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
-                  data-active={active}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  <tab.icon size={16} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-end gap-4 px-4 sm:px-6 md:justify-between lg:px-8">
+        <nav className="hidden min-w-0 items-center gap-1 md:flex" aria-label="Primary navigation">
+          {navTabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className="nav-tab flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+                data-active={active}
+                aria-current={active ? 'page' : undefined}
+              >
+                <tab.icon size={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
         <div className="flex shrink-0 items-center gap-1.5">
           <button

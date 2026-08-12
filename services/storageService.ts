@@ -3,6 +3,10 @@ import { Subscription, AppSettings, NotificationRecord } from '../types';
 import { canonicalCategoryKey, canonicalPaymentMethodKey } from './displayLabels';
 import { authHeaderOnly, authJsonHeaders, apiFetch, apiFetchJson, UnauthorizedError } from './apiClient';
 import { DEFAULT_REMINDER_TEMPLATE_STRING, normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
+import {
+  DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+  normalizeMonthlySummaryTemplateString,
+} from '../shared/monthlySummaryTemplate.js';
 import { createDefaultSettings, normalizeExchangeRates } from '../shared/defaultSettings.js';
 
 const API_BASE = '/api';
@@ -66,6 +70,29 @@ export const deleteUploadedIcon = async (url: string): Promise<void> => {
   if (!resp.ok) throw new Error(`http_${resp.status}`);
 };
 
+export const uploadWallpaperFile = async (file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+  const resp = await apiFetch(`${API_BASE}/wallpapers`, {
+    method: 'POST',
+    headers: authHeaderOnly(),
+    body: form,
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data?.url) throw new Error(data?.message || 'wallpaper_upload_failed');
+  return String(data.url);
+};
+
+export const deleteUploadedWallpaper = async (url: string): Promise<void> => {
+  const match = /^\/api\/uploads\/(wallpaper-[a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(url);
+  if (!match) return;
+  const resp = await apiFetch(`${API_BASE}/wallpapers/${encodeURIComponent(match[1])}`, {
+    method: 'DELETE',
+    headers: authHeaderOnly(),
+  });
+  if (!resp.ok) throw new Error(`http_${resp.status}`);
+};
+
 const normalizeSubscription = (sub: any): Subscription => {
   const category = canonicalCategoryKey(sub?.category || 'Other') || 'Other';
   const paymentMethod = canonicalPaymentMethodKey(sub?.paymentMethod || 'Credit Card') || 'Credit Card';
@@ -83,11 +110,13 @@ const normalizeSubscription = (sub: any): Subscription => {
   const cancelledAt = status === 'cancelled'
     ? normalizeYMD(sub?.cancelledAt) || normalizeYMD(sub?.startDate)
     : undefined;
+  const createdAt = normalizeYMD(sub?.createdAt);
 
   return {
     ...sub,
     status,
     cancelledAt,
+    createdAt,
     category,
     paymentMethod,
   } as Subscription;
@@ -109,10 +138,15 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
     !parsedRules.template || parsedRules.template === DEFAULT_REMINDER_TEMPLATE_STRING
       ? DEFAULT_REMINDER_TEMPLATE_STRING
       : normalizeReminderTemplateString(parsedRules.template);
+  const normalizedMonthlySummaryTemplate = normalizeMonthlySummaryTemplateString(
+    parsedRules.monthlySummaryTemplate || DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+  );
   const normalizedRules = {
     renewalReminder: parsedRules.renewalReminder !== undefined ? parsedRules.renewalReminder : DEFAULT_SETTINGS.notifications.rules.renewalReminder,
+    monthlySummary: parsedRules.monthlySummary !== undefined ? parsedRules.monthlySummary : DEFAULT_SETTINGS.notifications.rules.monthlySummary,
     reminderDays: parsedRules.reminderDays ?? DEFAULT_SETTINGS.notifications.rules.reminderDays,
     template: normalizedTemplate,
+    monthlySummaryTemplate: normalizedMonthlySummaryTemplate,
     channels: {
       ...DEFAULT_SETTINGS.notifications.rules.channels,
       ...(parsedRules.channels || {})
@@ -141,6 +175,10 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
   return {
     ...getDefaultSettings(),
     ...parsed,
+    wallpaper: {
+      ...DEFAULT_SETTINGS.wallpaper,
+      ...(parsed.wallpaper || {}),
+    },
     exchangeRateApi: {
       ...DEFAULT_SETTINGS.exchangeRateApi,
       ...(parsed as any).exchangeRateApi,
@@ -235,15 +273,13 @@ export const removeSubscriptions = (ids: string[], revision: number) =>
   mutateFeature<Subscription[]>('/subscriptions/batch-delete', 'POST', revision, { ids });
 
 export const replaceSettings = (settings: AppSettings, revision: number) => {
-  // Language and theme are device-local preferences. Do not send them to the
-  // server when persisting the remaining application settings.
-  const { language: _language, theme: _theme, ...serverSettings } = settings;
+  // Language/theme are device-local; timezone is deployment-managed.
+  const {
+    language: _language,
+    theme: _theme,
+    timezone: _timezone,
+    ...serverSettings
+  } = settings;
   return mutateFeature<AppSettings>('/settings', 'PUT', revision, serverSettings)
     .then((result) => ({ ...result, data: mergeSettings(result.data) }));
 };
-
-export const removeNotification = (id: string, revision: number) =>
-  mutateFeature<NotificationRecord[]>(`/notifications/${encodeURIComponent(id)}`, 'DELETE', revision);
-
-export const clearNotificationHistory = (revision: number) =>
-  mutateFeature<NotificationRecord[]>('/notifications', 'DELETE', revision);

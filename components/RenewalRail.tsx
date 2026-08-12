@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CalendarRange } from 'lucide-react';
 import { ServerClock, Subscription } from '../types';
 import { formatCurrency } from '../services/currency';
@@ -40,7 +40,11 @@ const extrapolateServerNow = (clock: ServerClock): number => (
 
 const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, serverClock }) => {
   const t = getT(lang);
+  const popoverId = useId();
+  const activeEventRef = useRef<HTMLDivElement | null>(null);
+  const activeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [serverNowMs, setServerNowMs] = useState(() => extrapolateServerNow(serverClock));
+  const [openGroupDay, setOpenGroupDay] = useState<number | null>(null);
   const serverNow = new Date(serverNowMs);
   const zonedNow = getZonedRailDateTimeParts(serverNowMs, timeZone);
   const daysInMonth = getDaysInRailMonth(serverNowMs, timeZone);
@@ -63,6 +67,28 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
     const timer = window.setInterval(updateNow, 1_000);
     return () => window.clearInterval(timer);
   }, [serverClock]);
+
+  useEffect(() => {
+    if (openGroupDay === null) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!activeEventRef.current?.contains(event.target as Node)) {
+        setOpenGroupDay(null);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpenGroupDay(null);
+      activeTriggerRef.current?.focus();
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [openGroupDay]);
 
   const groups = useMemo(() => {
     const byDay = new Map<number, RenewalRailEvent[]>();
@@ -109,7 +135,7 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
       </div>
 
       <div className="overflow-x-auto">
-        <div className="rail-canvas" role="img" aria-label={`${monthLabel}: ${events.length} ${t('planned_charges')}`}>
+        <div className="rail-canvas" role="group" aria-label={`${monthLabel}: ${events.length} ${t('planned_charges')}`}>
           <div className="rail-legend">
             <span className="flex items-center gap-1.5 text-[var(--rail-teal)]"><i className="status-dot" />{t('paid')}</span>
             <span className="flex items-center gap-1.5 text-[var(--due-amber)]"><i className="status-dot" />{t('pending')}</span>
@@ -118,6 +144,8 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
           <div className="rail-track">
             {groups.map((group, index) => {
               const first = group.events[0];
+              const hasMultipleEvents = group.events.length > 1;
+              const isPopoverOpen = openGroupDay === group.day;
               const daysUntil = daysUntilYMD(formatLocalYMD(first.date), timeZone, serverNow);
               const state = group.events.every((event) => event.state === 'paid')
                 ? 'paid'
@@ -136,6 +164,7 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
                   className="rail-event"
                   data-state={state}
                   data-lane={group.lane}
+                  data-popover-open={isPopoverOpen || undefined}
                   title={title}
                   style={{
                     left: `${railPositionForDay(group.day, daysInMonth)}%`,
@@ -154,9 +183,39 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
                     <strong>{serviceLabel}</strong>
                     <span>{formatCurrency(group.amount, 'USD')}</span>
                   </div>
-                  <span className="rail-node">
-                    {group.events.length > 1 && <span className="rail-count">{group.events.length}</span>}
-                  </span>
+                  {hasMultipleEvents ? (
+                    <button
+                      type="button"
+                      className="rail-node rail-node-trigger"
+                      aria-expanded={isPopoverOpen}
+                      aria-controls={isPopoverOpen ? `${popoverId}-${group.day}` : undefined}
+                      aria-label={`${serviceLabel} · ${formatCurrency(group.amount, 'USD')} · ${t('view_details')}`}
+                      onClick={(event) => {
+                        activeEventRef.current = event.currentTarget.closest('.rail-event');
+                        activeTriggerRef.current = event.currentTarget;
+                        setOpenGroupDay((currentDay) => currentDay === group.day ? null : group.day);
+                      }}
+                    />
+                  ) : (
+                    <span className="rail-node" />
+                  )}
+
+                  {isPopoverOpen && (
+                    <div
+                      id={`${popoverId}-${group.day}`}
+                      className="rail-event-popover"
+                      role="region"
+                      aria-label={t('view_details')}
+                      data-align={group.day <= 4 ? 'start' : group.day >= daysInMonth - 3 ? 'end' : 'center'}
+                    >
+                      {group.events.map((event) => (
+                        <div className="rail-event-detail" key={event.sub.id}>
+                          <span>{event.sub.name}</span>
+                          <strong>{formatCurrency(event.cost, 'USD')}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

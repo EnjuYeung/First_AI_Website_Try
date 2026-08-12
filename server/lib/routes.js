@@ -8,7 +8,11 @@ export const registerRoutes = (dependencies) => {
   const { app, config } = dependencies;
   registerTelegramWebhookRoutes(dependencies);
   registerAuthRoutes(dependencies);
-  registerDataRoutes({ ...dependencies, maxIconBytes: config.maxIconBytes });
+  registerDataRoutes({
+    ...dependencies,
+    maxIconBytes: config.maxIconBytes,
+    maxWallpaperBytes: config.maxWallpaperBytes,
+  });
   registerExchangeRateRoutes(dependencies);
   registerNotificationRoutes(dependencies);
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));

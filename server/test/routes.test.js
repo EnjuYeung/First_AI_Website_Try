@@ -15,6 +15,8 @@ test('registerRoutes preserves all public API endpoints after route split', () =
     app,
     config: {
       maxIconBytes: 1024,
+      maxWallpaperBytes: 8192,
+      timeZone: 'Asia/Shanghai',
       publicBaseUrl: '',
       debugTelegram: false,
       jwtSecret: 'route-test-jwt-secret-0123456789abcdef',
@@ -45,6 +47,8 @@ test('registerRoutes preserves all public API endpoints after route split', () =
       'DELETE /api/notifications',
       'POST /api/icons',
       'DELETE /api/icons/:filename',
+      'POST /api/wallpapers',
+      'DELETE /api/wallpapers/:filename',
       'POST /api/exchange-rate/config',
       'POST /api/exchange-rate/update',
       'POST /api/notifications/test-telegram',

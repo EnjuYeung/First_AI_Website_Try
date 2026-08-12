@@ -8,20 +8,6 @@ export enum Frequency {
 
 export { DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS } from './shared/constants.js';
 
-export const COMMON_TIMEZONES = [
-  'UTC',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'Asia/Singapore',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'America/New_York',
-  'America/Los_Angeles',
-  'Australia/Sydney'
-];
-
 export const ISO_CURRENCIES = [
     { code: 'USD', name: 'United States Dollar' },
     { code: 'EUR', name: 'Euro' },
@@ -76,6 +62,7 @@ export interface Subscription {
   paymentMethod: string; // Changed from Enum to string
   status: 'active' | 'cancelled'; // New status field
   cancelledAt?: string; // YYYY-MM-DD when status is cancelled
+  createdAt?: string; // YYYY-MM-DD when added to Subm
   startDate: string;
   nextBillingDate: string;
   iconUrl?: string;
@@ -98,10 +85,13 @@ export interface CurrencyConfig {
 
 export interface NotificationRule {
   renewalReminder: boolean;
+  monthlySummary: boolean;
   reminderDays: number;
   template: string;
+  monthlySummaryTemplate: string;
   channels: {
     renewalReminder: NotificationChannel[];
+    monthlySummary: NotificationChannel[];
   };
 }
 
@@ -121,6 +111,11 @@ export interface AppSettings {
   language: 'zh' | 'en';
   timezone: string;
   theme: 'light' | 'dark' | 'system';
+  wallpaper: {
+    url: string;
+    blur: number;
+    overlay: number;
+  };
   customCategories: string[];
   customPaymentMethods: string[];
   customCurrencies: CurrencyConfig[];
@@ -149,7 +144,7 @@ export interface AppSettings {
 
 // --- Notification History Types ---
 
-export type NotificationType = 'renewal_reminder' | 'subscription_change';
+export type NotificationType = 'renewal_reminder' | 'monthly_summary' | 'subscription_change';
 export type NotificationStatus = 'success' | 'failed';
 export type NotificationChannel = 'telegram' | 'email';
 
@@ -171,5 +166,6 @@ export interface NotificationRecord {
     errorReason?: string;
     subscriptionId?: string;
     renewalFeedback?: string;
+    periodKey?: string;
   };
 }

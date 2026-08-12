@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Home, CreditCard, BellRing, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Home, CreditCard, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
 import { AppSettings, Subscription } from './types';
 import { getT } from './services/i18n';
 import LoginPage from './components/LoginPage';
@@ -8,7 +8,6 @@ const Dashboard = lazy(() => import('./components/Dashboard'));
 const SubscriptionList = lazy(() => import('./components/SubscriptionList'));
 const SubscriptionForm = lazy(() => import('./components/SubscriptionForm'));
 const Settings = lazy(() => import('./components/Settings'));
-const NotificationHistory = lazy(() => import('./components/NotificationHistory'));
 
 // Custom Hooks
 import { useAuth } from './hooks/useAuth';
@@ -26,7 +25,7 @@ const App: React.FC = () => {
   const {
     subscriptions, settings, notifications, serverClock, isDataLoading,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
-    batchDeleteSubscriptions, duplicateSubscription, deleteNotification, clearNotifications,
+    batchDeleteSubscriptions, duplicateSubscription,
     lastMutationError, clearMutationError
   } = useAppData(isAuthenticated, logout, language);
 
@@ -34,10 +33,10 @@ const App: React.FC = () => {
 
   useTheme(theme);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'notifications' | 'settings'>(() => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'settings'>(() => {
     if (typeof window === 'undefined') return 'dashboard';
     const stored = window.localStorage.getItem('subm.activeTab');
-    if (stored === 'dashboard' || stored === 'list' || stored === 'notifications' || stored === 'settings') {
+    if (stored === 'dashboard' || stored === 'list' || stored === 'settings') {
       return stored;
     }
     return 'dashboard';
@@ -144,7 +143,6 @@ const App: React.FC = () => {
   const navTabs = [
     { id: 'dashboard', icon: Home, label: t('dashboard') },
     { id: 'list', icon: CreditCard, label: t('subscriptions') },
-    { id: 'notifications', icon: BellRing, label: t('notifications_history') },
     { id: 'settings', icon: SettingsIcon, label: t('settings') },
   ] as const;
 
@@ -162,7 +160,20 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col transition-colors duration-200">
+    <div className="app-shell min-h-screen bg-transparent flex flex-col transition-colors duration-200">
+
+      {clientSettings.wallpaper.url && (
+        <div className="app-wallpaper" aria-hidden="true">
+          <div
+            className="app-wallpaper-image"
+            style={{
+              backgroundImage: `url(${JSON.stringify(clientSettings.wallpaper.url)})`,
+              filter: `blur(${clientSettings.wallpaper.blur}px)`,
+            }}
+          />
+          <div className="app-wallpaper-mask" style={{ opacity: clientSettings.wallpaper.overlay / 100 }} />
+        </div>
+      )}
 
       <AppHeader
         navTabs={navTabs}
@@ -202,15 +213,6 @@ const App: React.FC = () => {
               lang={language}
               exchangeRates={clientSettings.exchangeRates}
               timezone={clientSettings.timezone}
-            />
-          )}
-
-          {activeTab === 'notifications' && (
-            <NotificationHistory
-              lang={language}
-              notifications={notifications}
-              onDeleteNotification={deleteNotification}
-              onClearNotifications={clearNotifications}
             />
           )}
 

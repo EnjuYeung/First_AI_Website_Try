@@ -11,13 +11,13 @@ const iconExtFromMime = (mime) => {
   return '';
 };
 
-export const createIconUpload = ({ uploadsDir, maxIconBytes }) =>
+export const createIconUpload = ({ uploadsDir, maxIconBytes, filenamePrefix = '' }) =>
   multer({
     storage: multer.diskStorage({
       destination: (_req, _file, cb) => cb(null, uploadsDir),
       filename: (_req, file, cb) => {
         const ext = iconExtFromMime(file.mimetype) || path.extname(file.originalname || '') || '';
-        cb(null, `${crypto.randomUUID()}${ext}`);
+        cb(null, `${filenamePrefix}${crypto.randomUUID()}${ext}`);
       },
     }),
     limits: { fileSize: maxIconBytes },
@@ -26,4 +26,3 @@ export const createIconUpload = ({ uploadsDir, maxIconBytes }) =>
       cb(null, true);
     },
   });
-

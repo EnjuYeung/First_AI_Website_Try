@@ -9,7 +9,7 @@ const REQUIRED_ENV = {
   JWT_SECRET: 'config-test-jwt-secret-0123456789abcdef',
   DATA_ENCRYPTION_KEY: 'config-test-data-key-0123456789abcdef',
 };
-const CONFIG_ENV = ['ALLOWED_ORIGINS', 'TRUST_PROXY', 'PUBLIC_BASE_URL'];
+const CONFIG_ENV = ['ALLOWED_ORIGINS', 'TRUST_PROXY', 'PUBLIC_BASE_URL', 'TIMEZONE'];
 
 const withEnvironment = (values, callback) => {
   const keys = [...new Set([...Object.keys(REQUIRED_ENV), ...CONFIG_ENV, ...Object.keys(values)])];
@@ -48,6 +48,16 @@ test('default browser origins include the Compose frontend', () => {
     assert.ok(config.allowedOrigins.includes('http://localhost:3001'));
     assert.match(String(config.trustProxy), /uniquelocal/);
     assert.equal(config.publicBaseUrl, '');
+    assert.equal(config.timeZone, 'Asia/Shanghai');
+  });
+});
+
+test('deployment timezone accepts valid IANA names and rejects invalid values', () => {
+  withEnvironment({ TIMEZONE: 'America/New_York' }, () => {
+    assert.equal(getConfig().timeZone, 'America/New_York');
+  });
+  withEnvironment({ TIMEZONE: 'Not/A-Timezone' }, () => {
+    assert.throws(() => getConfig(), /TIMEZONE is not a valid IANA timezone/);
   });
 });
 

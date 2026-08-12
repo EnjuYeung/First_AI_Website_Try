@@ -19,7 +19,11 @@ export const bootstrap = async () => {
   const config = getConfig();
   await ensureDataDir();
 
-  const storage = createStorage({ adminUser: config.adminUser, adminPass: config.adminPass });
+  const storage = createStorage({
+    adminUser: config.adminUser,
+    adminPass: config.adminPass,
+    timeZone: config.timeZone,
+  });
 
   const auth = await createAuth({ jwtSecret: config.jwtSecret, storage });
   assertAdminIdentity(config.adminUser, auth.getAdminUsername());

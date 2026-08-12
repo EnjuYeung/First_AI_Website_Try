@@ -78,6 +78,16 @@ const configuredPublicBaseUrl = () => {
   }
 };
 
+const configuredTimeZone = () => {
+  const timeZone = String(process.env.TIMEZONE || 'Asia/Shanghai').trim();
+  try {
+    new Intl.DateTimeFormat('en', { timeZone }).format();
+    return timeZone;
+  } catch {
+    throw new Error(`TIMEZONE is not a valid IANA timezone: ${timeZone || '(empty)'}`);
+  }
+};
+
 export const getConfig = () => {
   const adminUser = requireEnv('ADMIN_USER');
   const adminPass = requireEnv('ADMIN_PASS');
@@ -96,7 +106,9 @@ export const getConfig = () => {
   const notifyIntervalMs = Number(process.env.NOTIFY_INTERVAL_MS || 10 * 60 * 1000);
   const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '2mb';
   const maxIconBytes = Number(process.env.MAX_ICON_BYTES || 1024 * 1024);
+  const maxWallpaperBytes = Number(process.env.MAX_WALLPAPER_BYTES || 8 * 1024 * 1024);
   const publicBaseUrl = configuredPublicBaseUrl();
+  const timeZone = configuredTimeZone();
 
   const smtp = {
     host: process.env.SMTP_HOST || '',
@@ -118,6 +130,8 @@ export const getConfig = () => {
     notifyIntervalMs,
     jsonBodyLimit,
     maxIconBytes,
+    maxWallpaperBytes,
+    timeZone,
     smtp,
     allowedOrigins,
     trustProxy,

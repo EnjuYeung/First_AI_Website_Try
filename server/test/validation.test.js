@@ -65,4 +65,18 @@ test('validateSettings bounds reminder days', () => {
     validateSettings({ ...validSettings, timezone: 'Not/A-Timezone' }),
     'invalid_timezone'
   );
+  assert.equal(
+    validateSettings({
+      ...validSettings,
+      wallpaper: { ...validSettings.wallpaper, url: 'javascript:alert(1)' },
+    }),
+    'invalid_wallpaper_settings'
+  );
+  assert.equal(
+    validateSettings({
+      ...validSettings,
+      wallpaper: { ...validSettings.wallpaper, blur: 31 },
+    }),
+    'invalid_wallpaper_settings'
+  );
 });

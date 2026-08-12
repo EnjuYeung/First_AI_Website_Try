@@ -9,9 +9,24 @@ const isBoundedString = (value, min, max) =>
   typeof value === 'string' && value.trim().length >= min && value.length <= max;
 const isFiniteTimestamp = (value) =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const isValidWallpaperUrl = (value) => {
+  if (value === '') return true;
+  if (/^\/api\/uploads\/wallpaper-[a-f0-9-]+\.(?:png|jpg|webp)$/i.test(value)) return true;
+  try {
+    const parsed = new URL(value);
+    return (
+      ['http:', 'https:'].includes(parsed.protocol) &&
+      Boolean(parsed.hostname) &&
+      !parsed.username &&
+      !parsed.password
+    );
+  } catch {
+    return false;
+  }
+};
 const SUBSCRIPTION_KEYS = [
   'id', 'name', 'price', 'currency', 'frequency', 'category', 'paymentMethod',
-  'status', 'cancelledAt', 'startDate', 'nextBillingDate', 'iconUrl', 'url',
+  'status', 'cancelledAt', 'createdAt', 'startDate', 'nextBillingDate', 'iconUrl', 'url',
   'notes', 'notificationsEnabled',
 ];
 
@@ -56,6 +71,9 @@ export const validateSubscriptions = (subscriptions) => {
     if (sub.cancelledAt !== undefined && !isValidYmd(sub.cancelledAt)) {
       return 'invalid_subscription_cancelled_date';
     }
+    if (sub.createdAt !== undefined && !isValidYmd(sub.createdAt)) {
+      return 'invalid_subscription_created_date';
+    }
     if (typeof sub.notificationsEnabled !== 'boolean') {
       return 'invalid_subscription_notifications';
     }
@@ -74,7 +92,7 @@ export const validateSubscriptions = (subscriptions) => {
 export const validateSettings = (settings) => {
   if (!isPlainObject(settings)) return 'settings_must_be_object';
   if (!hasOnlyKeys(settings, [
-    'language', 'timezone', 'theme', 'customCategories', 'customPaymentMethods',
+    'language', 'timezone', 'theme', 'wallpaper', 'customCategories', 'customPaymentMethods',
     'customCurrencies', 'exchangeRates', 'lastRatesUpdate', 'exchangeRateApi',
     'notifications', 'security',
   ])) return 'unknown_settings_field';
@@ -88,6 +106,16 @@ export const validateSettings = (settings) => {
   } catch {
     return 'invalid_timezone';
   }
+  const wallpaper = settings.wallpaper;
+  if (
+    !isPlainObject(wallpaper) ||
+    !hasOnlyKeys(wallpaper, ['url', 'blur', 'overlay']) ||
+    typeof wallpaper.url !== 'string' ||
+    wallpaper.url.length > 2048 ||
+    !isValidWallpaperUrl(wallpaper.url) ||
+    !Number.isInteger(wallpaper.blur) || wallpaper.blur < 0 || wallpaper.blur > 30 ||
+    !Number.isInteger(wallpaper.overlay) || wallpaper.overlay < 0 || wallpaper.overlay > 90
+  ) return 'invalid_wallpaper_settings';
   const validStringList = (value) =>
     Array.isArray(value) &&
     value.length <= 100 &&
@@ -150,13 +178,20 @@ export const validateSettings = (settings) => {
   const reminderDays = settings.notifications?.rules?.reminderDays;
   if (
     !isPlainObject(rules) ||
-    !hasOnlyKeys(rules, ['renewalReminder', 'reminderDays', 'template', 'channels']) ||
+    !hasOnlyKeys(rules, [
+      'renewalReminder', 'monthlySummary', 'reminderDays', 'template',
+      'monthlySummaryTemplate', 'channels',
+    ]) ||
     typeof rules.renewalReminder !== 'boolean' ||
+    typeof rules.monthlySummary !== 'boolean' ||
     !Number.isInteger(reminderDays) || reminderDays < 0 || reminderDays > 365
   ) {
     return 'invalid_reminder_days';
   }
   if (typeof rules.template !== 'string' || rules.template.length > 10000) return 'invalid_template';
+  if (typeof rules.monthlySummaryTemplate !== 'string' || rules.monthlySummaryTemplate.length > 10000) {
+    return 'invalid_monthly_summary_template';
+  }
   try {
     const template = JSON.parse(rules.template);
     if (!Array.isArray(template.lines) || template.lines.length > 50 ||
@@ -166,11 +201,22 @@ export const validateSettings = (settings) => {
   } catch {
     return 'invalid_template';
   }
+  try {
+    const template = JSON.parse(rules.monthlySummaryTemplate);
+    if (!Array.isArray(template.lines) || template.lines.length > 50 ||
+        !template.lines.every((line) => typeof line === 'string' && line.length <= 500)) {
+      return 'invalid_monthly_summary_template';
+    }
+  } catch {
+    return 'invalid_monthly_summary_template';
+  }
   if (
     !isPlainObject(rules.channels) ||
-    !hasOnlyKeys(rules.channels, ['renewalReminder']) ||
+    !hasOnlyKeys(rules.channels, ['renewalReminder', 'monthlySummary']) ||
     !Array.isArray(rules.channels.renewalReminder) ||
-    !rules.channels.renewalReminder.every((channel) => ['telegram', 'email'].includes(channel))
+    !Array.isArray(rules.channels.monthlySummary) ||
+    !rules.channels.renewalReminder.every((channel) => ['telegram', 'email'].includes(channel)) ||
+    !rules.channels.monthlySummary.every((channel) => ['telegram', 'email'].includes(channel))
   ) return 'invalid_notification_channels';
   const security = settings.security;
   if (
@@ -192,7 +238,7 @@ export const validateNotifications = (notifications) => {
       !isPlainObject(record) ||
       !isBoundedString(record.id, 1, 128) ||
       !isBoundedString(record.subscriptionName, 1, 200) ||
-      !['renewal_reminder', 'subscription_change'].includes(record.type) ||
+      !['renewal_reminder', 'monthly_summary', 'subscription_change'].includes(record.type) ||
       !['success', 'failed'].includes(record.status) ||
       !['telegram', 'email'].includes(record.channel) ||
       !isFiniteTimestamp(record.timestamp) ||

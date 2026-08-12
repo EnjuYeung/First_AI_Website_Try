@@ -19,6 +19,10 @@ import {
   DEFAULT_REMINDER_TEMPLATE_STRING,
   normalizeReminderTemplateString,
 } from '../../shared/reminderTemplate.js';
+import {
+  DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+  normalizeMonthlySummaryTemplateString,
+} from '../../shared/monthlySummaryTemplate.js';
 import { normalizeExchangeRates } from '../../shared/defaultSettings.js';
 
 const PREVIOUS_REMINDER_TEMPLATE_STRING = JSON.stringify(
@@ -82,7 +86,7 @@ export const ensureDataDir = async () => {
   await Promise.all([DATA_DIR, UPLOADS_DIR, USERS_DIR].map((dir) => fs.chmod(dir, 0o700)));
 };
 
-const mergeSettings = (incoming) => {
+const mergeSettings = (incoming, timeZone = 'Asia/Shanghai') => {
   const parsed = incoming || {};
   const base = defaultSettings();
 
@@ -102,14 +106,22 @@ const mergeSettings = (incoming) => {
     parsedTemplate === PREVIOUS_REMINDER_TEMPLATE_STRING
       ? DEFAULT_REMINDER_TEMPLATE_STRING
       : normalizeReminderTemplateString(parsedTemplate);
+  const monthlySummaryTemplate = normalizeMonthlySummaryTemplateString(
+    parsedRules.monthlySummaryTemplate || DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+  );
 
   const rules = {
     renewalReminder:
       parsedRules.renewalReminder !== undefined
         ? parsedRules.renewalReminder
         : base.notifications.rules.renewalReminder,
+    monthlySummary:
+      parsedRules.monthlySummary !== undefined
+        ? parsedRules.monthlySummary
+        : base.notifications.rules.monthlySummary,
     reminderDays: parsedRules.reminderDays ?? base.notifications.rules.reminderDays,
     template,
+    monthlySummaryTemplate,
     channels: {
       ...DEFAULT_RULE_CHANNELS,
       ...(parsedRules.channels || {}),
@@ -119,6 +131,8 @@ const mergeSettings = (incoming) => {
   return {
     ...base,
     ...parsed,
+    timezone: timeZone,
+    wallpaper: { ...base.wallpaper, ...(parsed.wallpaper || {}) },
     exchangeRateApi,
     exchangeRates,
     security: { ...base.security, ...(parsed.security || {}) },
@@ -205,7 +219,7 @@ const normalizeNotifications = (incoming, subscriptions) => {
   });
 };
 
-export const createStorage = ({ adminUser, adminPass }) => {
+export const createStorage = ({ adminUser, adminPass, timeZone = 'Asia/Shanghai' }) => {
   const FEATURES = ['subscriptions', 'notifications', 'settings'];
   const migratedUsers = new Set();
   const featureCache = new Map();
@@ -228,7 +242,7 @@ export const createStorage = ({ adminUser, adminPass }) => {
   const normalizeFeature = (feature, value, subscriptions = []) => {
     if (feature === 'subscriptions') return Array.isArray(value) ? value : [];
     if (feature === 'notifications') return normalizeNotifications(value, subscriptions);
-    if (feature === 'settings') return mergeSettings(value);
+    if (feature === 'settings') return mergeSettings(value, timeZone);
     throw new Error('unknown_storage_feature');
   };
 

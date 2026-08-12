@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Subscription, AppSettings, NotificationRecord, ServerClock } from '../types';
 import {
-  clearNotificationHistory,
   createSubscription,
   DataRevisions,
   fetchAllData,
   getDefaultSettings,
-  removeNotification,
   removeSubscription,
   removeSubscriptions,
   replaceSettings,
@@ -250,17 +248,6 @@ export const useAppData = (
     return persistFeature('subscriptions', (revision) => createSubscription(newSub, revision), applySubscriptions);
   };
 
-  const deleteNotification = (id: string) => {
-    const updated = notificationsRef.current.filter(n => n.id !== id);
-    applyNotifications(updated);
-    return persistFeature('notifications', (revision) => removeNotification(id, revision), applyNotifications);
-  };
-
-  const clearNotifications = () => {
-    applyNotifications([]);
-    return persistFeature('notifications', clearNotificationHistory, applyNotifications);
-  };
-
   return {
     subscriptions,
     settings,
@@ -274,8 +261,6 @@ export const useAppData = (
     saveSubscription,
     deleteSubscription,
     batchDeleteSubscriptions,
-    duplicateSubscription,
-    deleteNotification,
-    clearNotifications
+    duplicateSubscription
   };
 };

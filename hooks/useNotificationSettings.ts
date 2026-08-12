@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppSettings, NotificationChannel } from '../types';
 import { apiFetchJson, authJsonHeaders } from '../services/apiClient';
 import { normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
+import { normalizeMonthlySummaryTemplateString } from '../shared/monthlySummaryTemplate.js';
 import { SettingsAlert } from './settingsTypes';
 
 const assertTemplate = (raw: string) => {
@@ -16,8 +17,15 @@ export const useNotificationSettings = (
   setAlert: (alert: SettingsAlert) => void
 ) => {
   const [templateText, setTemplateText] = useState(settings.notifications.rules.template);
+  const [monthlySummaryTemplateText, setMonthlySummaryTemplateText] = useState(
+    settings.notifications.rules.monthlySummaryTemplate,
+  );
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
   useEffect(() => setTemplateText(settings.notifications.rules.template), [settings.notifications.rules.template]);
+  useEffect(
+    () => setMonthlySummaryTemplateText(settings.notifications.rules.monthlySummaryTemplate),
+    [settings.notifications.rules.monthlySummaryTemplate],
+  );
 
   const handleTestTelegram = async () => {
     setIsTestingTelegram(true);
@@ -60,8 +68,33 @@ export const useNotificationSettings = (
     }
   };
 
+  const handleSaveMonthlySummaryTemplate = async () => {
+    try {
+      assertTemplate(monthlySummaryTemplateText);
+      const monthlySummaryTemplate = normalizeMonthlySummaryTemplateString(monthlySummaryTemplateText);
+      const saved = await onUpdate({
+        ...settings,
+        notifications: {
+          ...settings.notifications,
+          rules: { ...settings.notifications.rules, monthlySummaryTemplate },
+        },
+      });
+      if (!saved) throw new Error('save_failed');
+      setMonthlySummaryTemplateText(monthlySummaryTemplate);
+      setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: t('template_saved') });
+    } catch (error) {
+      const message = error instanceof Error && error.message === 'save_failed'
+        ? t('connection_failed')
+        : t('template_json_error');
+      setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
+    }
+  };
+
   const toggleReminderChannel = (channel: NotificationChannel, checked: boolean) => {
-    const channels = settings.notifications.rules.channels || { renewalReminder: [] };
+    const channels = settings.notifications.rules.channels || {
+      renewalReminder: [],
+      monthlySummary: [],
+    };
     const current = channels.renewalReminder || [];
     const renewalReminder = checked
       ? Array.from(new Set([...current, channel]))
@@ -75,9 +108,30 @@ export const useNotificationSettings = (
     });
   };
 
+  const toggleMonthlySummaryChannel = (channel: NotificationChannel, checked: boolean) => {
+    const channels = settings.notifications.rules.channels || {
+      renewalReminder: [],
+      monthlySummary: [],
+    };
+    const current = channels.monthlySummary || [];
+    const monthlySummary = checked
+      ? Array.from(new Set([...current, channel]))
+      : current.filter((item) => item !== channel);
+    onUpdate({
+      ...settings,
+      notifications: {
+        ...settings.notifications,
+        rules: { ...settings.notifications.rules, channels: { ...channels, monthlySummary } },
+      },
+    });
+  };
+
   return {
-    templateText, setTemplateText, isTestingTelegram,
+    templateText, setTemplateText,
+    monthlySummaryTemplateText, setMonthlySummaryTemplateText,
+    isTestingTelegram,
     handleTestTelegram, handleTestTemplate: handleTestTelegram, handleSaveTemplate,
-    toggleReminderChannel,
+    handleSaveMonthlySummaryTemplate,
+    toggleReminderChannel, toggleMonthlySummaryChannel,
   };
 };

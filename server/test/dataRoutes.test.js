@@ -88,6 +88,42 @@ test('a post-commit icon cleanup failure does not turn a committed update into a
   assert.equal(persisted[0].iconUrl, undefined);
 });
 
+test('subscription creation records a server-controlled creation date', async () => {
+  let persisted;
+  const handlers = createRouteHarness({
+    async updateUserFeature(_username, feature, revision, updater) {
+      assert.equal(feature, 'subscriptions');
+      assert.equal(revision, 2);
+      persisted = await updater([]);
+      return { data: persisted, revision: 3 };
+    },
+  }, 'subm-data-routes-created-at-test');
+  const response = createResponse();
+
+  await handlers.get('POST /api/subscriptions')({
+    body: {
+      id: 'sub-created',
+      name: 'Created subscription',
+      price: 12,
+      currency: 'USD',
+      frequency: 'Monthly',
+      category: 'Other',
+      paymentMethod: 'Credit Card',
+      status: 'active',
+      startDate: '2026-08-01',
+      nextBillingDate: '2026-09-01',
+      notificationsEnabled: true,
+      createdAt: '2000-01-01',
+    },
+    user: { username: 'admin' },
+    get: (name) => name.toLowerCase() === 'if-match' ? '"2"' : '',
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(persisted[0].createdAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.notEqual(persisted[0].createdAt, '2000-01-01');
+});
+
 test('data responses expose 2FA status without exposing TOTP seeds', async () => {
   const stored = defaults.defaultUserData();
   stored.settings.security = {
@@ -137,6 +173,11 @@ test('general settings updates cannot modify or return server-managed 2FA fields
   }, 'subm-data-routes-security-test');
   const incoming = defaults.defaultSettings();
   incoming.timezone = 'UTC';
+  incoming.wallpaper = {
+    url: 'https://images.example.test/background.webp',
+    blur: 8,
+    overlay: 42,
+  };
   incoming.security = {
     twoFactorEnabled: false,
     twoFactorSecret: '',
@@ -155,7 +196,8 @@ test('general settings updates cannot modify or return server-managed 2FA fields
   );
 
   assert.equal(response.statusCode, 200);
-  assert.equal(savedSettings.timezone, 'UTC');
+  assert.equal(savedSettings.timezone, 'Asia/Shanghai');
+  assert.deepEqual(savedSettings.wallpaper, incoming.wallpaper);
   assert.deepEqual(savedSettings.security, currentSettings.security);
   assert.deepEqual(response.body.data.security, {
     twoFactorEnabled: true,

@@ -1,9 +1,18 @@
 import crypto from 'crypto';
-import { daysUntilDate } from './dates.js';
+import {
+  daysUntilDate,
+  formatDateInTimeZone,
+  getTimePartsInTimeZone,
+} from './dates.js';
 import {
   renderReminderTemplate,
   DEFAULT_REMINDER_TEMPLATE_STRING,
 } from '../../shared/reminderTemplate.js';
+import {
+  DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
+  renderMonthlySummaryTemplate,
+} from '../../shared/monthlySummaryTemplate.js';
+import { buildMonthlySummary, previousMonthPeriod } from './monthlySummary.js';
 import {
   createTelegramWebhookSecret,
   sendTelegramMessage,
@@ -57,6 +66,16 @@ const notificationAttemptExists = (
         ['attempting', 'delivered', 'unknown'].includes(record.details?.deliveryState))
   );
 };
+
+const monthlySummaryAttemptExists = (notifications, periodKey, channel) =>
+  (notifications || []).some(
+    (record) =>
+      record.type === 'monthly_summary' &&
+      record.channel === channel &&
+      record.details?.periodKey === periodKey &&
+      (record.status === 'success' ||
+        ['attempting', 'delivered', 'unknown'].includes(record.details?.deliveryState)),
+  );
 
 const updateRenewalFeedback = (
   notifications,
@@ -317,6 +336,140 @@ export const createReminders = ({ config, storage, email }) => {
     }
   };
 
+  const processMonthlySummaries = async (now = new Date()) => {
+    const username = config.adminUser;
+    let data;
+    try {
+      data = await storage.loadUserData(username);
+    } catch (err) {
+      console.error('Failed to load user data for monthly summary', safeErrorMessage(err));
+      return;
+    }
+
+    const settings = data.settings || {};
+    const rules = settings.notifications?.rules || {};
+    if (!rules.monthlySummary) return;
+
+    const timeZone = settings.timezone || config.timeZone || 'Asia/Shanghai';
+    const today = formatDateInTimeZone(timeZone, now);
+    const { hour } = getTimePartsInTimeZone(timeZone, now);
+    if (!today.endsWith('-01') || hour < 9) return;
+
+    const period = previousMonthPeriod(timeZone, now);
+    const summary = buildMonthlySummary(data.subscriptions, settings, period);
+    const template = rules.monthlySummaryTemplate || DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING;
+    const message = renderMonthlySummaryTemplate(template, summary);
+    const selectedChannels = rules.channels?.monthlySummary || [];
+
+    const attemptChannel = async (channel) => {
+      if (channel === 'telegram') {
+        const { enabled, botToken, chatId } = settings.notifications?.telegram || {};
+        if (!enabled || !botToken || !chatId || !selectedChannels.includes(channel)) return;
+      } else if (channel === 'email') {
+        const { enabled, emailAddress } = settings.notifications?.email || {};
+        if (!enabled || !emailAddress || !selectedChannels.includes(channel)) return;
+      } else {
+        return;
+      }
+
+      const timestamp = now.getTime();
+      const recordBase = {
+        id: randomId(),
+        subscriptionName: `${summary.month} 月度总结`,
+        type: 'monthly_summary',
+        channel,
+        timestamp,
+        details: {
+          periodKey: summary.periodKey,
+          message,
+          amount: summary.totalPaidUsd,
+          currency: 'USD',
+        },
+      };
+      let claimed = false;
+      try {
+        await storage.updateUserData(username, (current) => {
+          const currentRules = current.settings?.notifications?.rules;
+          if (
+            !currentRules?.monthlySummary ||
+            !(currentRules.channels?.monthlySummary || []).includes(channel) ||
+            monthlySummaryAttemptExists(current.notifications, summary.periodKey, channel)
+          ) return current;
+          if (!Array.isArray(current.notifications)) current.notifications = [];
+          current.notifications.push({
+            ...recordBase,
+            status: 'failed',
+            details: {
+              ...recordBase.details,
+              deliveryState: 'attempting',
+              deliveryAttemptedAt: timestamp,
+            },
+          });
+          claimed = true;
+          return current;
+        });
+      } catch (err) {
+        console.error('Failed to persist monthly summary attempt', safeErrorMessage(err));
+        return;
+      }
+      if (!claimed) return;
+
+      let deliveryStatus = 'success';
+      let deliveryState = 'delivered';
+      let deliveryError = '';
+      try {
+        if (channel === 'telegram') {
+          const { botToken, chatId } = settings.notifications.telegram;
+          await sendTelegramMessage(
+            { debug: config.debugTelegram },
+            botToken,
+            chatId,
+            message,
+            null,
+          );
+        } else {
+          await email.sendEmailMessage(
+            settings.notifications.email.emailAddress,
+            `月度订阅总结 · ${summary.month}`,
+            message,
+          );
+        }
+      } catch (err) {
+        deliveryStatus = 'failed';
+        const secret = channel === 'telegram' ? settings.notifications.telegram.botToken : '';
+        deliveryError = safeErrorMessage(err, secret);
+        deliveryState = channel === 'telegram' &&
+          (deliveryError === 'telegram_timeout' || deliveryError.endsWith('_request_failed'))
+          ? 'unknown'
+          : 'failed';
+      }
+
+      try {
+        await storage.updateUserData(username, (current) => {
+          const record = (current.notifications || []).find(
+            (candidate) => candidate?.id === recordBase.id,
+          );
+          if (!record) return current;
+          record.status = deliveryStatus;
+          record.details = {
+            ...record.details,
+            deliveryState,
+            deliveryCompletedAt: Date.now(),
+          };
+          if (deliveryError) record.details.errorReason = deliveryError;
+          else delete record.details.errorReason;
+          return current;
+        });
+      } catch (err) {
+        const secret = channel === 'telegram' ? settings.notifications.telegram.botToken : '';
+        console.error('Failed to finalize monthly summary attempt', safeErrorMessage(err, secret));
+      }
+    };
+
+    await attemptChannel('telegram');
+    await attemptChannel('email');
+  };
+
   const startReminderScheduler = () => {
     if (reminderTimer) return;
 
@@ -326,7 +479,12 @@ export const createReminders = ({ config, storage, email }) => {
       try {
         await processRenewalReminders();
       } catch (err) {
-        console.error('Reminder tick failed', safeErrorMessage(err));
+        console.error('Renewal reminder tick failed', safeErrorMessage(err));
+      }
+      try {
+        await processMonthlySummaries();
+      } catch (err) {
+        console.error('Monthly summary tick failed', safeErrorMessage(err));
       } finally {
         reminderRunning = false;
       }
@@ -336,5 +494,5 @@ export const createReminders = ({ config, storage, email }) => {
     reminderTimer = setInterval(tick, config.notifyIntervalMs);
   };
 
-  return { startReminderScheduler, processRenewalReminders };
+  return { startReminderScheduler, processRenewalReminders, processMonthlySummaries };
 };

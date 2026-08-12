@@ -1,5 +1,6 @@
 import { DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS, DEFAULT_RULE_CHANNELS } from './constants.js';
 import { DEFAULT_REMINDER_TEMPLATE_STRING } from './reminderTemplate.js';
+import { DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING } from './monthlySummaryTemplate.js';
 
 const EXCHANGE_RATE_CODE_RE = /^[A-Z0-9]{2,10}$/;
 
@@ -27,8 +28,13 @@ export const normalizeExchangeRates = (incoming, fallback = { USD: 1 }) => {
 
 export const createDefaultSettings = () => ({
   language: 'zh',
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
+  timezone: 'Asia/Shanghai',
   theme: 'system',
+  wallpaper: {
+    url: '',
+    blur: 0,
+    overlay: 36,
+  },
   customCategories: [...DEFAULT_CATEGORIES],
   customPaymentMethods: [...DEFAULT_PAYMENT_METHODS],
   customCurrencies: [
@@ -51,9 +57,11 @@ export const createDefaultSettings = () => ({
     email: { enabled: false, emailAddress: '' },
     rules: {
       renewalReminder: true,
+      monthlySummary: false,
       reminderDays: 3,
       channels: { ...DEFAULT_RULE_CHANNELS },
       template: DEFAULT_REMINDER_TEMPLATE_STRING,
+      monthlySummaryTemplate: DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
     },
   },
   security: {
