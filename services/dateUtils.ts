@@ -19,8 +19,6 @@ export const formatLocalYMD = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const getTodayLocalYMD = (): string => formatLocalYMD(new Date());
-
 export const formatYMDInTimeZone = (date: Date, timeZone?: string): string => {
   if (!timeZone) return formatLocalYMD(date);
   try {

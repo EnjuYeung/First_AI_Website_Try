@@ -64,8 +64,22 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
   useEffect(() => {
     const updateNow = () => setServerNowMs(extrapolateServerNow(serverClock));
     updateNow();
-    const timer = window.setInterval(updateNow, 1_000);
-    return () => window.clearInterval(timer);
+    const start = () => window.setInterval(updateNow, 30_000);
+    let timer = document.visibilityState === 'hidden' ? 0 : start();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        window.clearInterval(timer);
+        timer = 0;
+        return;
+      }
+      updateNow();
+      if (!timer) timer = start();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [serverClock]);
 
   useEffect(() => {

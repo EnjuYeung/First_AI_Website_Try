@@ -17,22 +17,6 @@ describe('General settings', () => {
         currentLanguage="en"
         settings={settings}
         onUpdateSettings={onUpdateSettings}
-        newCategory=""
-        setNewCategory={vi.fn()}
-        newPayment=""
-        setNewPayment={vi.fn()}
-        categories={settings.customCategories}
-        payments={settings.customPaymentMethods}
-        dragCatIndex={null}
-        setDragCatIndex={vi.fn()}
-        dragPayIndex={null}
-        setDragPayIndex={vi.fn()}
-        handleAddCategory={vi.fn()}
-        handleAddPayment={vi.fn()}
-        handleCategoryDragStart={vi.fn()}
-        handleCategoryDrop={vi.fn()}
-        handlePaymentDragStart={vi.fn()}
-        handlePaymentDrop={vi.fn()}
       />,
     );
 

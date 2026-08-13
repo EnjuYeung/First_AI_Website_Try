@@ -12,3 +12,8 @@ export const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 export const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
 export const LEGACY_EXCHANGE_RATE_KEYPAIR_FILE = path.join(DATA_DIR, 'exchange-rate-keypair.json');
 export const USERS_DIR = path.join(DATA_DIR, 'users');
+
+export const userDataPath = (username) => path.join(DATA_DIR, `${username}.json`);
+export const userFeatureDir = (username) => path.join(USERS_DIR, encodeURIComponent(username));
+export const userFeaturePath = (username, feature) =>
+  path.join(userFeatureDir(username), `${feature}.json`);

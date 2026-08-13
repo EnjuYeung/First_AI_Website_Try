@@ -61,30 +61,33 @@ const ApiTab: React.FC<Props> = ({
         </div>
 
         <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-          <div>已启用：{settings.exchangeRateApi?.enabled ? '是' : '否'}</div>
+          <div>{t('exchange_enabled')}: {settings.exchangeRateApi?.enabled ? t('yes') : t('no')}</div>
           <div>
-            上次测试：
+            {t('last_tested')}:
+            {' '}
             {settings.exchangeRateApi?.lastTestedAt
               ? new Date(settings.exchangeRateApi.lastTestedAt).toLocaleString(
                   currentLanguage === 'zh' ? 'zh-CN' : 'en-US'
                 )
-              : '-'}
+              : '—'}
           </div>
           <div>
-            上次自动(0时)：
+            {t('last_auto_midnight')}:
+            {' '}
             {settings.exchangeRateApi?.lastRunAt0
               ? new Date(settings.exchangeRateApi.lastRunAt0).toLocaleString(
                   currentLanguage === 'zh' ? 'zh-CN' : 'en-US'
                 )
-              : '-'}
+              : '—'}
           </div>
           <div>
-            上次自动(12时)：
+            {t('last_auto_noon')}:
+            {' '}
             {settings.exchangeRateApi?.lastRunAt12
               ? new Date(settings.exchangeRateApi.lastRunAt12).toLocaleString(
                   currentLanguage === 'zh' ? 'zh-CN' : 'en-US'
                 )
-              : '-'}
+              : '—'}
           </div>
         </div>
       </section>

@@ -12,7 +12,7 @@ import { getT } from '../services/i18n';
 import { displayCategoryLabel } from '../services/displayLabels';
 import { daysUntilYMD, formatLocalYMD, getTodayYMD, parseLocalYMD } from '../services/dateUtils';
 import { addBillingCycleYMD } from '../shared/billingDate.js';
-import { formatCurrency } from '../services/currency';
+import { convertToUSD, formatCurrency } from '../services/currency';
 import RenewalRail, { RenewalRailEvent } from './RenewalRail';
 
 interface Props {
@@ -39,14 +39,6 @@ interface DashboardStats {
   upcomingRenewals: BillingEvent[];
   monthlyEvents: RenewalRailEvent[];
 }
-
-const convertToUSD = (amount: number, currency: string, rates: Record<string, number> | undefined): number => {
-  if (!Number.isFinite(amount) || amount < 0) return 0;
-  if (!currency || currency === 'USD') return amount;
-  const rate = rates?.[currency] ?? 1;
-  if (rate <= 0 || !Number.isFinite(rate)) return amount;
-  return amount / rate;
-};
 
 const useDashboardStats = (
   subscriptions: Subscription[],
@@ -114,6 +106,11 @@ const useDashboardStats = (
         }
 
         const date = new Date(currentDate);
+        const isOverduePersistedDay =
+          !isCancelled &&
+          hasPersistedNextBilling &&
+          currentDate.getTime() === persistedNextBilling.getTime() &&
+          persistedNextBilling <= today;
         const isSupersededFutureCycle =
           !isCancelled &&
           currentDate > today &&
@@ -121,7 +118,10 @@ const useDashboardStats = (
           currentDate < persistedNextBilling;
 
         if (currentDate >= monthStart && currentDate <= monthEnd) {
-          if (currentDate <= today) {
+          if (isOverduePersistedDay) {
+            stats.monthlyPending += usdCost;
+            stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'pending' });
+          } else if (currentDate <= today) {
             stats.monthlyPaid += usdCost;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'paid' });
           } else if (!isCancelled && !isSupersededFutureCycle) {
@@ -131,11 +131,16 @@ const useDashboardStats = (
         }
 
         if (currentDate >= yearStart && currentDate <= yearEnd) {
-          if (currentDate <= today) stats.yearlyPaid += usdCost;
+          if (isOverduePersistedDay) stats.yearlyPending += usdCost;
+          else if (currentDate <= today) stats.yearlyPaid += usdCost;
           else if (!isCancelled && !isSupersededFutureCycle) stats.yearlyPending += usdCost;
         }
 
-        if (currentDate >= last7DaysStart && currentDate <= today) {
+        if (
+          currentDate >= last7DaysStart &&
+          currentDate <= today &&
+          !isOverduePersistedDay
+        ) {
           stats.recentPayments.push({ sub, date, cost: sub.price });
         }
 
@@ -147,7 +152,6 @@ const useDashboardStats = (
       if (
         !isCancelled &&
         hasPersistedNextBilling &&
-        persistedNextBilling > today &&
         persistedNextBilling <= next7DaysEnd
       ) {
         stats.upcomingRenewals.push({ sub, date: persistedNextBilling, cost: sub.price });
@@ -206,9 +210,11 @@ const PaymentList: React.FC<{
                   <div className="font-data text-sm font-medium text-[var(--ink)]">{formatCurrency(item.cost, item.sub.currency)}</div>
                   <div className={`mt-0.5 text-[11px] ${upcoming && days <= 3 ? 'text-[var(--alert-coral)]' : 'text-[var(--muted)]'}`}>
                     {upcoming
-                      ? days === 0
-                        ? t('today')
-                        : `${days} ${t('days_left')}`
+                      ? days < 0
+                        ? t('overdue')
+                        : days === 0
+                          ? t('today')
+                          : `${days} ${t('days_left')}`
                       : formatLocalYMD(item.date)}
                   </div>
                 </div>

@@ -98,12 +98,18 @@ const SubscriptionList: React.FC<Props> = ({
     setSelectedIds(newSelection);
   };
 
+  const handleDelete = (id: string) => {
+    if (!window.confirm(t('confirm_delete'))) return;
+    onDelete(id);
+  };
+
   const executeBatchDelete = () => {
     const visibleSelection = getVisibleSelectedIds(filteredSubscriptions, selectedIds);
-    if (visibleSelection.length > 0) {
-      onBatchDelete(visibleSelection);
-      setSelectedIds(new Set());
-    }
+    if (visibleSelection.length === 0) return;
+    const message = t('confirm_batch_delete').replace('{count}', visibleSelection.length.toString());
+    if (!window.confirm(message)) return;
+    onBatchDelete(visibleSelection);
+    setSelectedIds(new Set());
   };
 
   // --- Options Construction ---
@@ -286,7 +292,7 @@ const SubscriptionList: React.FC<Props> = ({
           onSort={handleSort}
           onEdit={onEdit}
           onDuplicate={onDuplicate}
-          onDelete={onDelete}
+          onDelete={handleDelete}
           renderDateBadge={renderDateBadge}
           lang={lang}
           t={t}
@@ -298,7 +304,7 @@ const SubscriptionList: React.FC<Props> = ({
           onSelectOne={handleSelectOne}
           onEdit={onEdit}
           onDuplicate={onDuplicate}
-          onDelete={onDelete}
+          onDelete={handleDelete}
           renderDateBadge={renderDateBadge}
           lang={lang}
           t={t}

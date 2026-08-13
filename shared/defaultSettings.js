@@ -70,6 +70,6 @@ export const createDefaultSettings = () => ({
     twoFactorEnabled: false,
     twoFactorSecret: '',
     pendingTwoFactorSecret: '',
-    lastPasswordChange: new Date().toISOString(),
+    lastPasswordChange: '1970-01-01T00:00:00.000Z',
   },
 });

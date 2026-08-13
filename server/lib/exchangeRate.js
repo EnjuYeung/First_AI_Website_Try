@@ -1,13 +1,21 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
-import { LEGACY_EXCHANGE_RATE_KEYPAIR_FILE } from './storagePaths.js';
+import { LEGACY_EXCHANGE_RATE_KEYPAIR_FILE } from './paths.js';
 import { formatDateInTimeZone, getTimePartsInTimeZone } from './dates.js';
 
 const ENCRYPTION_PREFIX = 'aesgcm-v1';
 
 const fetchUsdRatesFromExchangeRateApi = async (apiKey) => {
   const url = `https://v6.exchangerate-api.com/v6/${encodeURIComponent(apiKey)}/latest/USD`;
-  const resp = await fetch(url, { method: 'GET' });
+  let resp;
+  try {
+    resp = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10_000) });
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      throw new Error('exchange_rate_api_timeout');
+    }
+    throw err;
+  }
   const json = await resp.json().catch(() => ({}));
   if (!resp.ok) {
     const msg = json?.['error-type'] || json?.message || `exchange_rate_api_http_${resp.status}`;
@@ -110,7 +118,7 @@ export const createExchangeRate = ({
         const settings = data.settings || defaults.defaultSettings();
         const tz = settings.timezone || 'Asia/Shanghai';
         const today = formatDateInTimeZone(tz);
-        const { hour, minute } = getTimePartsInTimeZone(tz);
+        const { hour } = getTimePartsInTimeZone(tz);
 
         const cfg = settings.exchangeRateApi || defaults.defaultSettings().exchangeRateApi;
         if (!cfg.enabled || !cfg.encryptedKey || !cfg.lastTestedAt) return;
@@ -118,18 +126,9 @@ export const createExchangeRate = ({
         const ran0 = cfg.lastRunAt0 ? formatDateInTimeZone(tz, new Date(cfg.lastRunAt0)) : '';
         const ran12 = cfg.lastRunAt12 ? formatDateInTimeZone(tz, new Date(cfg.lastRunAt12)) : '';
 
-        if ((hour > 12 || (hour === 12 && minute >= 0)) && ran12 !== today) {
+        if (hour >= 12 && ran12 !== today) {
           await updateExchangeRatesForUser(username, 12);
-          if (ran0 !== today) {
-            const updatedData = await storage.loadUserData(username);
-            if (updatedData.settings?.exchangeRateApi) {
-              await storage.updateUserData(username, (current) => {
-                current.settings.exchangeRateApi.lastRunAt0 = Date.now();
-                return current;
-              });
-            }
-          }
-        } else if ((hour > 0 || (hour === 0 && minute >= 0)) && ran0 !== today) {
+        } else if (hour < 12 && ran0 !== today) {
           await updateExchangeRatesForUser(username, 0);
         }
       } catch (err) {

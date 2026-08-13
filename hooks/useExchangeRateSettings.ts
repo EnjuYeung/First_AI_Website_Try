@@ -4,8 +4,7 @@ import { apiFetchJson, authJsonHeaders } from '../services/apiClient';
 import { SettingsAlert } from './settingsTypes';
 
 export const useExchangeRateSettings = (
-  settings: AppSettings,
-  onUpdate: (settings: AppSettings) => void,
+  applyRemoteSettings: (patch: Partial<AppSettings>) => void,
   t: (key: any) => string,
   setAlert: (alert: SettingsAlert) => void
 ) => {
@@ -13,14 +12,9 @@ export const useExchangeRateSettings = (
   const [isSavingExchangeApi, setIsSavingExchangeApi] = useState(false);
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
   const isSavingExchangeApiRef = useRef(false);
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
 
   const applyResponse = (json: any) =>
-    onUpdate({
-      // The request may finish after another setting (for example, theme) was
-      // changed. Merge into the latest settings instead of a stale closure.
-      ...settingsRef.current,
+    applyRemoteSettings({
       exchangeRateApi: json.settings.exchangeRateApi,
       exchangeRates: json.settings.exchangeRates,
       lastRatesUpdate: json.settings.lastRatesUpdate,

@@ -9,7 +9,6 @@ const SubscriptionList = lazy(() => import('./components/SubscriptionList'));
 const SubscriptionForm = lazy(() => import('./components/SubscriptionForm'));
 const Settings = lazy(() => import('./components/Settings'));
 
-// Custom Hooks
 import { useAuth } from './hooks/useAuth';
 import { useAppData } from './hooks/useAppData';
 import { useClientPreferences } from './hooks/useClientPreferences';
@@ -26,7 +25,7 @@ const App: React.FC = () => {
     subscriptions, settings, notifications, serverClock, isDataLoading,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
     batchDeleteSubscriptions, duplicateSubscription,
-    lastMutationError, clearMutationError
+    lastMutationError, clearMutationError, applyRemoteSettings
   } = useAppData(isAuthenticated, logout, language);
 
   const clientSettings: AppSettings = { ...settings, language, theme, colorTheme };
@@ -143,13 +142,16 @@ const App: React.FC = () => {
 
   const mutationAlert = lastMutationError
     ? {
+        kind: 'save' as const,
         type: 'error' as const,
         log: lastMutationError instanceof Error
-          ? lastMutationError.stack || `${lastMutationError.name}: ${lastMutationError.message}`
+          ? lastMutationError.message
           : String(lastMutationError),
       }
     : null;
-  const visibleAlert = refreshAlert || mutationAlert;
+  const visibleAlert = refreshAlert
+    ? { kind: 'refresh' as const, ...refreshAlert }
+    : mutationAlert;
 
   // Nav Configuration
   const navTabs = [
@@ -159,7 +161,16 @@ const App: React.FC = () => {
   ] as const;
 
 
-  if (isLoadingAuth) return null; // Or a loading spinner
+  if (isLoadingAuth) {
+    return (
+      <div className="app-shell flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="eyebrow mb-3">Subm</div>
+          <p className="page-copy text-sm">{t('loading')}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -231,7 +242,13 @@ const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'settings' && <Settings settings={clientSettings} onUpdateSettings={handleSettingsUpdate} />}
+          {activeTab === 'settings' && (
+            <Settings
+              settings={clientSettings}
+              onUpdateSettings={handleSettingsUpdate}
+              onApplyRemoteSettings={applyRemoteSettings}
+            />
+          )}
         </div>
         </Suspense>
       </main>
@@ -265,7 +282,13 @@ const App: React.FC = () => {
               {visibleAlert.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              {t(visibleAlert.type === 'success' ? 'refresh_success' : 'refresh_failed')}
+              {t(
+                visibleAlert.type === 'success'
+                  ? 'refresh_success'
+                  : visibleAlert.kind === 'save'
+                    ? 'save_failed'
+                    : 'refresh_failed'
+              )}
             </h3>
             {visibleAlert.type === 'error' && (
               <pre className="max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-left text-xs leading-5 text-red-200 whitespace-pre-wrap break-words">

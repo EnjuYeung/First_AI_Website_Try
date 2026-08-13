@@ -20,7 +20,6 @@ const createTestApp = () => createApp({
   },
   storage: {},
   exchangeRate: {},
-  email: {},
 });
 
 const listen = async (app) => {

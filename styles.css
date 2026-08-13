@@ -305,15 +305,6 @@ textarea {
   background: transparent;
 }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
 .font-display {
   font-family: var(--font-display);
 }
@@ -323,8 +314,7 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.mac-surface,
-.surface-panel {
+.mac-surface {
   border: 1px solid var(--line) !important;
   background: var(--surface) !important;
   box-shadow: var(--shadow-panel) !important;
@@ -1237,13 +1227,6 @@ textarea {
 .settings-nav-button[data-active="true"] {
   color: var(--rail-teal);
   background: var(--rail-teal-soft);
-}
-
-.chart-tooltip {
-  border: 1px solid var(--line) !important;
-  color: var(--ink) !important;
-  background: var(--surface-raised) !important;
-  box-shadow: var(--shadow-float) !important;
 }
 
 .login-shell {

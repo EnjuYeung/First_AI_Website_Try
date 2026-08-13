@@ -12,6 +12,7 @@ import {
   updateSubscription,
 } from '../services/storageService';
 import { getT } from '../services/i18n';
+import { newId } from '../services/ids';
 import { UnauthorizedError } from '../services/apiClient';
 
 const FOCUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -187,6 +188,10 @@ export const useAppData = (
     return result;
   };
 
+  const applyRemoteSettings = (patch: Partial<AppSettings>) => {
+    applySettings({ ...settingsRef.current, ...patch });
+  };
+
   const updateSettings = (newSettings: AppSettings) => {
     applySettings(newSettings);
     return persistFeature('settings', (revision) => replaceSettings(newSettings, revision), applySettings);
@@ -210,36 +215,25 @@ export const useAppData = (
   };
 
   const deleteSubscription = (id: string) => {
-     if (window.confirm(t('confirm_delete'))) {
-      const updated = subscriptionsRef.current.filter(s => s.id !== id);
-      applySubscriptions(updated);
-      return persistFeature('subscriptions', (revision) => removeSubscription(id, revision), applySubscriptions);
-    }
-    return Promise.resolve(false);
+    const updated = subscriptionsRef.current.filter(s => s.id !== id);
+    applySubscriptions(updated);
+    return persistFeature('subscriptions', (revision) => removeSubscription(id, revision), applySubscriptions);
   };
 
   const batchDeleteSubscriptions = (ids: string[]) => {
-    const message = t('confirm_batch_delete').replace('{count}', ids.length.toString());
-    if (window.confirm(message)) {
-      const updated = subscriptionsRef.current.filter(s => !ids.includes(s.id));
-      applySubscriptions(updated);
-      return persistFeature('subscriptions', (revision) => removeSubscriptions(ids, revision), applySubscriptions);
-    }
-    return Promise.resolve(false);
+    const updated = subscriptionsRef.current.filter(s => !ids.includes(s.id));
+    applySubscriptions(updated);
+    return persistFeature('subscriptions', (revision) => removeSubscriptions(ids, revision), applySubscriptions);
   };
 
   const duplicateSubscription = (sub: Subscription) => {
-    const newId = typeof crypto !== 'undefined' && crypto.randomUUID 
-      ? crypto.randomUUID() 
-      : Date.now().toString(36) + Math.random().toString(36).substring(2);
-    
     const prefix = t('copy_prefix');
     const suffix = t('copy_suffix');
     const newName = `${prefix}${sub.name}${suffix}`;
 
     const newSub: Subscription = {
       ...sub,
-      id: newId,
+      id: newId(),
       name: newName,
     };
 
@@ -257,6 +251,7 @@ export const useAppData = (
     lastMutationError,
     clearMutationError: () => setLastMutationError(null),
     loadRemoteData,
+    applyRemoteSettings,
     updateSettings,
     saveSubscription,
     deleteSubscription,

@@ -40,10 +40,10 @@ export const useNotificationSettings = (
       const message = err?.message === 'telegram_not_configured'
         ? t('telegram_not_configured')
         : err?.message === 'telegram_webhook_https_required'
-          ? 'Telegram 回调需要公开可访问的 HTTPS 地址，请配置 PUBLIC_BASE_URL。'
+          ? t('telegram_https_required')
         : err?.message === 'invalid_template'
-          ? '模板格式错误，请输入包含 lines 数组的 JSON。'
-          : err?.message || 'Telegram test failed. Check your settings.';
+          ? t('template_json_error')
+          : err?.message || t('telegram_test_failed');
       setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
     } finally {
       setIsTestingTelegram(false);
@@ -67,10 +67,10 @@ export const useNotificationSettings = (
       const message = err?.message === 'telegram_not_configured'
         ? t('telegram_not_configured')
         : err?.message === 'telegram_webhook_https_required'
-          ? 'Telegram 回调需要公开可访问的 HTTPS 地址，请配置 PUBLIC_BASE_URL。'
+          ? t('telegram_https_required')
           : err?.message === 'invalid_template'
             ? t('template_json_error')
-            : err?.message || 'Monthly summary test failed.';
+            : err?.message || t('monthly_summary_test_failed');
       setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
     } finally {
       setIsTestingMonthlySummary(false);
@@ -87,11 +87,11 @@ export const useNotificationSettings = (
       });
       if (!saved) throw new Error('save_failed');
       setTemplateText(template);
-      setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: '模板已保存' });
+      setAlert({ isOpen: true, type: 'success', title: t('success_title'), message: t('template_saved') });
     } catch (error) {
       const message = error instanceof Error && error.message === 'save_failed'
         ? t('connection_failed')
-        : '模板格式错误，请输入包含 lines 数组的 JSON。';
+        : t('template_json_error');
       setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
     }
   };

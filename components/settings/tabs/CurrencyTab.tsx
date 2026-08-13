@@ -1,18 +1,11 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, RefreshCw, Search, X as XIcon } from 'lucide-react';
-import { AppSettings, CurrencyConfig } from '../../../types';
+import { AppSettings, ISO_CURRENCIES } from '../../../types';
 
 type Props = {
   t: (key: any) => string;
   settings: AppSettings;
   onUpdateSettings: (settings: AppSettings) => void;
-
-  currencySearch: string;
-  setCurrencySearch: React.Dispatch<React.SetStateAction<string>>;
-  showCurrencyDropdown: boolean;
-  setShowCurrencyDropdown: React.Dispatch<React.SetStateAction<boolean>>;
-  filteredCurrencies: CurrencyConfig[];
-
   isUpdatingRates: boolean;
   handleManualUpdateRates: () => void;
   formatLastUpdated: (timestamp: number) => string;
@@ -22,15 +15,17 @@ const CurrencyTab: React.FC<Props> = ({
   t,
   settings,
   onUpdateSettings,
-  currencySearch,
-  setCurrencySearch,
-  showCurrencyDropdown,
-  setShowCurrencyDropdown,
-  filteredCurrencies,
   isUpdatingRates,
   handleManualUpdateRates,
   formatLastUpdated,
 }) => {
+  const [currencySearch, setCurrencySearch] = useState('');
+  const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
+  const filteredCurrencies = useMemo(() => ISO_CURRENCIES.filter((currency) =>
+    `${currency.code} ${currency.name}`.toLowerCase().includes(currencySearch.toLowerCase()) &&
+    !settings.customCurrencies.some((item) => item.code === currency.code)
+  ), [currencySearch, settings.customCurrencies]);
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
       <div className="xl:col-span-5 space-y-6">
@@ -70,7 +65,7 @@ const CurrencyTab: React.FC<Props> = ({
                 </div>
               ))}
             {settings.customCurrencies.filter((c) => c.code !== 'USD').length === 0 && (
-              <div className="text-center py-6 text-gray-400 text-sm">Add currencies to see rates.</div>
+              <div className="text-center py-6 text-gray-400 text-sm">{t('add_currencies_hint')}</div>
             )}
           </div>
 
@@ -124,7 +119,7 @@ const CurrencyTab: React.FC<Props> = ({
                     </button>
                   ))
                 ) : (
-                  <div className="p-4 text-center text-gray-500 text-sm">No matches found</div>
+                  <div className="p-4 text-center text-gray-500 text-sm">{t('no_currency_matches')}</div>
                 )}
               </div>
             )}

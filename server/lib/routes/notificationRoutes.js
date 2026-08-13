@@ -6,6 +6,7 @@ import {
 import {
   sendTelegramMessage,
 } from '../telegram.js';
+import { formatDateInTimeZone } from '../dates.js';
 
 export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
   app.post('/api/notifications/test-telegram', auth.authMiddleware, async (req, res) => {
@@ -33,7 +34,7 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
           )
         : renderReminderTemplate(template || settings.notifications.rules.template || DEFAULT_REMINDER_TEMPLATE_STRING, {
             name: '测试订阅',
-            nextBillingDate: new Date().toISOString().slice(0, 10),
+            nextBillingDate: formatDateInTimeZone(config.timeZone),
             price: '0.00',
             currency: '',
             paymentMethod: '测试支付方式',

@@ -3,8 +3,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, RefreshCw, Bell, Loader2 } from 'lucide-react';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
+import { newId } from '../services/ids';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
-import { displayCategoryLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
 import { deleteUploadedIcon, uploadIconFile } from '../services/storageService';
 import { getTodayYMD } from '../services/dateUtils';
 import { calculateNextBillingDateYMD } from '../shared/billingDate.js';
@@ -21,19 +22,6 @@ interface Props {
 const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, settings, lang }) => {
   const t = getT(lang);
   
-  const frequencyLabel = (freq: Frequency) => {
-    if (lang === 'zh') {
-      switch (freq) {
-        case Frequency.MONTHLY: return '月度';
-        case Frequency.QUARTERLY: return '季度';
-        case Frequency.SEMI_ANNUALLY: return '半年';
-        case Frequency.YEARLY: return '年度';
-        default: return freq;
-      }
-    }
-    return freq;
-  };
-
   const [formData, setFormData] = useState<Partial<Subscription>>({
     name: '',
     price: 0,
@@ -46,6 +34,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     startDate: getTodayYMD(settings.timezone),
     nextBillingDate: '',
     iconUrl: '',
+    url: '',
     notes: '',
     notificationsEnabled: true
   });
@@ -149,6 +138,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           startDate: today,
           nextBillingDate: initialNextBill, // Set calculated value immediately
           iconUrl: '',
+          url: '',
           notes: '',
           notificationsEnabled: true
         });
@@ -172,13 +162,6 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
       setFormData(prev => ({ ...prev, nextBillingDate: calculated }));
     }
   }, [formData.startDate, formData.frequency, formData.status, isOpen, initialData, calculateNextDate, formData.nextBillingDate]);
-
-  const generateId = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    return Date.now().toString(36) + Math.random().toString(36).substring(2);
-  };
 
   const handleStatusChange = (value: 'active' | 'cancelled') => {
     setFormData((prev) => {
@@ -240,7 +223,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     let saved = false;
     try {
       saved = await onSave({
-          id: initialData?.id || generateId(),
+          id: initialData?.id || newId(),
           ...formData as Subscription,
           price: Number(formData.price),
           iconUrl: iconUrl.length > 0 ? iconUrl : undefined
@@ -250,7 +233,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     }
     if (!saved) {
       setIsSubmitting(false);
-      setSubmitError(lang === 'zh' ? '保存失败，请检查网络后重试。' : 'Save failed. Check your connection and try again.');
+      setSubmitError(t('save_failed_detail'));
       return;
     }
     temporaryUploads.current.delete(iconUrl);
@@ -406,7 +389,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                   }}
                 >
                   {Object.values(Frequency).map(f => (
-                    <option key={f} value={f}>{frequencyLabel(f as Frequency)}</option>
+                    <option key={f} value={f}>{displayFrequencyLabel(f as Frequency, lang)}</option>
                   ))}
                 </select>
               </div>
@@ -494,6 +477,19 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
             </div>
           </div>
 
+          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('service_url')}</label>
+            <input
+              type="url"
+              inputMode="url"
+              placeholder={t('service_url_placeholder')}
+              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              value={String(formData.url || '')}
+              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+            />
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('service_url_tip')}</p>
+          </div>
+
           {/* Notes */}
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('notes')}</label>
@@ -530,7 +526,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
             className="primary-action mt-2 w-full rounded-xl py-4 font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting
-              ? (lang === 'zh' ? '保存中…' : 'Saving…')
+              ? t('saving')
               : initialData ? t('save') : t('add_new')}
           </button>
           {submitError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{submitError}</p>}

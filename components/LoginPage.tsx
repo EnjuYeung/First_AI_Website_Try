@@ -30,7 +30,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
       });
 
       if (response.status === 403) {
-        setError(lang === 'zh' ? '请输入双重验证码后重试。' : 'Enter your two-factor code and try again.');
+        setError(t('two_factor_required'));
         return;
       }
 
@@ -145,7 +145,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-[var(--ink-soft)]">2FA</span>
+              <span className="mb-2 block text-xs font-semibold text-[var(--ink-soft)]">{t('two_factor')}</span>
               <span className="relative block">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={18} />
                 <input
@@ -155,7 +155,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
                   className="w-full rounded-xl border py-3 pl-11 pr-4 font-mono tracking-[0.18em] outline-none transition"
-                  placeholder={lang === 'zh' ? '已启用时输入 6 位验证码' : '6-digit code, when enabled'}
+                  placeholder={t('two_factor_login_hint')}
                 />
               </span>
             </label>

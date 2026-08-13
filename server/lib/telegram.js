@@ -159,13 +159,20 @@ export const setTelegramWebhook = async (
   }
 };
 
+const WEBHOOK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export const ensureTelegramWebhook = async (options, botToken, webhookUrl) => {
   if (!botToken || !webhookUrl) return false;
   const cached = webhookCache.get(botToken);
   const cacheValue = `${webhookUrl}\0${options?.secretToken || ''}`;
-  if (cached === cacheValue) return false;
+  if (
+    cached?.value === cacheValue &&
+    Date.now() - cached.setAt < WEBHOOK_CACHE_TTL_MS
+  ) {
+    return false;
+  }
   await setTelegramWebhook(options, botToken, webhookUrl);
-  webhookCache.set(botToken, cacheValue);
+  webhookCache.set(botToken, { value: cacheValue, setAt: Date.now() });
   return true;
 };
 

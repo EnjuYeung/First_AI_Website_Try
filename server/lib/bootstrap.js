@@ -37,7 +37,7 @@ export const bootstrap = async () => {
   });
   await exchangeRate.migrateLegacyKeyForUser(config.adminUser);
 
-  const app = createApp({ config, auth, storage, exchangeRate, email });
+  const app = createApp({ config, auth, storage, exchangeRate });
 
   return { config, app, services: { auth, storage, reminders, exchangeRate, email } };
 };

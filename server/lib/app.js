@@ -1,11 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import crypto from 'crypto';
 
-import { UPLOADS_DIR } from './storagePaths.js';
+import { UPLOADS_DIR } from './paths.js';
 import { registerRoutes } from './routes.js';
 
-export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
+export const createApp = ({ config, auth, storage, exchangeRate }) => {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy ?? false);
@@ -55,8 +54,6 @@ export const createApp = ({ config, auth, storage, exchangeRate, email }) => {
     auth,
     storage,
     exchangeRate,
-    email,
-    crypto,
     uploadsDir: UPLOADS_DIR,
   });
 

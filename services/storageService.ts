@@ -256,8 +256,14 @@ const mutateFeature = async <T>(
   return { data: (json as any).data as T, revision: Number((json as any).revision) };
 };
 
+const asNormalizedSubscriptions = (result: { data: Subscription[]; revision: number }) => ({
+  ...result,
+  data: (result.data || []).map(normalizeSubscription),
+});
+
 export const createSubscription = (subscription: Subscription, revision: number) =>
-  mutateFeature<Subscription[]>('/subscriptions', 'POST', revision, subscription);
+  mutateFeature<Subscription[]>('/subscriptions', 'POST', revision, subscription)
+    .then(asNormalizedSubscriptions);
 
 export const updateSubscription = (subscription: Subscription, revision: number) =>
   mutateFeature<Subscription[]>(
@@ -265,19 +271,22 @@ export const updateSubscription = (subscription: Subscription, revision: number)
     'PUT',
     revision,
     subscription
-  );
+  ).then(asNormalizedSubscriptions);
 
 export const removeSubscription = (id: string, revision: number) =>
-  mutateFeature<Subscription[]>(`/subscriptions/${encodeURIComponent(id)}`, 'DELETE', revision);
+  mutateFeature<Subscription[]>(`/subscriptions/${encodeURIComponent(id)}`, 'DELETE', revision)
+    .then(asNormalizedSubscriptions);
 
 export const removeSubscriptions = (ids: string[], revision: number) =>
-  mutateFeature<Subscription[]>('/subscriptions/batch-delete', 'POST', revision, { ids });
+  mutateFeature<Subscription[]>('/subscriptions/batch-delete', 'POST', revision, { ids })
+    .then(asNormalizedSubscriptions);
 
 export const replaceSettings = (settings: AppSettings, revision: number) => {
   // Language/theme are device-local; timezone is deployment-managed.
   const {
     language: _language,
     theme: _theme,
+    colorTheme: _colorTheme,
     timezone: _timezone,
     ...serverSettings
   } = settings;

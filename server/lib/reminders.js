@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import {
   daysUntilDate,
   formatDateInTimeZone,
@@ -18,11 +17,15 @@ import {
   sendTelegramMessage,
   ensureTelegramWebhook,
 } from './telegram.js';
+import {
+  findMonthlySummaryAttempt,
+  findRenewalAttempt,
+  isBlockingDeliveryAttempt,
+  safeErrorMessage,
+  updateRenewalFeedback,
+} from './notificationRecords.js';
 
-const randomId = () =>
-  typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const randomId = () => crypto.randomUUID();
 
 const buildInlineKeyboard = (notificationId, billingDate) => ({
   inline_keyboard: [
@@ -37,86 +40,6 @@ const normalizeBaseUrl = (value) =>
   String(value || '')
     .trim()
     .replace(/\/+$/, '');
-
-const matchesSubscription = (record, subscription, sameNameCount) => {
-  const recordSubscriptionId = record?.details?.subscriptionId;
-  if (recordSubscriptionId && subscription?.id) {
-    return recordSubscriptionId === subscription.id;
-  }
-  if (recordSubscriptionId || !subscription?.name) return false;
-  return sameNameCount === 1 && record?.subscriptionName === subscription.name;
-};
-
-const notificationAttemptExists = (
-  notifications,
-  subscription,
-  channel,
-  subscriptions
-) => {
-  const sameNameCount = (subscriptions || []).filter(
-    (candidate) => candidate?.name === subscription.name
-  ).length;
-  return (notifications || []).some(
-    (record) =>
-      record.type === 'renewal_reminder' &&
-      matchesSubscription(record, subscription, sameNameCount) &&
-      record.channel === channel &&
-      record.details?.date === subscription.nextBillingDate &&
-      (record.status === 'success' ||
-        ['attempting', 'delivered', 'unknown'].includes(record.details?.deliveryState))
-  );
-};
-
-const monthlySummaryAttemptExists = (notifications, periodKey, channel) =>
-  (notifications || []).some(
-    (record) =>
-      record.type === 'monthly_summary' &&
-      record.channel === channel &&
-      record.details?.periodKey === periodKey &&
-      (record.status === 'success' ||
-        ['attempting', 'delivered', 'unknown'].includes(record.details?.deliveryState)),
-  );
-
-const updateRenewalFeedback = (
-  notifications,
-  subscription,
-  dateLabel,
-  feedback,
-  subscriptions,
-  { onlyIfEmpty = false } = {}
-) => {
-  if (!dateLabel) return false;
-  let updated = false;
-  const sameNameCount = (subscriptions || []).filter(
-    (candidate) => candidate?.name === subscription.name
-  ).length;
-  (notifications || []).forEach((record) => {
-    if (record.type !== 'renewal_reminder') return;
-    if (record.details?.date !== dateLabel) return;
-    const recordSubscriptionId = record.details?.subscriptionId;
-    const sameSubscription = recordSubscriptionId
-      ? recordSubscriptionId === subscription.id
-      : sameNameCount === 1 &&
-        record.subscriptionName === subscription.name;
-    if (!sameSubscription) return;
-    if (onlyIfEmpty && record.details?.renewalFeedback) return;
-    record.details = {
-      ...record.details,
-      renewalFeedback: feedback,
-      subscriptionId: record.details?.subscriptionId || subscription.id,
-    };
-    updated = true;
-  });
-  return updated;
-};
-
-const safeErrorMessage = (err, secret = '') => {
-  let message = String(err?.message || 'unknown_error');
-  for (const value of [secret, encodeURIComponent(secret || '')]) {
-    if (value) message = message.split(value).join('[redacted]');
-  }
-  return message;
-};
 
 export const createReminders = ({ config, storage, email }) => {
   let reminderTimer = null;
@@ -167,6 +90,7 @@ export const createReminders = ({ config, storage, email }) => {
     if (!reminderRule) return;
 
     const subs = data.subscriptions || [];
+    const overdueSubs = [];
     for (const sub of subs) {
       if (!sub?.notificationsEnabled) continue;
       if (sub.status && sub.status !== 'active') continue;
@@ -174,25 +98,7 @@ export const createReminders = ({ config, storage, email }) => {
       const days = daysUntilDate(sub.nextBillingDate, timeZone);
       if (!Number.isFinite(days)) continue;
       if (days < 0) {
-        try {
-          await storage.updateUserData(username, (current) => {
-            const currentSub = (current.subscriptions || []).find(
-              (candidate) => candidate?.id === sub.id
-            );
-            if (!currentSub || currentSub.nextBillingDate !== sub.nextBillingDate) return current;
-            updateRenewalFeedback(
-              current.notifications,
-              currentSub,
-              currentSub.nextBillingDate,
-              'pending',
-              current.subscriptions,
-              { onlyIfEmpty: true }
-            );
-            return current;
-          });
-        } catch (err) {
-          console.error('Failed to persist renewal feedback', safeErrorMessage(err));
-        }
+        overdueSubs.push(sub);
         continue;
       }
       if (days > reminderDays) continue;
@@ -243,26 +149,38 @@ export const createReminders = ({ config, storage, email }) => {
               !currentSub ||
               currentSub.status !== 'active' ||
               !currentSub.notificationsEnabled ||
-              currentSub.nextBillingDate !== dateLabel ||
-              notificationAttemptExists(
-                current.notifications,
-                currentSub,
-                channel,
-                current.subscriptions
-              )
+              currentSub.nextBillingDate !== dateLabel
             ) {
               return current;
             }
+            const existing = findRenewalAttempt(
+              current.notifications,
+              currentSub,
+              channel,
+              current.subscriptions
+            );
+            if (existing && isBlockingDeliveryAttempt(existing)) return current;
             if (!Array.isArray(current.notifications)) current.notifications = [];
-            current.notifications.push({
-              ...recordBase,
-              status: 'failed',
-              details: {
-                ...recordBase.details,
-                deliveryState: 'attempting',
-                deliveryAttemptedAt: timestamp,
-              },
-            });
+            const attemptDetails = {
+              ...recordBase.details,
+              deliveryState: 'attempting',
+              deliveryAttemptedAt: timestamp,
+            };
+            if (existing) {
+              recordBase.id = existing.id;
+              existing.status = 'failed';
+              existing.timestamp = timestamp;
+              existing.details = {
+                ...existing.details,
+                ...attemptDetails,
+              };
+            } else {
+              current.notifications.push({
+                ...recordBase,
+                status: 'failed',
+                details: attemptDetails,
+              });
+            }
             claimed = true;
             return current;
           });
@@ -334,6 +252,30 @@ export const createReminders = ({ config, storage, email }) => {
       await attemptChannel('telegram');
       await attemptChannel('email');
     }
+
+    if (overdueSubs.length) {
+      try {
+        await storage.updateUserData(username, (current) => {
+          overdueSubs.forEach((sub) => {
+            const currentSub = (current.subscriptions || []).find(
+              (candidate) => candidate?.id === sub.id
+            );
+            if (!currentSub || currentSub.nextBillingDate !== sub.nextBillingDate) return;
+            updateRenewalFeedback(
+              current.notifications,
+              currentSub,
+              currentSub.nextBillingDate,
+              'pending',
+              current.subscriptions,
+              { onlyIfEmpty: true }
+            );
+          });
+          return current;
+        });
+      } catch (err) {
+        console.error('Failed to persist renewal feedback', safeErrorMessage(err));
+      }
+    }
   };
 
   const processMonthlySummaries = async (now = new Date()) => {
@@ -392,19 +334,35 @@ export const createReminders = ({ config, storage, email }) => {
           const currentRules = current.settings?.notifications?.rules;
           if (
             !currentRules?.monthlySummary ||
-            !(currentRules.channels?.monthlySummary || []).includes(channel) ||
-            monthlySummaryAttemptExists(current.notifications, summary.periodKey, channel)
+            !(currentRules.channels?.monthlySummary || []).includes(channel)
           ) return current;
+          const existing = findMonthlySummaryAttempt(
+            current.notifications,
+            summary.periodKey,
+            channel
+          );
+          if (existing && isBlockingDeliveryAttempt(existing)) return current;
           if (!Array.isArray(current.notifications)) current.notifications = [];
-          current.notifications.push({
-            ...recordBase,
-            status: 'failed',
-            details: {
-              ...recordBase.details,
-              deliveryState: 'attempting',
-              deliveryAttemptedAt: timestamp,
-            },
-          });
+          const attemptDetails = {
+            ...recordBase.details,
+            deliveryState: 'attempting',
+            deliveryAttemptedAt: timestamp,
+          };
+          if (existing) {
+            recordBase.id = existing.id;
+            existing.status = 'failed';
+            existing.timestamp = timestamp;
+            existing.details = {
+              ...existing.details,
+              ...attemptDetails,
+            };
+          } else {
+            current.notifications.push({
+              ...recordBase,
+              status: 'failed',
+              details: attemptDetails,
+            });
+          }
           claimed = true;
           return current;
         });

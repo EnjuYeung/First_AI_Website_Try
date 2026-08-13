@@ -67,6 +67,19 @@ test('monthly summary template omits only statistics whose value is zero', () =>
   assert.equal(emptyMessage, '📊 2026年1月 月度总结');
 });
 
+test('monthly summary treats a missing exchange rate as zero instead of USD', () => {
+  const period = previousMonthPeriod('UTC', new Date('2026-02-01T09:00:00Z'));
+  const summary = buildMonthlySummary(
+    [{
+      name: 'CNY only', price: 72, currency: 'CNY', frequency: 'Monthly',
+      startDate: '2026-01-05', createdAt: '2026-01-05', status: 'active',
+    }],
+    { exchangeRates: { USD: 1 } },
+    period,
+  );
+  assert.equal(summary.totalPaidUsd, 0);
+});
+
 test('monthly summary sends once per channel after 09:00 on day one', async (t) => {
   let sendCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {

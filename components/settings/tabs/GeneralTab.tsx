@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Check, Globe, Image, Link2, Palette, Plus, Trash2, Upload, X as XIcon } from 'lucide-react';
 import { AppSettings } from '../../../types';
 import { CategoryGlyph, PaymentGlyph } from '../../ui/glyphs';
-import { displayCategoryLabel, displayPaymentMethodLabel } from '../../../services/displayLabels';
+import { canonicalCategoryKey, canonicalPaymentMethodKey, displayCategoryLabel, displayPaymentMethodLabel } from '../../../services/displayLabels';
 import { deleteUploadedWallpaper, uploadWallpaperFile } from '../../../services/storageService';
 
 type Props = {
@@ -10,26 +10,13 @@ type Props = {
   currentLanguage: 'en' | 'zh';
   settings: AppSettings;
   onUpdateSettings: (settings: AppSettings) => boolean | Promise<boolean>;
+};
 
-  newCategory: string;
-  setNewCategory: React.Dispatch<React.SetStateAction<string>>;
-  newPayment: string;
-  setNewPayment: React.Dispatch<React.SetStateAction<string>>;
-
-  categories: string[];
-  payments: string[];
-
-  dragCatIndex: number | null;
-  setDragCatIndex: React.Dispatch<React.SetStateAction<number | null>>;
-  dragPayIndex: number | null;
-  setDragPayIndex: React.Dispatch<React.SetStateAction<number | null>>;
-
-  handleAddCategory: () => void;
-  handleAddPayment: () => void;
-  handleCategoryDragStart: (index: number) => void;
-  handleCategoryDrop: (index: number) => void;
-  handlePaymentDragStart: (index: number) => void;
-  handlePaymentDrop: (index: number) => void;
+const reorder = (list: string[], from: number, to: number) => {
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
 };
 
 const GeneralTab: React.FC<Props> = ({
@@ -37,24 +24,30 @@ const GeneralTab: React.FC<Props> = ({
   currentLanguage,
   settings,
   onUpdateSettings,
-  newCategory,
-  setNewCategory,
-  newPayment,
-  setNewPayment,
-  categories,
-  payments,
-  dragCatIndex,
-  setDragCatIndex,
-  dragPayIndex,
-  setDragPayIndex,
-  handleAddCategory,
-  handleAddPayment,
-  handleCategoryDragStart,
-  handleCategoryDrop,
-  handlePaymentDragStart,
-  handlePaymentDrop,
 }) => {
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
+  const [newCategory, setNewCategory] = useState('');
+  const [newPayment, setNewPayment] = useState('');
+  const [dragCatIndex, setDragCatIndex] = useState<number | null>(null);
+  const [dragPayIndex, setDragPayIndex] = useState<number | null>(null);
+  const categories = settings.customCategories;
+  const payments = settings.customPaymentMethods;
+
+  const handleAddCategory = () => {
+    const value = canonicalCategoryKey(newCategory);
+    if (value && !categories.some((item) => canonicalCategoryKey(item).toLowerCase() === value.toLowerCase())) {
+      onUpdateSettings({ ...settings, customCategories: [...categories, value] });
+      setNewCategory('');
+    }
+  };
+
+  const handleAddPayment = () => {
+    const value = canonicalPaymentMethodKey(newPayment);
+    if (value && !payments.some((item) => canonicalPaymentMethodKey(item).toLowerCase() === value.toLowerCase())) {
+      onUpdateSettings({ ...settings, customPaymentMethods: [...payments, value] });
+      setNewPayment('');
+    }
+  };
   const [wallpaperDraft, setWallpaperDraft] = useState(settings.wallpaper);
   const [isUploadingWallpaper, setIsUploadingWallpaper] = useState(false);
   const [wallpaperError, setWallpaperError] = useState('');
@@ -312,7 +305,7 @@ const GeneralTab: React.FC<Props> = ({
         <div className="flex gap-2 mb-3">
           <input
             type="text"
-            placeholder={currentLanguage === 'zh' ? '新增分类' : 'Add new category'}
+            placeholder={t('add_category')}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
@@ -329,14 +322,19 @@ const GeneralTab: React.FC<Props> = ({
             <span
               key={cat}
               draggable
-              onDragStart={() => handleCategoryDragStart(idx)}
+              onDragStart={() => setDragCatIndex(idx)}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => handleCategoryDrop(idx)}
+              onDrop={() => {
+                if (dragCatIndex !== null && dragCatIndex !== idx) {
+                  onUpdateSettings({ ...settings, customCategories: reorder(categories, dragCatIndex, idx) });
+                }
+                setDragCatIndex(null);
+              }}
               onDragEnd={() => setDragCatIndex(null)}
               className={`px-3 py-1 bg-gray-100/70 dark:bg-slate-700/60 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
                 dragCatIndex === idx ? 'ring-2 ring-primary-400' : ''
               }`}
-              title={currentLanguage === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
+              title={t('drag_to_reorder')}
             >
               <CategoryGlyph category={cat} containerSize={18} size={12} />
               {displayCategoryLabel(cat, currentLanguage)}
@@ -362,7 +360,7 @@ const GeneralTab: React.FC<Props> = ({
         <div className="flex gap-2 mb-3">
           <input
             type="text"
-            placeholder={currentLanguage === 'zh' ? '新增支付方式' : 'Add payment method'}
+            placeholder={t('add_payment_method')}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
             value={newPayment}
             onChange={(e) => setNewPayment(e.target.value)}
@@ -379,14 +377,19 @@ const GeneralTab: React.FC<Props> = ({
             <span
               key={pm}
               draggable
-              onDragStart={() => handlePaymentDragStart(idx)}
+              onDragStart={() => setDragPayIndex(idx)}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => handlePaymentDrop(idx)}
+              onDrop={() => {
+                if (dragPayIndex !== null && dragPayIndex !== idx) {
+                  onUpdateSettings({ ...settings, customPaymentMethods: reorder(payments, dragPayIndex, idx) });
+                }
+                setDragPayIndex(null);
+              }}
               onDragEnd={() => setDragPayIndex(null)}
               className={`px-3 py-1 bg-gray-100/70 dark:bg-slate-700/60 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
                 dragPayIndex === idx ? 'ring-2 ring-primary-400' : ''
               }`}
-              title={currentLanguage === 'zh' ? '拖动调整顺序' : 'Drag to reorder'}
+              title={t('drag_to_reorder')}
             >
               <PaymentGlyph method={pm} containerSize={18} size={12} />
               {displayPaymentMethodLabel(pm, currentLanguage)}

@@ -761,6 +761,47 @@ test('an ambiguous Telegram network failure is not retried automatically', async
   assert.equal(holder.value.notifications[0].details.deliveryState, 'unknown');
 });
 
+test('a definitive send failure reuses the same notification row', async (t) => {
+  let sendCount = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).endsWith('/sendMessage')) sendCount += 1;
+    return {
+      ok: false,
+      status: 400,
+      async json() {
+        return { ok: false, description: 'chat not found' };
+      },
+    };
+  });
+  const today = formatDateInTimeZone('UTC');
+  const initial = {
+    settings: baseSettings('UTC'),
+    subscriptions: [subscription({ nextBillingDate: today, startDate: today })],
+    notifications: [],
+  };
+  const { holder, storage } = memoryStorage(initial);
+  const reminders = createReminders({
+    config: {
+      adminUser: 'admin',
+      publicBaseUrl: '',
+      debugTelegram: false,
+      notifyIntervalMs: 60_000,
+    },
+    storage,
+    email: { async sendEmailMessage() {} },
+  });
+
+  await reminders.processRenewalReminders();
+  const firstId = holder.value.notifications[0].id;
+  await reminders.processRenewalReminders();
+
+  assert.equal(sendCount, 2);
+  assert.equal(holder.value.notifications.length, 1);
+  assert.equal(holder.value.notifications[0].id, firstId);
+  assert.equal(holder.value.notifications[0].status, 'failed');
+  assert.equal(holder.value.notifications[0].details.deliveryState, 'failed');
+});
+
 test('days-until calculations follow the configured timezone calendar date', () => {
   const now = new Date('2026-07-11T16:30:00.000Z');
   assert.equal(daysUntilDate('2026-07-12', 'Asia/Shanghai', now), 0);

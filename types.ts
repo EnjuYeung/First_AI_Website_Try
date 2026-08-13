@@ -107,6 +107,8 @@ export interface ExchangeRateApiSettings {
   lastRunAt12: number; // epoch ms
 }
 
+// language/theme/colorTheme are device-local. timezone, exchange rates, and
+// 2FA secrets are server-managed; the client overlays the first three on read.
 export interface AppSettings {
   language: 'zh' | 'en';
   timezone: string;

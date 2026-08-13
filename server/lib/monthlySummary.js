@@ -32,7 +32,7 @@ const toUsd = (amount, currency, rates) => {
   if (!Number.isFinite(value) || value < 0) return 0;
   if (!currency || currency === 'USD') return value;
   const rate = Number(rates?.[currency]);
-  return Number.isFinite(rate) && rate > 0 ? value / rate : value;
+  return Number.isFinite(rate) && rate > 0 ? value / rate : 0;
 };
 
 const billedAmountInPeriod = (subscription, period, rates) => {

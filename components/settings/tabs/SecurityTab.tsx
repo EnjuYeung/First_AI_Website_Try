@@ -88,13 +88,13 @@ const SecurityTab: React.FC<Props> = ({
           </label>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-          {settings.security.twoFactorEnabled ? '已开启双重认证' : '未开启双重认证'}
+          {settings.security.twoFactorEnabled ? t('two_factor_on') : t('two_factor_off')}
         </p>
         {settings.security.twoFactorEnabled && !isTwoFactorPending && (
           <input
             type="text"
             inputMode="numeric"
-            placeholder="关闭双重认证前请输入当前 6 位验证码"
+            placeholder={t('two_factor_disable_hint')}
             className="w-full mb-3 px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white"
             value={twoFaCode}
             onChange={(e) => setTwoFaCode(e.target.value)}
@@ -107,7 +107,7 @@ const SecurityTab: React.FC<Props> = ({
                 <img src={twoFaQrUrl} alt="2FA QR" className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
-                  Loading...
+                  {t('loading')}
                 </div>
               )}
             </div>
@@ -115,7 +115,7 @@ const SecurityTab: React.FC<Props> = ({
             <div className="flex gap-2 w-full max-w-sm">
               <input
                 type="text"
-                placeholder="Enter 6-digit code"
+                placeholder={t('two_factor_code')}
                 className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white"
                 value={twoFaCode}
                 onChange={(e) => setTwoFaCode(e.target.value)}
@@ -125,7 +125,7 @@ const SecurityTab: React.FC<Props> = ({
                 disabled={is2faVerifying}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-60"
               >
-                {is2faVerifying ? t('logging_in') : t('verify')}
+                {is2faVerifying ? t('verifying') : t('verify')}
               </button>
             </div>
           </div>

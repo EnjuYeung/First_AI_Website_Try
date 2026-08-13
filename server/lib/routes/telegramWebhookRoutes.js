@@ -7,6 +7,12 @@ import {
   createTelegramWebhookSecret,
 } from '../telegram.js';
 import { formatDateInTimeZone } from '../dates.js';
+import {
+  matchesSubscription,
+  safeErrorMessage,
+  sameNameCount,
+  updateRenewalFeedback,
+} from '../notificationRecords.js';
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TERMINAL_FEEDBACK = new Set(['renewed', 'deprecated']);
@@ -54,18 +60,6 @@ const findLegacySubscription = (subscriptions, rawId, messageText, template) => 
   return findUnique(subscriptions, (sub) => sub?.name === name);
 };
 
-const recordMatchesSubscription = (record, subscription, sameNameCount) => {
-  const recordSubscriptionId = record?.details?.subscriptionId;
-  if (recordSubscriptionId && subscription?.id) {
-    return recordSubscriptionId === subscription.id;
-  }
-  if (recordSubscriptionId || !subscription?.name) return false;
-  return (
-    sameNameCount === 1 &&
-    record?.subscriptionName === subscription.name
-  );
-};
-
 const isTelegramReminder = (record) =>
   record?.type === 'renewal_reminder' &&
   record?.channel === 'telegram' &&
@@ -73,13 +67,11 @@ const isTelegramReminder = (record) =>
     ['attempting', 'delivered', 'unknown'].includes(record?.details?.deliveryState));
 
 const selectLegacyRecord = (current, subscription, messageText) => {
-  const sameNameCount = (current.subscriptions || []).filter(
-    (candidate) => candidate?.name === subscription.name
-  ).length;
+  const nameCount = sameNameCount(current.subscriptions, subscription.name);
   const candidates = (current.notifications || []).filter(
     (record) =>
       isTelegramReminder(record) &&
-      recordMatchesSubscription(record, subscription, sameNameCount) &&
+      matchesSubscription(record, subscription, nameCount) &&
       YMD_RE.test(String(record.details?.date || ''))
   );
   if (candidates.length === 1) return candidates[0];
@@ -124,34 +116,6 @@ const resolveTarget = (current, callbackData, messageText) => {
   return record
     ? { record, subscription, expectedDate: record.details.date }
     : null;
-};
-
-const updateFeedback = (notifications, subscription, date, feedback, subscriptions) => {
-  const sameNameCount = (subscriptions || []).filter(
-    (candidate) => candidate?.name === subscription.name
-  ).length;
-  (notifications || []).forEach((record) => {
-    const recordSubscriptionId = record.details?.subscriptionId;
-    const sameSubscription = recordSubscriptionId
-      ? recordSubscriptionId === subscription.id
-      : sameNameCount === 1 &&
-        record.subscriptionName === subscription.name;
-    if (record.type === 'renewal_reminder' && record.details?.date === date && sameSubscription) {
-      record.details = {
-        ...record.details,
-        renewalFeedback: feedback,
-        subscriptionId: subscription.id,
-      };
-    }
-  });
-};
-
-const safeErrorMessage = (err, secret) => {
-  let message = String(err?.message || 'unknown_error');
-  for (const value of [secret, encodeURIComponent(secret || '')]) {
-    if (value) message = message.split(value).join('[redacted]');
-  }
-  return message;
 };
 
 const boundedCallbackId = (value) =>
@@ -263,7 +227,7 @@ export const registerTelegramWebhookRoutes = ({ app, auth, storage, config }) =>
           subscription.nextBillingDate = '';
         }
 
-        updateFeedback(
+        updateRenewalFeedback(
           current.notifications,
           subscription,
           expectedDate,

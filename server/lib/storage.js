@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import path from 'path';
-import { parseLocalYMD } from './dates.js';
+import { formatDateInTimeZone } from './dates.js';
 
 import {
   CREDENTIALS_FILE,
@@ -12,7 +12,7 @@ import {
   userDataPath,
   userFeatureDir,
   userFeaturePath,
-} from './storagePaths.js';
+} from './paths.js';
 import { defaultSettings, defaultUserData } from './defaults.js';
 import { DEFAULT_RULE_CHANNELS, normalizeRuleChannels } from '../../shared/constants.js';
 import {
@@ -79,11 +79,37 @@ const queueWrite = async (key, writeFn) => {
   return tracked;
 };
 
+const cleanupStaleTempFiles = async (dir) => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  let entries = [];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === 'ENOENT') return;
+    throw err;
+  }
+  await Promise.all(entries.map(async (entry) => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await cleanupStaleTempFiles(fullPath);
+      return;
+    }
+    if (!entry.name.includes('.tmp-')) return;
+    try {
+      const stat = await fs.stat(fullPath);
+      if (stat.mtimeMs < cutoff) await fs.unlink(fullPath);
+    } catch (err) {
+      if (err?.code !== 'ENOENT') throw err;
+    }
+  }));
+};
+
 export const ensureDataDir = async () => {
   await fs.mkdir(DATA_DIR, { recursive: true, mode: 0o700 });
   await fs.mkdir(UPLOADS_DIR, { recursive: true, mode: 0o700 });
   await fs.mkdir(USERS_DIR, { recursive: true, mode: 0o700 });
   await Promise.all([DATA_DIR, UPLOADS_DIR, USERS_DIR].map((dir) => fs.chmod(dir, 0o700)));
+  await cleanupStaleTempFiles(DATA_DIR);
 };
 
 const mergeSettings = (incoming, timeZone = 'Asia/Shanghai') => {
@@ -159,15 +185,13 @@ const resolveSubscriptionForNotification = (subscriptions, record) => {
   return list.find((sub) => sub?.name === name) || null;
 };
 
-const isPastDate = (ymd) => {
-  const date = parseLocalYMD(ymd);
-  if (Number.isNaN(date.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date < today;
+const isPastYmd = (ymd, timeZone) => {
+  const value = String(ymd || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return value < formatDateInTimeZone(timeZone);
 };
 
-const normalizeNotifications = (incoming, subscriptions) => {
+const normalizeNotifications = (incoming, subscriptions, timeZone = 'Asia/Shanghai') => {
   const list = Array.isArray(incoming) ? incoming : [];
   const retentionCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
   const filtered = list.filter(
@@ -187,11 +211,9 @@ const normalizeNotifications = (incoming, subscriptions) => {
       }
       const feedback = String(details.renewalFeedback || '').trim();
       const needsBackfill = !feedback || feedback === 'pending' || feedback === '未确定';
-      if (needsBackfill && isPastDate(details.date)) {
+      if (needsBackfill && isPastYmd(details.date, timeZone)) {
         const sub = resolveSubscriptionForNotification(subscriptions, record);
-        if (sub?.status === 'active') {
-          nextDetails = { ...nextDetails, renewalFeedback: 'renewed' };
-        } else if (sub?.status === 'cancelled') {
+        if (sub?.status === 'cancelled') {
           nextDetails = { ...nextDetails, renewalFeedback: 'deprecated' };
         }
       }
@@ -238,7 +260,7 @@ export const createStorage = ({ adminUser, adminPass, timeZone = 'Asia/Shanghai'
 
   const normalizeFeature = (feature, value, subscriptions = []) => {
     if (feature === 'subscriptions') return Array.isArray(value) ? value : [];
-    if (feature === 'notifications') return normalizeNotifications(value, subscriptions);
+    if (feature === 'notifications') return normalizeNotifications(value, subscriptions, timeZone);
     if (feature === 'settings') return mergeSettings(value, timeZone);
     throw new Error('unknown_storage_feature');
   };
@@ -316,14 +338,19 @@ export const createStorage = ({ adminUser, adminPass, timeZone = 'Asia/Shanghai'
     const subscriptionsDoc = await readFeatureDocument(username, 'subscriptions');
     const notificationsDoc = await readFeatureDocument(username, 'notifications');
     const settingsDoc = await readFeatureDocument(username, 'settings');
-    const notifications = normalizeNotifications(notificationsDoc.data, subscriptionsDoc.data);
-    if (JSON.stringify(notifications) !== JSON.stringify(notificationsDoc.data)) {
-      notificationsDoc.data = notifications;
+    const incomingCount = Array.isArray(notificationsDoc.data) ? notificationsDoc.data.length : 0;
+    const notifications = normalizeNotifications(
+      notificationsDoc.data,
+      subscriptionsDoc.data,
+      timeZone
+    );
+    notificationsDoc.data = notifications;
+    if (notifications.length !== incomingCount) {
       notificationsDoc.revision += 1;
       notificationsDoc.updatedAt = new Date().toISOString();
       await atomicWriteJson(userFeaturePath(username, 'notifications'), notificationsDoc);
-      setCachedDocument(username, 'notifications', notificationsDoc);
     }
+    setCachedDocument(username, 'notifications', notificationsDoc);
     return { subscriptionsDoc, notificationsDoc, settingsDoc };
   };
 

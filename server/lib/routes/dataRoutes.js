@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { createIconUpload } from '../iconUpload.js';
 import {
-  validateNotifications,
   validateSettings,
   validateSubscriptions,
 } from '../../../shared/dataSchema.js';
@@ -255,11 +254,9 @@ export const registerDataRoutes = ({
     )
   );
 
-  app.delete('/api/notifications', auth.authMiddleware, async (req, res) => {
-    const error = validateNotifications([]);
-    if (error) return res.status(400).json({ success: false, message: error });
-    return updateFeature(req, res, 'notifications', () => []);
-  });
+  app.delete('/api/notifications', auth.authMiddleware, async (req, res) =>
+    updateFeature(req, res, 'notifications', () => [])
+  );
   app.post('/api/icons', auth.authMiddleware, async (req, res) => {
     await storage.ensureDataDir();
     iconUpload.single('file')(req, res, (err) => {

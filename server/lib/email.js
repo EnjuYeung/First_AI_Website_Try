@@ -11,6 +11,9 @@ export const createEmail = ({ smtp }) => {
           user: smtp.user,
           pass: smtp.pass,
         },
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 10_000,
       })
     : null;
 
