@@ -3,7 +3,7 @@ import { Subscription, Frequency } from '../../types';
 import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Edit2, Copy, Trash2 } from 'lucide-react';
 import { CategoryGlyph, PaymentGlyph } from '../ui/glyphs';
 import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../../services/displayLabels';
-import { formatCurrency } from '../../services/currency';
+import { SubscriptionCostStack } from './SubscriptionCostStack';
 
 interface SortConfig {
     key: string | null;
@@ -26,6 +26,7 @@ interface SubscriptionTableViewProps {
     renderDateBadge: (dateStr: string, sub: Subscription) => React.ReactNode;
 
     lang: 'en' | 'zh';
+    timezone: string;
     t: (key: any) => string;
 }
 
@@ -41,6 +42,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
     onDelete,
     renderDateBadge,
     lang,
+    timezone,
     t
 }) => {
     const renderStatusBadge = (status: 'active' | 'cancelled') => {
@@ -145,8 +147,13 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                 <td className="px-5 py-4 whitespace-nowrap">
                                     {renderStatusBadge(sub.status)}
                                 </td>
-                                <td className="px-5 py-4 whitespace-nowrap">
-                                    <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(sub.price, sub.currency)}</span>
+                                <td className="px-5 py-4">
+                                    <SubscriptionCostStack
+                                        subscription={sub}
+                                        timezone={timezone}
+                                        size="table"
+                                        periodsLabel={t('lifetime_periods')}
+                                    />
                                 </td>
                                 <td className="px-5 py-4 whitespace-nowrap">
                                     <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${sub.frequency === Frequency.MONTHLY ? 'bg-[var(--rail-teal-soft)] text-[var(--rail-teal)]' :

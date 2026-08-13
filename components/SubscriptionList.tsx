@@ -295,6 +295,7 @@ const SubscriptionList: React.FC<Props> = ({
           onDelete={handleDelete}
           renderDateBadge={renderDateBadge}
           lang={lang}
+          timezone={timezone}
           t={t}
         />
       ) : (
@@ -307,6 +308,7 @@ const SubscriptionList: React.FC<Props> = ({
           onDelete={handleDelete}
           renderDateBadge={renderDateBadge}
           lang={lang}
+          timezone={timezone}
           t={t}
         />
       )}

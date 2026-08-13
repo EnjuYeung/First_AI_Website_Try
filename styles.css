@@ -870,6 +870,18 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.cost-current {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-lifetime {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
 .status-dot {
   display: inline-block;
   width: 7px;

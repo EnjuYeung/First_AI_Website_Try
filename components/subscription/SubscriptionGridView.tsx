@@ -3,7 +3,7 @@ import { Copy, Edit2, Trash2 } from 'lucide-react';
 import { Frequency, Subscription } from '../../types';
 import { CategoryGlyph, PaymentGlyph } from '../ui/glyphs';
 import { displayCategoryLabel, displayPaymentMethodLabel } from '../../services/displayLabels';
-import { formatCurrency } from '../../services/currency';
+import { SubscriptionCostStack } from './SubscriptionCostStack';
 
 interface SubscriptionGridViewProps {
   subscriptions: Subscription[];
@@ -14,6 +14,7 @@ interface SubscriptionGridViewProps {
   onDelete: (id: string) => void;
   renderDateBadge: (dateStr: string, sub: Subscription) => React.ReactNode;
   lang: 'en' | 'zh';
+  timezone: string;
   t: (key: any) => string;
 }
 
@@ -26,6 +27,7 @@ export const SubscriptionGridView: React.FC<SubscriptionGridViewProps> = ({
   onDelete,
   renderDateBadge,
   lang,
+  timezone,
   t,
 }) => {
   if (subscriptions.length === 0) {
@@ -80,9 +82,14 @@ export const SubscriptionGridView: React.FC<SubscriptionGridViewProps> = ({
             {sub.status === 'cancelled' && <span className="rounded-md bg-[var(--alert-coral-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--alert-coral)]">{t('cancelled')}</span>}
           </div>
 
-          <div className="mt-6 flex items-baseline gap-2">
-            <span className={`data-value text-2xl font-medium ${sub.status === 'cancelled' ? 'opacity-45' : ''}`}>{formatCurrency(sub.price, sub.currency)}</span>
-            <span className="text-xs text-[var(--muted)]">/ {frequencySuffix(sub.frequency)}</span>
+          <div className="mt-6">
+            <SubscriptionCostStack
+              subscription={sub}
+              timezone={timezone}
+              size="grid"
+              frequencySuffix={frequencySuffix(sub.frequency)}
+              periodsLabel={t('lifetime_periods')}
+            />
           </div>
 
           <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4 text-xs">
