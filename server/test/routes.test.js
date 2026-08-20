@@ -17,7 +17,6 @@ test('registerRoutes preserves all public API endpoints after route split', () =
       maxIconBytes: 1024,
       maxWallpaperBytes: 8192,
       timeZone: 'Asia/Shanghai',
-      publicBaseUrl: '',
       debugTelegram: false,
       jwtSecret: 'route-test-jwt-secret-0123456789abcdef',
     },
@@ -29,7 +28,6 @@ test('registerRoutes preserves all public API endpoints after route split', () =
   assert.deepEqual(
     new Set(registered),
     new Set([
-      'POST /api/telegram/webhook',
       'POST /api/login',
       'POST /api/logout',
       'GET /api/me',

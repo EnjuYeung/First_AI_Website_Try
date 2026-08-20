@@ -12,11 +12,7 @@ import {
   renderMonthlySummaryTemplate,
 } from '../../shared/monthlySummaryTemplate.js';
 import { buildMonthlySummary, previousMonthPeriod } from './monthlySummary.js';
-import {
-  createTelegramWebhookSecret,
-  sendTelegramMessage,
-  ensureTelegramWebhook,
-} from './telegram.js';
+import { sendTelegramMessage } from './telegram.js';
 import {
   findMonthlySummaryAttempt,
   findRenewalAttempt,
@@ -26,20 +22,6 @@ import {
 } from './notificationRecords.js';
 
 const randomId = () => crypto.randomUUID();
-
-const buildInlineKeyboard = (notificationId, billingDate) => ({
-  inline_keyboard: [
-    [
-      { text: '✅ 已续订', callback_data: `renewed|${notificationId}|${billingDate}` },
-      { text: '🛑 已弃用', callback_data: `deprecated|${notificationId}|${billingDate}` },
-    ],
-  ],
-});
-
-const normalizeBaseUrl = (value) =>
-  String(value || '')
-    .trim()
-    .replace(/\/+$/, '');
 
 export const createReminders = ({ config, storage, email }) => {
   let reminderTimer = null;
@@ -59,33 +41,7 @@ export const createReminders = ({ config, storage, email }) => {
     const reminderRule = settings.notifications?.rules?.renewalReminder;
     const reminderDays = Number(settings.notifications?.rules?.reminderDays ?? 3);
     const ruleChannels = settings.notifications?.rules?.channels;
-    const webhookBaseUrl = normalizeBaseUrl(config.publicBaseUrl);
-    const telegramWebhookUrl = webhookBaseUrl
-      ? `${webhookBaseUrl}/api/telegram/webhook`
-      : '';
     const timeZone = settings.timezone;
-
-    const telegramConfig = settings.notifications?.telegram || {};
-    let telegramWebhookReady = false;
-    if (telegramWebhookUrl && telegramConfig.enabled && telegramConfig.botToken) {
-      const secretToken = createTelegramWebhookSecret(
-        config.jwtSecret,
-        telegramConfig.botToken
-      );
-      try {
-        await ensureTelegramWebhook(
-          { debug: config.debugTelegram, secretToken },
-          telegramConfig.botToken,
-          telegramWebhookUrl
-        );
-        telegramWebhookReady = true;
-      } catch (err) {
-        console.error(
-          'Failed to ensure Telegram webhook',
-          safeErrorMessage(err, telegramConfig.botToken)
-        );
-      }
-    }
 
     if (!reminderRule) return;
 
@@ -196,15 +152,11 @@ export const createReminders = ({ config, storage, email }) => {
         try {
           if (channel === 'telegram') {
             const { botToken, chatId } = settings.notifications.telegram;
-            const replyMarkup = telegramWebhookReady
-              ? buildInlineKeyboard(recordBase.id, dateLabel)
-              : null;
             await sendTelegramMessage(
               { debug: config.debugTelegram },
               botToken,
               chatId,
-              message,
-              replyMarkup
+              message
             );
           } else {
             const { emailAddress } = settings.notifications.email;
@@ -383,7 +335,6 @@ export const createReminders = ({ config, storage, email }) => {
             botToken,
             chatId,
             message,
-            null,
           );
         } else {
           await email.sendEmailMessage(

@@ -48,9 +48,7 @@ docker compose up -d --build
 前端入口为 `http://localhost:3001`。后端只暴露在 Compose 私有网络，由 Nginx
 代理 `/api`，不会默认映射到宿主机端口。
 
-生产域名应通过逗号分隔的 `ALLOWED_ORIGINS` 明确配置；Telegram Webhook 还必须设置
-HTTPS Origin 形式的 `PUBLIC_BASE_URL`（例如 `https://subm.example.com`，不能包含路径）。
-未配置有效地址时，Telegram 提醒仍会发送，但不会附带无法使用的操作按钮。
+生产域名应通过逗号分隔的 `ALLOWED_ORIGINS` 明确配置。
 `TRUST_PROXY` 默认仅信任回环及私有网络，适配本仓库的 Nginx → 后端拓扑。
 
 ## 环境变量
@@ -70,7 +68,6 @@ HTTPS Origin 形式的 `PUBLIC_BASE_URL`（例如 `https://subm.example.com`，�
 - `PORT`（默认 `3001`）
 - `ALLOWED_ORIGINS`（逗号分隔的完整 Origin）
 - `TRUST_PROXY`
-- `PUBLIC_BASE_URL`（Telegram 回调所用的公开 HTTPS Origin）
 - `NOTIFY_INTERVAL_MS`（默认 `600000`）
 - `TIMEZONE`（IANA 时区，默认 `Asia/Shanghai`）
 - `JSON_BODY_LIMIT`（默认 `2mb`）

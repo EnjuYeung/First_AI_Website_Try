@@ -52,3 +52,39 @@ export const calculateNextBillingDateYMD = (startYmd, frequency, todayYmd) => {
   }
   return next > todayYmd ? next : '';
 };
+
+export const advanceOverdueNextBillingDateYMD = (nextYmd, frequency, anchorYmd, todayYmd) => {
+  if (!parseYmdParts(nextYmd) || !parseYmdParts(todayYmd) || !FREQUENCY_MONTHS[frequency]) {
+    return nextYmd || '';
+  }
+  if (nextYmd >= todayYmd) return nextYmd;
+
+  const anchor = parseYmdParts(anchorYmd) ? anchorYmd : nextYmd;
+  let next = nextYmd;
+  for (let iteration = 0; iteration < 12000 && next < todayYmd; iteration += 1) {
+    const advanced = addBillingCycleYMD(next, frequency, anchor);
+    if (!advanced || advanced <= next) return next;
+    next = advanced;
+  }
+  return next;
+};
+
+export const rollForwardActiveSubscriptions = (subscriptions, todayYmd) => {
+  if (!Array.isArray(subscriptions)) return [];
+  let changed = false;
+  const next = subscriptions.map((sub) => {
+    if (!sub || typeof sub !== 'object' || sub.status !== 'active' || !sub.nextBillingDate) {
+      return sub;
+    }
+    const rolledDate = advanceOverdueNextBillingDateYMD(
+      sub.nextBillingDate,
+      sub.frequency,
+      sub.startDate,
+      todayYmd,
+    );
+    if (!rolledDate || rolledDate === sub.nextBillingDate) return sub;
+    changed = true;
+    return { ...sub, nextBillingDate: rolledDate };
+  });
+  return changed ? next : subscriptions;
+};

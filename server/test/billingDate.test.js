@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   addBillingCycleYMD,
+  advanceOverdueNextBillingDateYMD,
   calculateNextBillingDateYMD,
+  rollForwardActiveSubscriptions,
 } from '../../shared/billingDate.js';
 
 test('billing cycles preserve the corresponding day', () => {
@@ -33,4 +35,51 @@ test('next billing date does not drift after a short month', () => {
     calculateNextBillingDateYMD('2025-06-30', 'Monthly', '2026-07-03'),
     '2026-07-30'
   );
+});
+
+test('overdue next billing dates roll forward while the billing day itself is kept', () => {
+  assert.equal(
+    advanceOverdueNextBillingDateYMD('2026-01-01', 'Monthly', '2026-01-01', '2026-01-01'),
+    '2026-01-01'
+  );
+  assert.equal(
+    advanceOverdueNextBillingDateYMD('2026-01-01', 'Monthly', '2026-01-01', '2026-01-02'),
+    '2026-02-01'
+  );
+  assert.equal(
+    advanceOverdueNextBillingDateYMD('2026-01-01', 'Monthly', '2026-01-01', '2026-04-02'),
+    '2026-05-01'
+  );
+  assert.equal(
+    advanceOverdueNextBillingDateYMD('2026-01-01', 'Yearly', '2026-01-01', '2026-01-02'),
+    '2027-01-01'
+  );
+});
+
+test('active overdue subscriptions roll forward and cancelled ones stay put', () => {
+  const active = {
+    id: 'active',
+    status: 'active',
+    frequency: 'Monthly',
+    startDate: '2026-01-01',
+    nextBillingDate: '2026-01-01',
+  };
+  const cancelled = {
+    id: 'cancelled',
+    status: 'cancelled',
+    frequency: 'Monthly',
+    startDate: '2026-01-01',
+    nextBillingDate: '2026-01-01',
+  };
+  const future = {
+    id: 'future',
+    status: 'active',
+    frequency: 'Monthly',
+    startDate: '2026-01-01',
+    nextBillingDate: '2026-08-01',
+  };
+  const rolled = rollForwardActiveSubscriptions([active, cancelled, future], '2026-01-02');
+  assert.equal(rolled[0].nextBillingDate, '2026-02-01');
+  assert.equal(rolled[1].nextBillingDate, '2026-01-01');
+  assert.equal(rolled[2].nextBillingDate, '2026-08-01');
 });

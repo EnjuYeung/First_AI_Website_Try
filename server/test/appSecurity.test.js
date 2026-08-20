@@ -9,7 +9,6 @@ const createTestApp = () => createApp({
     trustProxy: 'loopback',
     jsonBodyLimit: '16kb',
     maxIconBytes: 1024,
-    publicBaseUrl: '',
     debugTelegram: false,
   },
   auth: {

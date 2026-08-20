@@ -39,7 +39,7 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
             currency: '',
             paymentMethod: '测试支付方式',
           });
-      await sendTelegramMessage({ debug: config.debugTelegram }, botToken, chatId, message, null);
+      await sendTelegramMessage({ debug: config.debugTelegram }, botToken, chatId, message);
       res.json({ ok: true });
     } catch (err) {
       res.status(400).json({ ok: false, message: err?.message || 'telegram_test_failed' });

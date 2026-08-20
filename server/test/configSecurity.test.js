@@ -9,7 +9,7 @@ const REQUIRED_ENV = {
   JWT_SECRET: 'config-test-jwt-secret-0123456789abcdef',
   DATA_ENCRYPTION_KEY: 'config-test-data-key-0123456789abcdef',
 };
-const CONFIG_ENV = ['ALLOWED_ORIGINS', 'TRUST_PROXY', 'PUBLIC_BASE_URL', 'TIMEZONE'];
+const CONFIG_ENV = ['ALLOWED_ORIGINS', 'TRUST_PROXY', 'TIMEZONE'];
 
 const withEnvironment = (values, callback) => {
   const keys = [...new Set([...Object.keys(REQUIRED_ENV), ...CONFIG_ENV, ...Object.keys(values)])];
@@ -47,7 +47,6 @@ test('default browser origins include the Compose frontend', () => {
     const config = getConfig();
     assert.ok(config.allowedOrigins.includes('http://localhost:3001'));
     assert.match(String(config.trustProxy), /uniquelocal/);
-    assert.equal(config.publicBaseUrl, '');
     assert.equal(config.timeZone, 'Asia/Shanghai');
   });
 });
@@ -65,30 +64,6 @@ test('invalid configured CORS origins fail closed at startup', () => {
   withEnvironment({ ALLOWED_ORIGINS: 'https://allowed.example/path' }, () => {
     assert.throws(() => getConfig(), /ALLOWED_ORIGINS contains invalid origin/);
   });
-});
-
-test('Telegram public base URL is normalized to an HTTPS origin', () => {
-  withEnvironment({ PUBLIC_BASE_URL: 'https://subm.example.test/' }, () => {
-    assert.equal(getConfig().publicBaseUrl, 'https://subm.example.test');
-  });
-});
-
-test('invalid Telegram public base URLs fail closed at startup', () => {
-  for (const publicBaseUrl of [
-    'http://subm.example.test',
-    'subm.example.test',
-    'https://subm.example.test/path',
-    'https://subm.example.test?source=test',
-    'https://subm.example.test#webhook',
-    'https://user:pass@subm.example.test',
-  ]) {
-    withEnvironment({ PUBLIC_BASE_URL: publicBaseUrl }, () => {
-      assert.throws(
-        () => getConfig(),
-        /PUBLIC_BASE_URL must be an HTTPS origin/
-      );
-    });
-  }
 });
 
 test('an admin username that cannot fit the login boundary fails at startup', () => {

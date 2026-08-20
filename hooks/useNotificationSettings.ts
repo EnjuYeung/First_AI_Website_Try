@@ -39,8 +39,6 @@ export const useNotificationSettings = (
     } catch (err: any) {
       const message = err?.message === 'telegram_not_configured'
         ? t('telegram_not_configured')
-        : err?.message === 'telegram_webhook_https_required'
-          ? t('telegram_https_required')
         : err?.message === 'invalid_template'
           ? t('template_json_error')
           : err?.message || t('telegram_test_failed');
@@ -66,11 +64,9 @@ export const useNotificationSettings = (
     } catch (err: any) {
       const message = err?.message === 'telegram_not_configured'
         ? t('telegram_not_configured')
-        : err?.message === 'telegram_webhook_https_required'
-          ? t('telegram_https_required')
-          : err?.message === 'invalid_template'
-            ? t('template_json_error')
-            : err?.message || t('monthly_summary_test_failed');
+        : err?.message === 'invalid_template'
+          ? t('template_json_error')
+          : err?.message || t('monthly_summary_test_failed');
       setAlert({ isOpen: true, type: 'error', title: t('error_title'), message });
     } finally {
       setIsTestingMonthlySummary(false);

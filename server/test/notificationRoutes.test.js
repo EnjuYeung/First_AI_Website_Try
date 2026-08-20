@@ -37,7 +37,6 @@ const registerTestRoute = ({ config, botToken }) => {
       },
     },
     config: {
-      publicBaseUrl: '',
       allowedOrigins: [],
       debugTelegram: false,
       jwtSecret: JWT_SECRET,
@@ -69,7 +68,7 @@ const request = ({ protocol = 'http', host = 'internal.example.test', body = {} 
   },
 });
 
-test('test notification sends a message without registering a webhook', async (t) => {
+test('test notification sends a Telegram message', async (t) => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push({ url: String(url), body: JSON.parse(options.body) });
@@ -77,7 +76,6 @@ test('test notification sends a message without registering a webhook', async (t
   });
   const handler = registerTestRoute({
     botToken: '101:configured-route-token',
-    config: { publicBaseUrl: 'https://subm.example.test' },
   });
   const res = response();
 
@@ -90,25 +88,6 @@ test('test notification sends a message without registering a webhook', async (t
   assert.equal(calls[0].body.chat_id, 'chat-1');
 });
 
-test('test notification does not require a public HTTPS origin', async (t) => {
-  const calls = [];
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
-    calls.push({ url: String(url), body: JSON.parse(options.body) });
-    return telegramOk();
-  });
-  const handler = registerTestRoute({
-    botToken: '102:inferred-route-token',
-    config: { allowedOrigins: [] },
-  });
-  const res = response();
-
-  await handler(request({ protocol: 'http', host: 'localhost:3001' }), res);
-
-  assert.equal(res.statusCode, 200);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].url, /\/sendMessage$/);
-});
-
 test('monthly summary template tests render the monthly sample payload', async (t) => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
@@ -117,7 +96,6 @@ test('monthly summary template tests render the monthly sample payload', async (
   });
   const handler = registerTestRoute({
     botToken: '106:monthly-summary-token',
-    config: { publicBaseUrl: 'https://subm.example.test' },
   });
   const res = response();
 
@@ -147,7 +125,6 @@ test('Telegram send failures are returned by the test endpoint', async (t) => {
   });
   const handler = registerTestRoute({
     botToken: '104:failed-route-token',
-    config: { publicBaseUrl: 'https://subm.example.test' },
   });
   const res = response();
 

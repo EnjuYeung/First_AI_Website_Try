@@ -55,28 +55,6 @@ const configuredTrustProxy = () => {
   return configured;
 };
 
-const configuredPublicBaseUrl = () => {
-  const raw = String(process.env.PUBLIC_BASE_URL || '').trim();
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    if (
-      parsed.protocol !== 'https:' ||
-      !parsed.hostname ||
-      parsed.username ||
-      parsed.password ||
-      parsed.pathname !== '/' ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      throw new Error('invalid_public_base_url');
-    }
-    return parsed.origin;
-  } catch {
-    throw new Error('PUBLIC_BASE_URL must be an HTTPS origin without a path, query, or fragment');
-  }
-};
-
 const configuredTimeZone = () => {
   const timeZone = String(process.env.TIMEZONE || 'Asia/Shanghai').trim();
   try {
@@ -106,7 +84,6 @@ export const getConfig = () => {
   const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '2mb';
   const maxIconBytes = Number(process.env.MAX_ICON_BYTES || 1024 * 1024);
   const maxWallpaperBytes = Number(process.env.MAX_WALLPAPER_BYTES || 8 * 1024 * 1024);
-  const publicBaseUrl = configuredPublicBaseUrl();
   const timeZone = configuredTimeZone();
 
   const smtp = {
@@ -135,6 +112,5 @@ export const getConfig = () => {
     allowedOrigins,
     trustProxy,
     debugTelegram: process.env.DEBUG_TELEGRAM === '1',
-    publicBaseUrl,
   };
 };

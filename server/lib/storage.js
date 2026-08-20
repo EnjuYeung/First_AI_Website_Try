@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import { formatDateInTimeZone } from './dates.js';
+import { rollForwardActiveSubscriptions } from '../../shared/billingDate.js';
 
 import {
   CREDENTIALS_FILE,
@@ -259,10 +260,26 @@ export const createStorage = ({ adminUser, adminPass, timeZone = 'Asia/Shanghai'
   };
 
   const normalizeFeature = (feature, value, subscriptions = []) => {
-    if (feature === 'subscriptions') return Array.isArray(value) ? value : [];
+    if (feature === 'subscriptions') {
+      return rollForwardActiveSubscriptions(
+        Array.isArray(value) ? value : [],
+        formatDateInTimeZone(timeZone),
+      );
+    }
     if (feature === 'notifications') return normalizeNotifications(value, subscriptions, timeZone);
     if (feature === 'settings') return mergeSettings(value, timeZone);
     throw new Error('unknown_storage_feature');
+  };
+
+  const persistNormalizedDocument = async (username, feature, document, nextData) => {
+    if (JSON.stringify(document.data) === JSON.stringify(nextData)) {
+      setCachedDocument(username, feature, document);
+      return structuredClone(document);
+    }
+    const nextDocument = makeDocument(nextData, document.revision + 1);
+    await atomicWriteJson(userFeaturePath(username, feature), nextDocument);
+    setCachedDocument(username, feature, nextDocument);
+    return structuredClone(nextDocument);
   };
 
   const ensureUserMigrated = async (username) => {
@@ -310,18 +327,31 @@ export const createStorage = ({ adminUser, adminPass, timeZone = 'Asia/Shanghai'
 
   const readFeatureDocument = async (username, feature) => {
     const cached = getCachedDocument(username, feature);
-    if (cached) return cached;
+    if (cached) {
+      if (feature !== 'subscriptions') return cached;
+      return persistNormalizedDocument(
+        username,
+        feature,
+        cached,
+        normalizeFeature(feature, cached.data),
+      );
+    }
 
     const filePath = userFeaturePath(username, feature);
     try {
       const document = await readJson(filePath);
       const data = normalizeFeature(feature, document.data);
+      const revision = Number.isInteger(document.revision) ? document.revision : 1;
       const normalizedDocument = {
         schemaVersion: 1,
-        revision: Number.isInteger(document.revision) ? document.revision : 1,
+        revision,
         updatedAt: document.updatedAt || new Date(0).toISOString(),
-        data,
+        data: document.data,
       };
+      if (feature === 'subscriptions') {
+        return persistNormalizedDocument(username, feature, normalizedDocument, data);
+      }
+      normalizedDocument.data = data;
       setCachedDocument(username, feature, normalizedDocument);
       return structuredClone(normalizedDocument);
     } catch (err) {

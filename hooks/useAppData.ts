@@ -14,6 +14,8 @@ import {
 import { getT } from '../services/i18n';
 import { newId } from '../services/ids';
 import { UnauthorizedError } from '../services/apiClient';
+import { getTodayYMD } from '../services/dateUtils';
+import { rollForwardActiveSubscriptions } from '../shared/billingDate.js';
 
 const FOCUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -42,12 +44,19 @@ export const useAppData = (
   const subscriptionsRef = useRef<Subscription[]>(subscriptions);
   const settingsRef = useRef<AppSettings>(settings);
   const notificationsRef = useRef<NotificationRecord[]>(notifications);
+  const serverClockRef = useRef(serverClock);
   const isLoadingRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
 
   const applySubscriptions = useCallback((value: Subscription[]) => {
-    subscriptionsRef.current = value;
-    setSubscriptions(value);
+    const clock = serverClockRef.current;
+    const now = new Date(clock.serverTimeMs + Math.max(0, Date.now() - clock.receivedAtMs));
+    const rolled = rollForwardActiveSubscriptions(
+      value,
+      getTodayYMD(settingsRef.current.timezone, now),
+    );
+    subscriptionsRef.current = rolled;
+    setSubscriptions(rolled);
   }, []);
   const applySettings = useCallback((value: AppSettings) => {
     settingsRef.current = value;
@@ -72,10 +81,12 @@ export const useAppData = (
     try {
       const data = await fetchAllData();
       const receivedAtMs = Date.now();
-      applySubscriptions(data.subscriptions);
+      const nextClock = { serverTimeMs: data.serverTime, receivedAtMs };
       applySettings(data.settings);
+      serverClockRef.current = nextClock;
+      setServerClock(nextClock);
+      applySubscriptions(data.subscriptions);
       applyNotifications(data.notifications || []);
-      setServerClock({ serverTimeMs: data.serverTime, receivedAtMs });
       revisionsRef.current = data.revisions;
       lastLoadedAtRef.current = Date.now();
       return { ok: true };
@@ -110,7 +121,10 @@ export const useAppData = (
 
     const refreshIfStale = () => {
       if (document.visibilityState === 'hidden') return;
-      if (Date.now() - lastLoadedAtRef.current < FOCUS_REFRESH_INTERVAL_MS) return;
+      const previous = subscriptionsRef.current;
+      applySubscriptions(previous);
+      const rolledOverdue = subscriptionsRef.current !== previous;
+      if (!rolledOverdue && Date.now() - lastLoadedAtRef.current < FOCUS_REFRESH_INTERVAL_MS) return;
       void loadRemoteData();
     };
 
@@ -120,7 +134,7 @@ export const useAppData = (
       window.removeEventListener('focus', refreshIfStale);
       document.removeEventListener('visibilitychange', refreshIfStale);
     };
-  }, [isAuthenticated, loadRemoteData]);
+  }, [isAuthenticated, loadRemoteData, applySubscriptions]);
 
   const persistFeature = <K extends keyof DataRevisions, T>(
     feature: K,
@@ -198,18 +212,24 @@ export const useAppData = (
   };
 
   const saveSubscription = (sub: Subscription, isEditing: boolean) => {
+    const clock = serverClockRef.current;
+    const now = new Date(clock.serverTimeMs + Math.max(0, Date.now() - clock.receivedAtMs));
+    const toSave = rollForwardActiveSubscriptions(
+      [sub],
+      getTodayYMD(settingsRef.current.timezone, now),
+    )[0] || sub;
     let updated: Subscription[];
     if (isEditing) {
-      updated = subscriptionsRef.current.map(s => s.id === sub.id ? sub : s);
+      updated = subscriptionsRef.current.map(s => s.id === toSave.id ? toSave : s);
     } else {
-      updated = [...subscriptionsRef.current, sub];
+      updated = [...subscriptionsRef.current, toSave];
     }
     applySubscriptions(updated);
     return persistFeature(
       'subscriptions',
       (revision) => isEditing
-        ? updateSubscription(sub, revision)
-        : createSubscription(sub, revision),
+        ? updateSubscription(toSave, revision)
+        : createSubscription(toSave, revision),
       applySubscriptions
     );
   };
