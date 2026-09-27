@@ -3,6 +3,7 @@ export function normalizeMonthlySummaryTemplateString(templateString: string): s
 export function renderMonthlySummaryTemplate(
   templateString: string,
   summary: {
+    unconvertedSubscriptions?: number;
     month: string;
     totalPaidUsd: number;
     activeSubscriptions: number;

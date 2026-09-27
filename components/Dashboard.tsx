@@ -29,6 +29,7 @@ interface BillingEvent {
 }
 
 interface DashboardStats {
+  unconvertedCount: number;
   monthlyPaid: number;
   monthlyPending: number;
   yearlyPaid: number;
@@ -64,6 +65,7 @@ const useDashboardStats = (
     next7DaysEnd.setDate(today.getDate() + 7);
 
     const stats: DashboardStats = {
+      unconvertedCount: 0,
       monthlyPaid: 0,
       monthlyPending: 0,
       yearlyPaid: 0,
@@ -84,6 +86,7 @@ const useDashboardStats = (
       if (!sub.startDate) continue;
 
       const usdCost = convertToUSD(sub.price, sub.currency, settings.exchangeRates);
+      if (usdCost === null) stats.unconvertedCount += 1;
       const persistedNextBilling = parseLocalYMD(sub.nextBillingDate);
       const hasPersistedNextBilling = Number.isFinite(persistedNextBilling.getTime());
       const loopEnd = new Date(Math.max(yearEnd.getTime(), next7DaysEnd.getTime()));
@@ -119,21 +122,21 @@ const useDashboardStats = (
 
         if (currentDate >= monthStart && currentDate <= monthEnd) {
           if (isOverduePersistedDay) {
-            stats.monthlyPending += usdCost;
+            stats.monthlyPending += usdCost ?? 0;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'pending' });
           } else if (currentDate <= today) {
-            stats.monthlyPaid += usdCost;
+            stats.monthlyPaid += usdCost ?? 0;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'paid' });
           } else if (!isCancelled && !isSupersededFutureCycle) {
-            stats.monthlyPending += usdCost;
+            stats.monthlyPending += usdCost ?? 0;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'pending' });
           }
         }
 
         if (currentDate >= yearStart && currentDate <= yearEnd) {
-          if (isOverduePersistedDay) stats.yearlyPending += usdCost;
-          else if (currentDate <= today) stats.yearlyPaid += usdCost;
-          else if (!isCancelled && !isSupersededFutureCycle) stats.yearlyPending += usdCost;
+          if (isOverduePersistedDay) stats.yearlyPending += usdCost ?? 0;
+          else if (currentDate <= today) stats.yearlyPaid += usdCost ?? 0;
+          else if (!isCancelled && !isSupersededFutureCycle) stats.yearlyPending += usdCost ?? 0;
         }
 
         if (
@@ -258,6 +261,11 @@ const Dashboard: React.FC<Props> = ({ subscriptions, lang, settings, serverClock
         <p className="page-copy max-w-md text-sm sm:text-right">{t('overview_text')}</p>
       </header>
 
+      {data.unconvertedCount > 0 && <p role="status" className="text-sm text-[var(--due-amber)]">
+        {lang === 'zh'
+          ? `${data.unconvertedCount} 条订阅缺少汇率，未计入美元合计；原币账单仍展示。请在设置中刷新汇率。`
+          : `${data.unconvertedCount} subscriptions lack exchange rates and are excluded from USD totals. Original amounts remain visible. Refresh rates in Settings.`}
+      </p>}
       <RenewalRail
         events={data.monthlyEvents}
         monthlyTotal={data.monthlyPaid + data.monthlyPending}

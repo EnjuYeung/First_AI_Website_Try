@@ -1,20 +1,16 @@
 
-import { Subscription, AppSettings, NotificationRecord } from '../types';
+import { Subscription, AppSettings, RemoteSettings, EditableSettingsPatch, NotificationRecord } from '../types';
 import { canonicalCategoryKey, canonicalPaymentMethodKey } from './displayLabels';
-import { authHeaderOnly, authJsonHeaders, apiFetch, apiFetchJson, UnauthorizedError } from './apiClient';
-import { DEFAULT_REMINDER_TEMPLATE_STRING, normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
-import {
-  DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
-  normalizeMonthlySummaryTemplateString,
-} from '../shared/monthlySummaryTemplate.js';
-import { createDefaultSettings, normalizeExchangeRates } from '../shared/defaultSettings.js';
-import { normalizeRuleChannels } from '../shared/constants.js';
+import { authJsonHeaders, apiFetch, apiFetchJson, UnauthorizedError } from './apiClient';
+import { createDefaultSettings } from '../shared/defaultSettings.js';
+import { normalizeSettings } from '../shared/settingsNormalization.js';
+import { publicRemoteSettings, pickEditableSettings } from '../shared/settingsOwnership.js';
 
 const API_BASE = '/api';
 
 export interface PersistedData {
   subscriptions: Subscription[];
-  settings: AppSettings;
+  settings: RemoteSettings;
   notifications: NotificationRecord[];
   revisions: DataRevisions;
   serverTime: number;
@@ -34,16 +30,19 @@ export class RevisionConflictError extends Error {
   }
 }
 
-const DEFAULT_SETTINGS: AppSettings = createDefaultSettings();
+const DEFAULT_SETTINGS = createDefaultSettings();
 
-export const getDefaultSettings = (): AppSettings => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+export const getDefaultRemoteSettings = (): RemoteSettings => publicRemoteSettings(createDefaultSettings());
+export const getDefaultSettings = (): AppSettings => ({
+  language: DEFAULT_SETTINGS.language, theme: DEFAULT_SETTINGS.theme, colorTheme: DEFAULT_SETTINGS.colorTheme,
+  ...getDefaultRemoteSettings(),
+});
 
 export const uploadIconFile = async (file: File): Promise<string> => {
   const form = new FormData();
   form.append('file', file);
   const resp = await apiFetch(`${API_BASE}/icons`, {
     method: 'POST',
-    headers: authHeaderOnly(),
     body: form
   });
   if (!resp.ok) {
@@ -66,7 +65,6 @@ export const deleteUploadedIcon = async (url: string): Promise<void> => {
   if (!match) return;
   const resp = await apiFetch(`${API_BASE}/icons/${encodeURIComponent(match[1])}`, {
     method: 'DELETE',
-    headers: authHeaderOnly(),
   });
   if (!resp.ok) throw new Error(`http_${resp.status}`);
 };
@@ -76,7 +74,6 @@ export const uploadWallpaperFile = async (file: File): Promise<string> => {
   form.append('file', file);
   const resp = await apiFetch(`${API_BASE}/wallpapers`, {
     method: 'POST',
-    headers: authHeaderOnly(),
     body: form,
   });
   const data = await resp.json().catch(() => ({}));
@@ -89,7 +86,6 @@ export const deleteUploadedWallpaper = async (url: string): Promise<void> => {
   if (!match) return;
   const resp = await apiFetch(`${API_BASE}/wallpapers/${encodeURIComponent(match[1])}`, {
     method: 'DELETE',
-    headers: authHeaderOnly(),
   });
   if (!resp.ok) throw new Error(`http_${resp.status}`);
 };
@@ -123,37 +119,8 @@ const normalizeSubscription = (sub: any): Subscription => {
   } as Subscription;
 };
 
-const mergeSettings = (incoming?: AppSettings): AppSettings => {
-  const parsed: Partial<AppSettings> = incoming || {};
-  if ('currencyApi' in parsed) {
-    // @ts-ignore
-    delete (parsed as any).currencyApi;
-  }
-  if ('aiConfig' in parsed) {
-    // @ts-ignore - strip removed legacy config
-    delete (parsed as any).aiConfig;
-  }
-
-  const parsedRules: Partial<AppSettings['notifications']['rules']> = parsed.notifications?.rules || {};
-  const normalizedTemplate =
-    !parsedRules.template || parsedRules.template === DEFAULT_REMINDER_TEMPLATE_STRING
-      ? DEFAULT_REMINDER_TEMPLATE_STRING
-      : normalizeReminderTemplateString(parsedRules.template);
-  const normalizedMonthlySummaryTemplate = normalizeMonthlySummaryTemplateString(
-    parsedRules.monthlySummaryTemplate || DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING,
-  );
-  const normalizedRules = {
-    renewalReminder: parsedRules.renewalReminder !== undefined ? parsedRules.renewalReminder : DEFAULT_SETTINGS.notifications.rules.renewalReminder,
-    monthlySummary: parsedRules.monthlySummary !== undefined ? parsedRules.monthlySummary : DEFAULT_SETTINGS.notifications.rules.monthlySummary,
-    reminderDays: parsedRules.reminderDays ?? DEFAULT_SETTINGS.notifications.rules.reminderDays,
-    template: normalizedTemplate,
-    monthlySummaryTemplate: normalizedMonthlySummaryTemplate,
-    channels: normalizeRuleChannels(
-      parsedRules.channels,
-      DEFAULT_SETTINGS.notifications.rules.channels,
-    ),
-  };
-
+const mergeSettings = (incoming?: unknown): RemoteSettings => {
+  const parsed = normalizeSettings(incoming);
   const mergeStringList = (existing: any, defaults: string[], canonicalize: (v: string) => string) => {
     const hasPersistedList = Array.isArray(existing);
     const raw = hasPersistedList ? existing : defaults;
@@ -174,37 +141,9 @@ const mergeSettings = (incoming?: AppSettings): AppSettings => {
   };
 
   return {
-    ...getDefaultSettings(),
-    ...parsed,
-    wallpaper: {
-      ...DEFAULT_SETTINGS.wallpaper,
-      ...(parsed.wallpaper || {}),
-    },
-    exchangeRateApi: {
-      ...DEFAULT_SETTINGS.exchangeRateApi,
-      ...(parsed as any).exchangeRateApi,
-    },
-    notifications: {
-      telegram: {
-        ...DEFAULT_SETTINGS.notifications.telegram,
-        ...(parsed.notifications?.telegram || {}),
-      },
-      email: {
-        ...DEFAULT_SETTINGS.notifications.email,
-        ...(parsed.notifications?.email || {}),
-      },
-      rules: { 
-        ...normalizedRules
-      }
-    },
-    security: {
-      ...DEFAULT_SETTINGS.security,
-      ...(parsed.security || {})
-    },
-    exchangeRates: normalizeExchangeRates(parsed.exchangeRates, DEFAULT_SETTINGS.exchangeRates),
-    customCurrencies: parsed.customCurrencies || DEFAULT_SETTINGS.customCurrencies,
-    customCategories: mergeStringList((parsed as any).customCategories, DEFAULT_SETTINGS.customCategories, canonicalCategoryKey),
-    customPaymentMethods: mergeStringList((parsed as any).customPaymentMethods, DEFAULT_SETTINGS.customPaymentMethods, canonicalPaymentMethodKey)
+    ...publicRemoteSettings(parsed),
+    customCategories: mergeStringList(parsed.customCategories, DEFAULT_SETTINGS.customCategories, canonicalCategoryKey),
+    customPaymentMethods: mergeStringList(parsed.customPaymentMethods, DEFAULT_SETTINGS.customPaymentMethods, canonicalPaymentMethodKey),
   };
 };
 
@@ -281,15 +220,6 @@ export const removeSubscriptions = (ids: string[], revision: number) =>
   mutateFeature<Subscription[]>('/subscriptions/batch-delete', 'POST', revision, { ids })
     .then(asNormalizedSubscriptions);
 
-export const replaceSettings = (settings: AppSettings, revision: number) => {
-  // Language/theme are device-local; timezone is deployment-managed.
-  const {
-    language: _language,
-    theme: _theme,
-    colorTheme: _colorTheme,
-    timezone: _timezone,
-    ...serverSettings
-  } = settings;
-  return mutateFeature<AppSettings>('/settings', 'PUT', revision, serverSettings)
-    .then((result) => ({ ...result, data: mergeSettings(result.data) }));
-};
+export const updateSettingsFields = (patch: EditableSettingsPatch, revision: number) =>
+  mutateFeature<RemoteSettings>('/settings', 'PUT', revision, pickEditableSettings(patch))
+    .then(result => ({ ...result, data: mergeSettings(result.data) }));

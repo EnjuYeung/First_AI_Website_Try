@@ -20,9 +20,9 @@ const matchesSelection = (selected: string[], value: string) => (
     selected.length === 0 || selected.includes(value)
 );
 
-const matchesPriceRanges = (selectedRanges: string[], price: number) => (
+const matchesPriceRanges = (selectedRanges: string[], price: number | null) => (
     selectedRanges.length === 0 ||
-    selectedRanges.some(range => PRICE_RANGE_MATCHERS[range]?.(price) ?? false)
+    (price !== null && selectedRanges.some(range => PRICE_RANGE_MATCHERS[range]?.(price) ?? false))
 );
 
 export const matchesSubscriptionPriceRanges = (
@@ -110,6 +110,8 @@ export const useSubscriptionFilters = (
                 const aValue = getSortValue(a, sortConfig.key, exchangeRates);
                 const bValue = getSortValue(b, sortConfig.key, exchangeRates);
 
+                if (aValue === null) return bValue === null ? 0 : 1;
+                if (bValue === null) return -1;
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
                 return 0;

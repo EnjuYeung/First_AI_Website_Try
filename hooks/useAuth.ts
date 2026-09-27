@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetchJson, SESSION_EXPIRED_EVENT, UnauthorizedError } from '../services/apiClient';
+import { apiFetchJson, SESSION_EXPIRED_EVENT } from '../services/apiClient';
 
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -12,12 +12,8 @@ export const useAuth = () => {
       try {
         await apiFetchJson('/api/me');
         if (!cancelled) setIsAuthenticated(true);
-      } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          if (!cancelled) setIsAuthenticated(false);
-        } else if (!cancelled) {
-          setIsAuthenticated(false);
-        }
+      } catch {
+        if (!cancelled) setIsAuthenticated(false);
       } finally {
         if (!cancelled) setIsLoadingAuth(false);
       }

@@ -1,3 +1,4 @@
+import { settingsStateResult } from '../settingsPolicy.js';
 export const registerExchangeRateRoutes = ({ app, auth, storage, exchangeRate }) => {
   app.post('/api/exchange-rate/config', auth.authMiddleware, async (req, res) => {
     try {
@@ -39,15 +40,8 @@ export const registerExchangeRateRoutes = ({ app, auth, storage, exchangeRate })
         }
         return current;
       });
-      const settings = configured.settings;
-      res.json({
-        ok: true,
-        settings: {
-          exchangeRateApi: settings.exchangeRateApi,
-          exchangeRates: settings.exchangeRates,
-          lastRatesUpdate: settings.lastRatesUpdate,
-        },
-      });
+      const result = settingsStateResult(configured);
+      res.json({ ok: true, ...result, settings: result.settingsState });
     } catch (err) {
       console.error('Exchange rate config error', err);
       res.status(400).json({ ok: false, message: err?.message || 'exchange_rate_config_failed' });
@@ -60,14 +54,7 @@ export const registerExchangeRateRoutes = ({ app, auth, storage, exchangeRate })
       if (!updated.updated) {
         return res.status(400).json({ ok: false, message: updated.reason || 'not_updated' });
       }
-      res.json({
-        ok: true,
-        settings: {
-          exchangeRateApi: updated.exchangeRateApi,
-          exchangeRates: updated.exchangeRates,
-          lastRatesUpdate: updated.lastRatesUpdate,
-        },
-      });
+      res.json({ ok: true, settings: updated.settingsState, settingsState: updated.settingsState, revision: updated.revision });
     } catch (err) {
       res.status(500).json({ ok: false, message: err?.message || 'exchange_rate_update_failed' });
     }

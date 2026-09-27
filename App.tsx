@@ -1,6 +1,8 @@
+import { pickEditableSettings } from './shared/settingsOwnership.js';
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Home, CreditCard, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
-import { AppSettings, Subscription } from './types';
+import { AppSettings, SettingsUpdate, Subscription } from './types';
+import { RevisionConflictError } from './services/storageService';
 import { getT } from './services/i18n';
 import LoginPage from './components/LoginPage';
 
@@ -22,7 +24,7 @@ const App: React.FC = () => {
   const { isAuthenticated, isLoadingAuth, login, logout } = useAuth();
   const { language, setLanguage, theme, setTheme, colorTheme, setColorTheme } = useClientPreferences();
   const {
-    subscriptions, settings, notifications, serverClock, isDataLoading,
+    subscriptions, settings, notifications, serverClock, isDataLoading, hasLoadedData, loadError,
     loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
     batchDeleteSubscriptions, duplicateSubscription,
     lastMutationError, clearMutationError, applyRemoteSettings
@@ -86,33 +88,12 @@ const App: React.FC = () => {
     setTheme(nextTheme[theme] || 'system');
   };
 
-  const handleSettingsUpdate = (nextSettings: AppSettings) => {
-    if (nextSettings.language !== language) setLanguage(nextSettings.language);
-    if (nextSettings.theme !== theme) setTheme(nextSettings.theme);
-    if (nextSettings.colorTheme !== colorTheme) setColorTheme(nextSettings.colorTheme);
-
-    const {
-      language: _nextLanguage,
-      theme: _nextTheme,
-      colorTheme: _nextColorTheme,
-      ...nextServerSettings
-    } = nextSettings;
-    const {
-      language: _language,
-      theme: _theme,
-      colorTheme: _colorTheme,
-      ...currentServerSettings
-    } = settings;
-    if (JSON.stringify(nextServerSettings) === JSON.stringify(currentServerSettings)) {
-      return Promise.resolve(true);
-    }
-
-    return updateSettings({
-      ...nextSettings,
-      language: settings.language,
-      theme: settings.theme,
-      colorTheme: settings.colorTheme,
-    });
+  const handleSettingsUpdate = (patch: SettingsUpdate) => {
+    if (patch.language !== undefined) setLanguage(patch.language);
+    if (patch.theme !== undefined) setTheme(patch.theme);
+    if (patch.colorTheme !== undefined) setColorTheme(patch.colorTheme);
+    const editable = pickEditableSettings(patch);
+    return Object.keys(editable).length ? updateSettings(editable) : Promise.resolve(true);
   };
 
   const handleManualRefresh = async () => {
@@ -144,7 +125,9 @@ const App: React.FC = () => {
     ? {
         kind: 'save' as const,
         type: 'error' as const,
-        log: lastMutationError instanceof Error
+        log: lastMutationError instanceof RevisionConflictError
+          ? (language === 'zh' ? '数据已在其他位置更新，本次保存已停止。请刷新并核对草稿后重新保存。' : 'Data changed elsewhere; saving stopped. Refresh and review your draft before saving again.')
+          : lastMutationError instanceof Error
           ? lastMutationError.message
           : String(lastMutationError),
       }
@@ -181,6 +164,15 @@ const App: React.FC = () => {
       />
     );
   }
+
+  if (!hasLoadedData) {
+    return <div className="app-shell flex min-h-screen items-center justify-center">
+      {loadError ? <div role="alert"><p>{t('connection_failed')}</p>
+        <button disabled={isDataLoading} onClick={() => void loadRemoteData()}>{language === 'zh' ? '重试加载' : 'Retry loading'}</button>
+      </div> : <p>{t('loading')}</p>}
+    </div>;
+  }
+
 
   return (
     <div
@@ -254,14 +246,14 @@ const App: React.FC = () => {
       </main>
 
       <Suspense fallback={null}>
-      <SubscriptionForm
+      {isModalOpen && <SubscriptionForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveWrapper}
         initialData={editingSub}
         settings={clientSettings}
         lang={language}
-      />
+      />}
       </Suspense>
 
       <MobileNav

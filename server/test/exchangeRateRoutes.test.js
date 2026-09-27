@@ -25,6 +25,7 @@ test('testing an exchange-rate key validates first and commits the key and rates
     },
   };
   let userData = {
+    revisions: { settings: 4 },
     subscriptions: [],
     notifications: [],
     settings: defaults.defaultSettings(),
@@ -38,6 +39,7 @@ test('testing an exchange-rate key validates first and commits the key and rates
     async updateUserData(_username, updater) {
       updateCount += 1;
       userData = await updater(structuredClone(userData));
+      userData.revisions.settings += 1;
       return structuredClone(userData);
     },
   };
@@ -69,6 +71,9 @@ test('testing an exchange-rate key validates first and commits the key and rates
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.ok, true);
+  assert.equal(response.body.revision, 5);
+  assert.equal(response.body.settingsState.exchangeRates.CNY, 7.25);
+  assert.equal(response.body.settings.exchangeRateApi.encryptedKey, undefined);
   assert.equal(updateCount, 1);
   assert.equal(userData.settings.exchangeRateApi.encryptedKey, 'aesgcm-v1.encrypted');
   assert.equal(userData.settings.exchangeRateApi.enabled, true);

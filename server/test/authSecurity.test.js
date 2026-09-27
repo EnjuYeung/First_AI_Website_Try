@@ -214,6 +214,7 @@ test('dedicated 2FA routes still initialize, verify, and disable TOTP', async ()
     get() {},
   };
   let data = {
+    revisions: { settings: 1 },
     settings: {
       security: {
         twoFactorEnabled: false,
@@ -227,6 +228,7 @@ test('dedicated 2FA routes still initialize, verify, and disable TOTP', async ()
     async loadUserData() { return structuredClone(data); },
     async updateUserData(_username, updater) {
       data = await updater(structuredClone(data));
+      data.revisions.settings += 1;
       return structuredClone(data);
     },
   };
@@ -251,7 +253,11 @@ test('dedicated 2FA routes still initialize, verify, and disable TOTP', async ()
   const code = speakeasy.totp({ secret: initialized.body.secret, encoding: 'base32' });
   const verified = response();
   await handlers.get('/api/2fa/verify')(request({ code }), verified);
-  assert.deepEqual(verified.body, { success: true });
+  assert.equal(verified.body.success, true);
+  assert.equal(verified.body.revision, 3);
+  assert.equal(verified.body.settingsState.security.twoFactorEnabled, true);
+  assert.equal(verified.body.settingsState.security.twoFactorSecret, undefined);
+  assert.equal(verified.body.settingsState.security.pendingTwoFactorSecret, undefined);
   assert.equal(data.settings.security.twoFactorEnabled, true);
   assert.equal(data.settings.security.twoFactorSecret, initialized.body.secret);
   assert.equal(data.settings.security.pendingTwoFactorSecret, '');
@@ -261,7 +267,9 @@ test('dedicated 2FA routes still initialize, verify, and disable TOTP', async ()
     request({ currentPassword: 'Current-password-1!', code }),
     disabled
   );
-  assert.deepEqual(disabled.body, { success: true });
+  assert.equal(disabled.body.success, true);
+  assert.equal(disabled.body.revision, 4);
+  assert.equal(disabled.body.settingsState.security.twoFactorEnabled, false);
   assert.deepEqual(data.settings.security, {
     twoFactorEnabled: false,
     twoFactorSecret: '',

@@ -1,58 +1,30 @@
 services:
   web:
-    container_name: ai-website-web
-    build: .
-    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: first_ai_website_try-web:latest
+    container_name: subm-web
     ports:
-      - "3001:80" # host 3001 -> container 80 (frontend)
+      - "127.0.0.1:33001:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - appnet
-    # Optional: Basic resource limits to prevent OOM
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-        reservations:
-          cpus: '0.10'
-          memory: 128M
 
   backend:
-    container_name: ai-website-backend
     build:
       context: .
       dockerfile: server/Dockerfile
-    restart: always
+    image: first_ai_website_try-backend:latest
+    container_name: subm-backend
     env_file:
-      - ./server/.env
+      - /opt/1panel/apps/First_AI_Website_Try/.env
     volumes:
-      - backend-data:/app/server/data
-    expose:
-      - "3001"
+      - /opt/1panel/apps/First_AI_Website_Try/Jan:/app/server/data
     networks:
       - appnet
-    healthcheck:
-      # Using wget because the base image is likely Alpine (which has wget but often not curl)
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-        reservations:
-          cpus: '0.10'
-          memory: 128M
 
 networks:
   appnet:
     driver: bridge
-
-volumes:
-  backend-data:

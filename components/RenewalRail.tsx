@@ -15,7 +15,7 @@ import {
 export interface RenewalRailEvent {
   sub: Subscription;
   date: Date;
-  cost: number;
+  cost: number | null;
   state: 'paid' | 'pending';
 }
 
@@ -118,7 +118,7 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
         return {
           day,
           events: groupedEvents,
-          amount: groupedEvents.reduce((sum, event) => sum + event.cost, 0),
+          amount: groupedEvents.reduce((sum, event) => sum + (event.cost ?? 0), 0),
           lane: lanes[index],
         };
       });
@@ -170,7 +170,7 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
                 ? `${first.sub.name} +${group.events.length - 1}`
                 : first.sub.name;
               const title = group.events
-                .map((event) => `${event.sub.name} · ${formatCurrency(event.cost, 'USD')}`)
+                .map((event) => `${event.sub.name} · ${(event.cost === null ? `${formatCurrency(event.sub.price, event.sub.currency)} ${event.sub.currency}` : formatCurrency(event.cost, 'USD'))}`)
                 .join('\n');
               return (
                 <div
@@ -225,7 +225,7 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
                       {group.events.map((event) => (
                         <div className="rail-event-detail" key={event.sub.id}>
                           <span>{event.sub.name}</span>
-                          <strong>{formatCurrency(event.cost, 'USD')}</strong>
+                          <strong>{(event.cost === null ? `${formatCurrency(event.sub.price, event.sub.currency)} ${event.sub.currency}` : formatCurrency(event.cost, 'USD'))}</strong>
                         </div>
                       ))}
                     </div>
@@ -274,7 +274,7 @@ const RenewalRail: React.FC<Props> = ({ events, monthlyTotal, lang, timeZone, se
       <ul className="sr-only">
         {events.map((event) => (
           <li key={`${event.sub.id}-${formatLocalYMD(event.date)}`}>
-            {event.sub.name}, {formatLocalYMD(event.date)}, {formatCurrency(event.cost, 'USD')}
+            {event.sub.name}, {formatLocalYMD(event.date)}, {(event.cost === null ? `${formatCurrency(event.sub.price, event.sub.currency)} ${event.sub.currency}` : formatCurrency(event.cost, 'USD'))}
           </li>
         ))}
       </ul>

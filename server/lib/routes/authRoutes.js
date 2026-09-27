@@ -1,3 +1,4 @@
+import { settingsStateResult } from '../settingsPolicy.js';
 import speakeasy from 'speakeasy';
 import { isIP } from 'node:net';
 import { isStrongPassword } from '../securityPolicy.js';
@@ -121,11 +122,11 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       name: `Subm (${req.user.username})`,
       issuer: 'Subm',
     });
-    await storage.updateUserData(req.user.username, (current) => {
+    const updated = await storage.updateUserData(req.user.username, (current) => {
       current.settings.security.pendingTwoFactorSecret = secret.base32;
       return current;
     });
-    res.json({ secret: secret.base32, otpauthUrl: secret.otpauth_url });
+    res.json({ secret: secret.base32, otpauthUrl: secret.otpauth_url, ...settingsStateResult(updated) });
   });
 
   app.post('/api/2fa/verify', auth.authMiddleware, async (req, res) => {
@@ -142,7 +143,7 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       window: 1,
     });
     if (!verified) return res.status(400).json({ message: 'Invalid code' });
-    await storage.updateUserData(req.user.username, (current) => {
+    const updated = await storage.updateUserData(req.user.username, (current) => {
       const security = current.settings.security;
       if (security.pendingTwoFactorSecret !== secret && security.twoFactorSecret !== secret) {
         throw new Error('two_factor_secret_changed');
@@ -154,7 +155,7 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       });
       return current;
     });
-    res.json({ success: true });
+    res.json({ success: true, ...settingsStateResult(updated) });
   });
 
   app.post('/api/2fa/disable', auth.authMiddleware, async (req, res) => {
@@ -166,7 +167,7 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
     if (!verifyCurrentTotp(existing.settings.security, code)) {
       return res.status(401).json({ message: 'invalid_2fa' });
     }
-    await storage.updateUserData(req.user.username, (current) => {
+    const updated = await storage.updateUserData(req.user.username, (current) => {
       Object.assign(current.settings.security, {
         twoFactorEnabled: false,
         twoFactorSecret: '',
@@ -174,7 +175,7 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       });
       return current;
     });
-    res.json({ success: true });
+    res.json({ success: true, ...settingsStateResult(updated) });
   });
 
   app.post('/api/change-password', auth.authMiddleware, async (req, res) => {

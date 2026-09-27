@@ -1,16 +1,5 @@
 const YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export const parseLocalYMD = (value) => {
-  const match = YMD_RE.exec(String(value || '').trim());
-  if (!match) return new Date(NaN);
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const d = new Date(year, month - 1, day);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
 export const formatLocalYMD = (date) => {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
   const year = date.getFullYear();

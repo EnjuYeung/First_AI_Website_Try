@@ -86,6 +86,9 @@ test('test notification sends a Telegram message', async (t) => {
   assert.equal(calls.length, 1);
   assert.match(calls[0].url, /\/sendMessage$/);
   assert.equal(calls[0].body.chat_id, 'chat-1');
+  assert.match(calls[0].body.text, /测试模式，未修改真实订阅/);
+  assert.deepEqual(calls[0].body.reply_markup.inline_keyboard[0].map((button) => button.callback_data),
+    ['test_renewal|renewed', 'test_renewal|deprecated']);
 });
 
 test('monthly summary template tests render the monthly sample payload', async (t) => {
@@ -108,6 +111,7 @@ test('monthly summary template tests render the monthly sample payload', async (
 
   assert.equal(res.statusCode, 200);
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.reply_markup, undefined);
   assert.match(calls[0].body.text, /SUMMARY 2026年7月 \/ 8/);
 });
 

@@ -49,7 +49,7 @@ export const renderMonthlySummaryTemplate = (templateString, summary) => {
       : '',
   };
 
-  return lines.flatMap((line) => {
+  const renderedLines = lines.flatMap((line) => {
     if (typeof line !== 'string') return [];
     const tokens = [...line.matchAll(/{{\s*([a-zA-Z]+)\s*}}/g)].map((match) => match[1]);
     if (tokens.some((token) => token in values && !values[token])) return [];
@@ -57,5 +57,9 @@ export const renderMonthlySummaryTemplate = (templateString, summary) => {
       token in values ? values[token] : ''
     ));
     return rendered ? [rendered] : [];
-  }).join('\n');
+  });
+  if (summary?.unconvertedSubscriptions > 0) {
+    renderedLines.push(`⚠️ ${summary.unconvertedSubscriptions} 条订阅缺少汇率，未计入美元支出合计。`);
+  }
+  return renderedLines.join('\n');
 };

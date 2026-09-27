@@ -103,7 +103,10 @@ test('same-name subscriptions with different IDs each receive a reminder', async
 
   assert.equal(sentPayloads.length, 2);
   assert.deepEqual(telegramMethods, ['sendMessage', 'sendMessage']);
-  assert.ok(sentPayloads.every((payload) => Object.hasOwn(payload, 'reply_markup') === false));
+  assert.ok(sentPayloads.every((payload) => payload.reply_markup.inline_keyboard[0].length === 2));
+  assert.ok(sentPayloads.every((payload) => payload.reply_markup.inline_keyboard[0].every(
+    (button) => Buffer.byteLength(button.callback_data) <= 64
+  )));
   assert.equal(holder.value.notifications.length, 2);
   assert.deepEqual(
     new Set(holder.value.notifications.map((record) => record.details.subscriptionId)),

@@ -48,7 +48,6 @@ describe('Notification settings', () => {
     expect(onUpdateSettings).toHaveBeenCalledWith(expect.objectContaining({
       notifications: expect.objectContaining({
         rules: expect.objectContaining({
-          renewalReminder: true,
           monthlySummary: false,
         }),
       }),

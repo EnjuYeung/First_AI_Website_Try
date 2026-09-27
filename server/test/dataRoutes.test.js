@@ -330,3 +330,17 @@ test('settings updates discard the legacy notification scheduled task', async ()
   assert.equal(savedSettings.theme, currentSettings.theme);
   assert.equal('scheduledTask' in savedSettings.notifications, false);
 });
+
+test('deleting an icon still referenced by a subscription returns a conflict without unlinking', async (t) => {
+  const unlink = t.mock.method(fs, 'unlink', async () => {});
+  const handlers = createRouteHarness({
+    async updateUserData(_username, updater) {
+      return updater({ subscriptions: [{ iconUrl: '/api/uploads/abc.png' }] });
+    },
+  });
+  const response = createResponse();
+  await handlers.get('DELETE /api/icons/:filename')({ params: { filename: 'abc.png' }, user: { username: 'admin' } }, response);
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.message, 'icon_in_use');
+  assert.equal(unlink.mock.callCount(), 0);
+});

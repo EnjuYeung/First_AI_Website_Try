@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
-import { AppSettings } from '../types';
+import { ServerSettingsUpdate, SettingsStateResponse } from '../types';
 import { apiFetchJson, authJsonHeaders } from '../services/apiClient';
 import { SettingsAlert } from './settingsTypes';
 
 export const useExchangeRateSettings = (
-  applyRemoteSettings: (patch: Partial<AppSettings>) => void,
+  applyRemoteSettings: (update: ServerSettingsUpdate) => void,
   t: (key: any) => string,
   setAlert: (alert: SettingsAlert) => void
 ) => {
@@ -13,19 +13,15 @@ export const useExchangeRateSettings = (
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
   const isSavingExchangeApiRef = useRef(false);
 
-  const applyResponse = (json: any) =>
-    applyRemoteSettings({
-      exchangeRateApi: json.settings.exchangeRateApi,
-      exchangeRates: json.settings.exchangeRates,
-      lastRatesUpdate: json.settings.lastRatesUpdate,
-    });
+  const applyResponse = (json: SettingsStateResponse) =>
+    applyRemoteSettings({ state: json.settingsState, revision: json.revision });
 
   const handleSaveExchangeApiKey = async (test: boolean) => {
     if (!exchangeApiKey.trim() || isSavingExchangeApiRef.current) return;
     isSavingExchangeApiRef.current = true;
     setIsSavingExchangeApi(true);
     try {
-      const json = await apiFetchJson<any>('/api/exchange-rate/config', {
+      const json = await apiFetchJson<SettingsStateResponse>('/api/exchange-rate/config', {
         method: 'POST',
         headers: authJsonHeaders(),
         body: JSON.stringify({ apiKey: exchangeApiKey.trim(), test }),
@@ -44,7 +40,7 @@ export const useExchangeRateSettings = (
   const handleManualUpdateRates = async () => {
     setIsUpdatingRates(true);
     try {
-      const json = await apiFetchJson<any>('/api/exchange-rate/update', {
+      const json = await apiFetchJson<SettingsStateResponse>('/api/exchange-rate/update', {
         method: 'POST',
         headers: authJsonHeaders(),
       });

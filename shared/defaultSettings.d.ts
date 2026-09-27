@@ -1,5 +1,5 @@
-import type { AppSettings } from '../types';
-export function createDefaultSettings(): AppSettings;
+import type { StoredSettings } from '../types';
+export function createDefaultSettings(): StoredSettings;
 export function normalizeExchangeRates(
   incoming: unknown,
   fallback?: Record<string, number>

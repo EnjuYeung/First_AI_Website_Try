@@ -5,6 +5,7 @@ import {
 } from '../../../shared/monthlySummaryTemplate.js';
 import {
   sendTelegramMessage,
+  buildTestRenewalKeyboard,
 } from '../telegram.js';
 import { formatDateInTimeZone } from '../dates.js';
 
@@ -39,7 +40,13 @@ export const registerNotificationRoutes = ({ app, config, auth, storage }) => {
             currency: '',
             paymentMethod: '测试支付方式',
           });
-      await sendTelegramMessage({ debug: config.debugTelegram }, botToken, chatId, message);
+      await sendTelegramMessage(
+        { debug: config.debugTelegram }, botToken, chatId,
+        templateType === 'renewalReminder'
+          ? `${message}\n\n🧪 点击下方按钮测试后台接收。测试模式，未修改真实订阅。`
+          : message,
+        templateType === 'renewalReminder' ? buildTestRenewalKeyboard() : undefined,
+      );
       res.json({ ok: true });
     } catch (err) {
       res.status(400).json({ ok: false, message: err?.message || 'telegram_test_failed' });

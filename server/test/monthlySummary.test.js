@@ -34,6 +34,7 @@ test('monthly summary counts spend, active subscriptions, additions by cycle, an
   ];
 
   assert.deepEqual(buildMonthlySummary(subscriptions, settings, period), {
+    unconvertedSubscriptions: 0,
     periodKey: '2026-01',
     month: '2026年1月',
     totalPaidUsd: 40,
@@ -67,7 +68,7 @@ test('monthly summary template omits only statistics whose value is zero', () =>
   assert.equal(emptyMessage, '📊 2026年1月 月度总结');
 });
 
-test('monthly summary treats a missing exchange rate as zero instead of USD', () => {
+test('monthly summary reports subscriptions excluded because an exchange rate is missing', () => {
   const period = previousMonthPeriod('UTC', new Date('2026-02-01T09:00:00Z'));
   const summary = buildMonthlySummary(
     [{
@@ -78,6 +79,8 @@ test('monthly summary treats a missing exchange rate as zero instead of USD', ()
     period,
   );
   assert.equal(summary.totalPaidUsd, 0);
+  assert.equal(summary.unconvertedSubscriptions, 1);
+  assert.match(renderMonthlySummaryTemplate(DEFAULT_MONTHLY_SUMMARY_TEMPLATE_STRING, summary), /1 条订阅缺少汇率/);
 });
 
 test('monthly summary sends once per channel after 09:00 on day one', async (t) => {

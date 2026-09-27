@@ -231,24 +231,3 @@ export const validateSettings = (settings) => {
   ) return 'invalid_security_settings';
   return null;
 };
-
-export const validateNotifications = (notifications) => {
-  if (!Array.isArray(notifications)) return 'notifications_must_be_array';
-  if (notifications.length > 10000) return 'too_many_notifications';
-  for (const record of notifications) {
-    if (
-      !isPlainObject(record) ||
-      !isBoundedString(record.id, 1, 128) ||
-      !isBoundedString(record.subscriptionName, 1, 200) ||
-      !['renewal_reminder', 'monthly_summary', 'subscription_change'].includes(record.type) ||
-      !['success', 'failed'].includes(record.status) ||
-      !['telegram', 'email'].includes(record.channel) ||
-      !isFiniteTimestamp(record.timestamp) ||
-      !isPlainObject(record.details) ||
-      JSON.stringify(record).length > 10000
-    ) {
-      return 'invalid_notification';
-    }
-  }
-  return null;
-};

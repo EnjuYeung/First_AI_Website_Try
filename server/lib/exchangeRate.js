@@ -1,3 +1,4 @@
+import { settingsStateResult } from './settingsPolicy.js';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { LEGACY_EXCHANGE_RATE_KEYPAIR_FILE } from './paths.js';
@@ -101,6 +102,7 @@ export const createExchangeRate = ({
 
     return {
       updated: true,
+      ...settingsStateResult(updatedData),
       lastRatesUpdate: now,
       exchangeRates: updatedData.settings.exchangeRates,
       exchangeRateApi: updatedData.settings.exchangeRateApi,

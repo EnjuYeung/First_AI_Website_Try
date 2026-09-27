@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AppSettings } from '../types';
+import { ClientPreferences } from '../types';
 
 const LANGUAGE_KEY = 'subm.language';
 const THEME_KEY = 'subm.theme';
 const COLOR_THEME_KEY = 'subm.colorTheme';
 
-const readLanguage = (): AppSettings['language'] => {
+const readLanguage = (): ClientPreferences['language'] => {
   if (typeof window === 'undefined') return 'zh';
   try {
     const value = window.localStorage.getItem(LANGUAGE_KEY);
@@ -15,7 +15,7 @@ const readLanguage = (): AppSettings['language'] => {
   }
 };
 
-const readTheme = (): AppSettings['theme'] => {
+const readTheme = (): ClientPreferences['theme'] => {
   if (typeof window === 'undefined') return 'system';
   try {
     const value = window.localStorage.getItem(THEME_KEY);
@@ -25,7 +25,7 @@ const readTheme = (): AppSettings['theme'] => {
   }
 };
 
-const readColorTheme = (): AppSettings['colorTheme'] => {
+const readColorTheme = (): ClientPreferences['colorTheme'] => {
   if (typeof window === 'undefined') return 'default';
   try {
     const value = window.localStorage.getItem(COLOR_THEME_KEY);
@@ -36,9 +36,9 @@ const readColorTheme = (): AppSettings['colorTheme'] => {
 };
 
 export const useClientPreferences = () => {
-  const [language, setLanguage] = useState<AppSettings['language']>(readLanguage);
-  const [theme, setTheme] = useState<AppSettings['theme']>(readTheme);
-  const [colorTheme, setColorTheme] = useState<AppSettings['colorTheme']>(readColorTheme);
+  const [language, setLanguage] = useState<ClientPreferences['language']>(readLanguage);
+  const [theme, setTheme] = useState<ClientPreferences['theme']>(readTheme);
+  const [colorTheme, setColorTheme] = useState<ClientPreferences['colorTheme']>(readColorTheme);
 
   useEffect(() => {
     try {

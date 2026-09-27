@@ -39,13 +39,13 @@
 
 ## Docker Compose
 
-配置文件必须位于 `server/.env`，然后运行：
+本机 Compose 使用项目根目录的 `.env`（可从 `server/.env.example` 复制）。设置 `ALLOWED_ORIGINS=http://127.0.0.1:33001`；通过反向代理访问时改为实际站点域名。然后运行：
 
 ```bash
 docker compose up -d --build
 ```
 
-前端入口为 `http://localhost:3001`。后端只暴露在 Compose 私有网络，由 Nginx
+前端入口为 `http://127.0.0.1:33001`。后端只暴露在 Compose 私有网络，由 Nginx
 代理 `/api`，不会默认映射到宿主机端口。
 
 生产域名应通过逗号分隔的 `ALLOWED_ORIGINS` 明确配置。
@@ -100,3 +100,17 @@ CI 会执行前后端测试、生产构建、依赖审计，并拒绝跟踪真�
   API Key；该密钥不得与数据备份放在一起。
 
 安全事件和密钥误提交处理见 [SECURITY.md](./SECURITY.md)。
+
+### Telegram 通知按钮
+
+启用 Telegram 通知并填写 Bot Token、Chat ID 后，后台自动长轮询接收按钮操作，无需公网回调地址或额外前端配置。续订提醒提供“已续订”和“已弃用”按钮：前者保持生效中并推进一个账期，后者停用订阅并停止后续账单。按服务端 `TIMEZONE`（默认 Asia/Shanghai）的账单日结束后，未操作的生效中订阅自动推进账单，通知反馈自动记为已续订。已处理或过期按钮不会再次修改订阅。
+
+后台启动及更换 Telegram 配置时会移除该 Bot 的旧 webhook（保留待处理更新）。同一 Bot 应仅由一个本项目后端实例接收更新，避免与其他机器人程序的 webhook / getUpdates 冲突。续订测试消息提供“测试续订 / 测试弃用”按钮，点击后在 Telegram 弹出提示并将原消息更新为测试结果、移除按钮，不修改真实订阅。月度汇总测试不含按钮。
+
+### 本机 Compose 部署约定
+
+`docker compose up -d --build` 会构建前后端镜像。当前 Compose 从 `/opt/1panel/apps/First_AI_Website_Try/.env` 加载环境变量，并将该目录下的 `Jan/` 挂载为后端数据目录；迁移到其他目录时请同步修改这两个绝对路径。入口为 `http://127.0.0.1:33001`。`Jan/` 已从 Git 和 Docker 构建上下文排除。上述命令仅用于部署，源码修改不会自动重启已有容器。
+
+仪表盘和月度汇总按当前价格、当前汇率及推算账期估算支出，不代表历史支付流水。缺失汇率的订阅保留原币金额，并在美元合计旁提示未计入数量。
+
+模块职责、设置更新协议与存储兼容约定见 [ARCHITECTURE.md](./ARCHITECTURE.md)。

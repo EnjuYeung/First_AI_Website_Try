@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as QRCode from 'qrcode';
-import { AppSettings } from '../types';
+import { AppSettings, SettingsStateResponse, ServerSettingsUpdate } from '../types';
 import { apiFetchJson, authJsonHeaders } from '../services/apiClient';
 import { SettingsAlert } from './settingsTypes';
 
@@ -8,14 +8,14 @@ export const useSecuritySettings = (
   settings: AppSettings,
   t: (key: any) => string,
   setAlert: (alert: SettingsAlert) => void,
-  setToast: (message: string) => void
+  setToast: (message: string) => void,
+  onApplyRemoteSettings: (update: ServerSettingsUpdate) => void
 ) => {
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [showQr, setShowQr] = useState(false);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [twoFaQrUrl, setTwoFaQrUrl] = useState<string | null>(null);
   const [pendingTwoFactorSecret, setPendingTwoFactorSecret] = useState('');
-  const [twoFactorEnabledOverride, setTwoFactorEnabledOverride] = useState<boolean | null>(null);
   const [is2faBusy, setIs2faBusy] = useState(false);
   const [is2faVerifying, setIs2faVerifying] = useState(false);
 
@@ -33,10 +33,6 @@ export const useSecuritySettings = (
       .catch(() => { if (!cancelled) setTwoFaQrUrl(null); });
     return () => { cancelled = true; };
   }, [pendingTwoFactorSecret]);
-
-  useEffect(() => {
-    setTwoFactorEnabledOverride(null);
-  }, [settings.security.twoFactorEnabled]);
 
   const fail = (error: any) =>
     setAlert({ isOpen: true, type: 'error', title: t('error_title'), message: error?.message || t('connection_failed') || 'Network error' });
@@ -58,24 +54,25 @@ export const useSecuritySettings = (
   const start = async () => {
     setIs2faBusy(true);
     try {
-      const data = await apiFetchJson<any>('/api/2fa/init', {
+      const data = await apiFetchJson<SettingsStateResponse & { secret: string }>('/api/2fa/init', {
         method: 'POST',
         headers: authJsonHeaders(),
         body: JSON.stringify({ currentPassword: passwords.current, code: twoFaCode }),
       });
       setPendingTwoFactorSecret(String(data.secret || ''));
+      onApplyRemoteSettings({ state: data.settingsState, revision: data.revision });
     } catch (error) { fail(error); } finally { setIs2faBusy(false); }
   };
   const disable = async () => {
     setIs2faBusy(true);
     try {
-      await apiFetchJson('/api/2fa/disable', {
+      const data = await apiFetchJson<SettingsStateResponse>('/api/2fa/disable', {
         method: 'POST',
         headers: authJsonHeaders(),
         body: JSON.stringify({ currentPassword: passwords.current, code: twoFaCode }),
       });
       setTwoFaCode(''); setTwoFaQrUrl(null); setShowQr(false); setPendingTwoFactorSecret('');
-      setTwoFactorEnabledOverride(false);
+      onApplyRemoteSettings({ state: data.settingsState, revision: data.revision });
       setToast(t('success_title'));
     } catch (error) { fail(error); } finally { setIs2faBusy(false); }
   };
@@ -83,11 +80,11 @@ export const useSecuritySettings = (
     if (!twoFaCode) return fail(new Error(t('password_error_empty')));
     setIs2faVerifying(true);
     try {
-      await apiFetchJson('/api/2fa/verify', {
+      const data = await apiFetchJson<SettingsStateResponse>('/api/2fa/verify', {
         method: 'POST', headers: authJsonHeaders(), body: JSON.stringify({ code: twoFaCode }),
       });
       setTwoFaCode(''); setTwoFaQrUrl(null); setShowQr(false); setPendingTwoFactorSecret('');
-      setTwoFactorEnabledOverride(true);
+      onApplyRemoteSettings({ state: data.settingsState, revision: data.revision });
       setToast(t('success_title'));
     } catch (error) { fail(error); } finally { setIs2faVerifying(false); }
   };
@@ -96,7 +93,7 @@ export const useSecuritySettings = (
     passwords, setPasswords, showQr, twoFaCode, setTwoFaCode, twoFaQrUrl,
     is2faBusy, is2faVerifying, verifyTwoFactor,
     handleUpdatePassword, handleToggleTwoFactor: (enabled: boolean) => enabled ? start() : disable(),
-    isTwoFactorActive: twoFactorEnabledOverride ?? settings.security.twoFactorEnabled,
+    isTwoFactorActive: settings.security.twoFactorEnabled,
     isTwoFactorPending: !!pendingTwoFactorSecret,
   };
 };

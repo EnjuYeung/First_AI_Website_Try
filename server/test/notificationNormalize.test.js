@@ -6,7 +6,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-test('loading overdue active reminders does not infer renewed or rewrite the file', async () => {
+test('loading overdue active reminders persists automatic renewal and advances billing', async () => {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'subm-notify-normalize-'));
   const userDir = path.join(dataDir, 'users', 'admin');
   await fs.mkdir(userDir, { recursive: true, mode: 0o700 });
@@ -20,6 +20,8 @@ test('loading overdue active reminders does not infer renewed or rewrite the fil
     id: 'sub-1',
     name: 'Overdue',
     status: 'active',
+    frequency: 'Monthly',
+    startDate: '2020-01-01',
     nextBillingDate: '2020-01-01',
   }])));
   await fs.writeFile(path.join(userDir, 'notifications.json'), JSON.stringify(document([{
@@ -50,10 +52,14 @@ test('loading overdue active reminders does not infer renewed or rewrite the fil
       timeZone: 'UTC',
     });
     const loaded = await storage.loadUserData('admin');
-    assert.equal(loaded.notifications[0].details.renewalFeedback, 'pending');
+    assert.equal(loaded.notifications[0].details.renewalFeedback, 'renewed');
+    assert.equal(loaded.notifications[0].details.autoRenewed, true);
+    assert.ok(loaded.subscriptions[0].nextBillingDate >= new Date().toISOString().slice(0, 10));
+    const reloaded = await storage.loadUserData('admin');
+    assert.equal(reloaded.revisions.notifications, loaded.revisions.notifications);
     const persisted = JSON.parse(await fs.readFile(path.join(process.env.DATA_DIR, 'users', 'admin', 'notifications.json'), 'utf8'));
-    assert.equal(persisted.revision, 1);
-    assert.equal(persisted.data[0].details.renewalFeedback, 'pending');
+    assert.equal(persisted.revision, 2);
+    assert.equal(persisted.data[0].details.renewalFeedback, 'renewed');
   `;
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
     cwd: testFileDir,

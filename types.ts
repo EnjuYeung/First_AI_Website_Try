@@ -6,7 +6,6 @@ export enum Frequency {
   YEARLY = 'Yearly',
 }
 
-export { DEFAULT_CATEGORIES, DEFAULT_PAYMENT_METHODS } from './shared/constants.js';
 
 export const ISO_CURRENCIES = [
     { code: 'USD', name: 'United States Dollar' },
@@ -107,44 +106,60 @@ export interface ExchangeRateApiSettings {
   lastRunAt12: number; // epoch ms
 }
 
-// language/theme/colorTheme are device-local. timezone, exchange rates, and
-// 2FA secrets are server-managed; the client overlays the first three on read.
-export interface AppSettings {
+/** Device-local preferences; never sent to a settings mutation endpoint. */
+export interface ClientPreferences {
   language: 'zh' | 'en';
-  timezone: string;
   theme: 'light' | 'dark' | 'system';
   colorTheme: 'default' | 'blue' | 'violet' | 'rose';
-  wallpaper: {
-    url: string;
-    blur: number;
-    overlay: number;
-    panelOpacity: number;
-  };
+}
+
+/** User-editable, persisted configuration. */
+export interface EditableSettings {
+  wallpaper: { url: string; blur: number; overlay: number; panelOpacity: number };
   customCategories: string[];
   customPaymentMethods: string[];
   customCurrencies: CurrencyConfig[];
-  exchangeRates: ExchangeRates; // Store rates locally
-  lastRatesUpdate: number; // Timestamp of last update
-  exchangeRateApi: ExchangeRateApiSettings;
   notifications: {
-    telegram: {
-      enabled: boolean;
-      botToken: string;
-      chatId: string;
-    };
-    email: {
-      enabled: boolean;
-      emailAddress: string;
-    };
+    telegram: { enabled: boolean; botToken: string; chatId: string };
+    email: { enabled: boolean; emailAddress: string };
     rules: NotificationRule;
   };
-  security: {
-    twoFactorEnabled: boolean;
-    twoFactorSecret?: string;
-    pendingTwoFactorSecret?: string;
-    lastPasswordChange: string;
-  };
 }
+
+/** Read-only public state maintained by dedicated server operations. */
+export interface ServerSettingsState {
+  timezone: string;
+  exchangeRates: ExchangeRates;
+  lastRatesUpdate: number;
+  exchangeRateApi: Omit<ExchangeRateApiSettings, 'encryptedKey'>;
+  security: { twoFactorEnabled: boolean; lastPasswordChange: string };
+}
+export type RemoteSettings = EditableSettings & ServerSettingsState;
+/** Composed view for components, not a write payload. */
+export type AppSettings = ClientPreferences & RemoteSettings;
+
+export type EditableSettingsPatch = Partial<Omit<EditableSettings, 'notifications' | 'wallpaper'>> & {
+  wallpaper?: Partial<EditableSettings['wallpaper']>;
+  notifications?: {
+    telegram?: Partial<EditableSettings['notifications']['telegram']>;
+    email?: Partial<EditableSettings['notifications']['email']>;
+    rules?: Partial<Omit<NotificationRule, 'channels'>> & { channels?: Partial<NotificationRule['channels']> };
+  };
+};
+export type SettingsUpdate = EditableSettingsPatch & Partial<ClientPreferences>;
+export interface SettingsStateResponse {
+  settingsState: ServerSettingsState;
+  revision: number;
+}
+export interface ServerSettingsUpdate {
+  state: Partial<ServerSettingsState>;
+  revision?: number;
+}
+/** On-disk schema retains legacy preferences and private server credentials. */
+export type StoredSettings = AppSettings & {
+  exchangeRateApi: ExchangeRateApiSettings;
+  security: ServerSettingsState['security'] & { twoFactorSecret: string; pendingTwoFactorSecret: string };
+};
 
 // --- Notification History Types ---
 

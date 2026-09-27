@@ -51,6 +51,11 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   const dialogRef = useRef<HTMLDivElement>(null);
   const iconUrl = String(formData.iconUrl || '').trim();
 
+  useEffect(() => () => {
+    // A late upload belongs to the closed form, even when the lazy form unmounts.
+    formSession.current += 1;
+  }, []);
+
   const handleIconFile = async (file: File | null) => {
     if (!file) return;
     const uploadSession = formSession.current;
@@ -175,6 +180,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   };
 
   const closeAndDiscardUploads = useCallback(() => {
+    if (isSubmitting) return;
     formSession.current += 1;
     setIsIconUploading(false);
     setIsSubmitting(false);
@@ -182,7 +188,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     temporaryUploads.current.clear();
     pending.forEach((url) => void deleteUploadedIcon(url).catch(console.error));
     onClose();
-  }, [onClose]);
+  }, [onClose, isSubmitting]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -253,7 +259,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
             {initialData ? t('edit_subscription') : t('add_subscription')}
             </h2>
           </div>
-          <button aria-label={t('close')} onClick={closeAndDiscardUploads} className="icon-control rounded-xl p-2 transition-colors">
+          <button disabled={isSubmitting} aria-label={t('close')} onClick={closeAndDiscardUploads} className="icon-control rounded-xl p-2 transition-colors">
             <X size={24} />
           </button>
         </div>

@@ -155,7 +155,7 @@ const SubscriptionList: React.FC<Props> = ({
       const feedback = notif.details?.renewalFeedback;
       const date = notif.details?.date;
       if (!feedback || !date) return;
-      const key = notif.details?.subscriptionId || notif.subscriptionName;
+      const key = notif.details?.subscriptionId ? `id:${notif.details.subscriptionId}` : `name:${notif.subscriptionName}`;
       if (!key) return;
       const subMap = bySub.get(key) || new Map<string, { feedback: string; timestamp: number }>();
       const timestamp = typeof notif.timestamp === 'number' ? notif.timestamp : 0;
@@ -170,8 +170,9 @@ const SubscriptionList: React.FC<Props> = ({
 
   const getRenewalFeedback = (sub: Subscription, dateStr: string) => {
     if (!dateStr) return '';
-    const byId = sub.id ? renewalFeedbackMap.get(sub.id) : undefined;
-    const byName = renewalFeedbackMap.get(sub.name);
+    const byId = sub.id ? renewalFeedbackMap.get(`id:${sub.id}`) : undefined;
+    const byName = subscriptions.filter(candidate => candidate.name === sub.name).length === 1
+      ? renewalFeedbackMap.get(`name:${sub.name}`) : undefined;
     const entry = byId?.get(dateStr) || byName?.get(dateStr);
     return canonicalRenewalFeedback(entry?.feedback);
   };

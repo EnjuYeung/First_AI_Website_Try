@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, RefreshCw, Search, X as XIcon } from 'lucide-react';
-import { AppSettings, ISO_CURRENCIES } from '../../../types';
+import { AppSettings, SettingsUpdate, ISO_CURRENCIES } from '../../../types';
 
 type Props = {
   t: (key: any) => string;
   settings: AppSettings;
-  onUpdateSettings: (settings: AppSettings) => void;
+  onUpdateSettings: (patch: SettingsUpdate) => void;
   isUpdatingRates: boolean;
   handleManualUpdateRates: () => void;
   formatLastUpdated: (timestamp: number) => string;
@@ -81,6 +81,11 @@ const CurrencyTab: React.FC<Props> = ({
         <div className="mac-surface rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm h-full flex flex-col">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('manage_currencies')}</h3>
 
+          {settings.customCurrencies.some(c => c.code !== 'USD' && !(settings.exchangeRates[c.code] > 0)) && (
+            <p role="status" className="mb-4 text-sm text-[var(--due-amber)]">
+              {settings.language === 'zh' ? '部分币种缺少汇率，请刷新汇率；相关金额暂不计入美元合计。' : 'Some currencies lack exchange rates. Refresh rates to include their amounts in USD totals.'}
+            </p>
+          )}
           <div className="relative mb-6">
             <div className="flex items-center gap-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-primary-500 transition-all">
               <Search size={20} className="text-gray-400" />
@@ -103,7 +108,6 @@ const CurrencyTab: React.FC<Props> = ({
                       key={c.code}
                       onClick={() => {
                         onUpdateSettings({
-                          ...settings,
                           customCurrencies: [...settings.customCurrencies, c],
                         });
                         setCurrencySearch('');
@@ -140,7 +144,6 @@ const CurrencyTab: React.FC<Props> = ({
                     <button
                       onClick={() =>
                         onUpdateSettings({
-                          ...settings,
                           customCurrencies: settings.customCurrencies.filter((cur) => cur.code !== c.code),
                         })
                       }

@@ -15,7 +15,7 @@ vi.mock('../services/storageService', async (importOriginal) => {
   const original = await importOriginal<typeof import('../services/storageService')>();
   return {
     ...original,
-    replaceSettings: vi.fn((settings: any) => new Promise((resolve) => {
+    updateSettingsFields: vi.fn((settings: any) => new Promise((resolve) => {
       storageMock.pending.push({ settings, resolve });
     })),
   };

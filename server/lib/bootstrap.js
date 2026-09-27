@@ -5,6 +5,7 @@ import { createEmail } from './email.js';
 import { createReminders } from './reminders.js';
 import { createExchangeRate } from './exchangeRate.js';
 import * as defaults from './defaults.js';
+import { createTelegramPolling } from './telegramPolling.js';
 import { createApp } from './app.js';
 
 export const assertAdminIdentity = (configuredUsername, persistedUsername) => {
@@ -39,5 +40,6 @@ export const bootstrap = async () => {
 
   const app = createApp({ config, auth, storage, exchangeRate });
 
-  return { config, app, services: { auth, storage, reminders, exchangeRate, email } };
+  const telegram = createTelegramPolling({ config, storage });
+  return { config, app, services: { auth, storage, reminders, exchangeRate, email, telegram } };
 };

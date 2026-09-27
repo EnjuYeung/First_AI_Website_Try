@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppSettings, NotificationChannel } from '../types';
+import { AppSettings, SettingsUpdate, NotificationChannel } from '../types';
 import { apiFetchJson, authJsonHeaders } from '../services/apiClient';
 import { normalizeReminderTemplateString } from '../shared/reminderTemplate.js';
 import { normalizeMonthlySummaryTemplateString } from '../shared/monthlySummaryTemplate.js';
@@ -12,7 +12,7 @@ const assertTemplate = (raw: string) => {
 
 export const useNotificationSettings = (
   settings: AppSettings,
-  onUpdate: (settings: AppSettings) => boolean | Promise<boolean>,
+  onUpdate: (patch: SettingsUpdate) => boolean | Promise<boolean>,
   t: (key: any) => string,
   setAlert: (alert: SettingsAlert) => void
 ) => {
@@ -78,8 +78,7 @@ export const useNotificationSettings = (
       assertTemplate(templateText);
       const template = normalizeReminderTemplateString(templateText);
       const saved = await onUpdate({
-        ...settings,
-        notifications: { ...settings.notifications, rules: { ...settings.notifications.rules, template } },
+        notifications: { rules: { template } },
       });
       if (!saved) throw new Error('save_failed');
       setTemplateText(template);
@@ -97,10 +96,8 @@ export const useNotificationSettings = (
       assertTemplate(monthlySummaryTemplateText);
       const monthlySummaryTemplate = normalizeMonthlySummaryTemplateString(monthlySummaryTemplateText);
       const saved = await onUpdate({
-        ...settings,
         notifications: {
-          ...settings.notifications,
-          rules: { ...settings.notifications.rules, monthlySummaryTemplate },
+          rules: { monthlySummaryTemplate },
         },
       });
       if (!saved) throw new Error('save_failed');
@@ -124,10 +121,8 @@ export const useNotificationSettings = (
       ? Array.from(new Set([...current, channel]))
       : current.filter((item) => item !== channel);
     onUpdate({
-      ...settings,
       notifications: {
-        ...settings.notifications,
-        rules: { ...settings.notifications.rules, channels: { ...channels, renewalReminder } },
+        rules: { channels: { renewalReminder } },
       },
     });
   };
@@ -142,10 +137,8 @@ export const useNotificationSettings = (
       ? Array.from(new Set([...current, channel]))
       : current.filter((item) => item !== channel);
     onUpdate({
-      ...settings,
       notifications: {
-        ...settings.notifications,
-        rules: { ...settings.notifications.rules, channels: { ...channels, monthlySummary } },
+        rules: { channels: { monthlySummary } },
       },
     });
   };

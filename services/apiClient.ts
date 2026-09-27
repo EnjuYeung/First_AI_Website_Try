@@ -8,7 +8,6 @@ export class UnauthorizedError extends Error {
 
 export const SESSION_EXPIRED_EVENT = 'subm:session-expired';
 
-export const authHeaderOnly = (): Record<string, string> => ({});
 
 export const authJsonHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',

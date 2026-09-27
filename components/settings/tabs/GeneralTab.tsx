@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Globe, Image, Link2, Palette, Plus, Trash2, Upload, X as XIcon } from 'lucide-react';
-import { AppSettings } from '../../../types';
+import { AppSettings, SettingsUpdate } from '../../../types';
 import { CategoryGlyph, PaymentGlyph } from '../../ui/glyphs';
 import { canonicalCategoryKey, canonicalPaymentMethodKey, displayCategoryLabel, displayPaymentMethodLabel } from '../../../services/displayLabels';
 import { deleteUploadedWallpaper, uploadWallpaperFile } from '../../../services/storageService';
@@ -9,7 +9,7 @@ type Props = {
   t: (key: any) => string;
   currentLanguage: 'en' | 'zh';
   settings: AppSettings;
-  onUpdateSettings: (settings: AppSettings) => boolean | Promise<boolean>;
+  onUpdateSettings: (patch: SettingsUpdate) => boolean | Promise<boolean>;
 };
 
 const reorder = (list: string[], from: number, to: number) => {
@@ -36,7 +36,7 @@ const GeneralTab: React.FC<Props> = ({
   const handleAddCategory = () => {
     const value = canonicalCategoryKey(newCategory);
     if (value && !categories.some((item) => canonicalCategoryKey(item).toLowerCase() === value.toLowerCase())) {
-      onUpdateSettings({ ...settings, customCategories: [...categories, value] });
+      onUpdateSettings({ customCategories: [...categories, value] });
       setNewCategory('');
     }
   };
@@ -44,7 +44,7 @@ const GeneralTab: React.FC<Props> = ({
   const handleAddPayment = () => {
     const value = canonicalPaymentMethodKey(newPayment);
     if (value && !payments.some((item) => canonicalPaymentMethodKey(item).toLowerCase() === value.toLowerCase())) {
-      onUpdateSettings({ ...settings, customPaymentMethods: [...payments, value] });
+      onUpdateSettings({ customPaymentMethods: [...payments, value] });
       setNewPayment('');
     }
   };
@@ -55,7 +55,7 @@ const GeneralTab: React.FC<Props> = ({
   useEffect(() => setWallpaperDraft(settings.wallpaper), [settings.wallpaper]);
 
   const saveWallpaper = async (wallpaper: AppSettings['wallpaper']) => {
-    const saved = await onUpdateSettings({ ...settings, wallpaper });
+    const saved = await onUpdateSettings({ wallpaper });
     if (saved !== false) setWallpaperDraft(wallpaper);
     return saved !== false;
   };
@@ -125,7 +125,7 @@ const GeneralTab: React.FC<Props> = ({
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('language')}</h3>
         <div className="flex space-x-4">
           <button
-            onClick={() => onUpdateSettings({ ...settings, language: 'zh' })}
+            onClick={() => onUpdateSettings({ language: 'zh' })}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
               settings.language === 'zh'
                 ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white'
@@ -136,7 +136,7 @@ const GeneralTab: React.FC<Props> = ({
             <span>简体中文</span>
           </button>
           <button
-            onClick={() => onUpdateSettings({ ...settings, language: 'en' })}
+            onClick={() => onUpdateSettings({ language: 'en' })}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
               settings.language === 'en'
                 ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white'
@@ -172,7 +172,7 @@ const GeneralTab: React.FC<Props> = ({
                 className="theme-choice"
                 data-active={selected}
                 aria-pressed={selected}
-                onClick={() => onUpdateSettings({ ...settings, colorTheme: id })}
+                onClick={() => onUpdateSettings({ colorTheme: id })}
               >
                 <span className="theme-choice-preview" data-theme-preview={id} aria-hidden="true">
                   <i />
@@ -326,7 +326,7 @@ const GeneralTab: React.FC<Props> = ({
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
                 if (dragCatIndex !== null && dragCatIndex !== idx) {
-                  onUpdateSettings({ ...settings, customCategories: reorder(categories, dragCatIndex, idx) });
+                  onUpdateSettings({ customCategories: reorder(categories, dragCatIndex, idx) });
                 }
                 setDragCatIndex(null);
               }}
@@ -342,7 +342,6 @@ const GeneralTab: React.FC<Props> = ({
                 disabled={categories.length <= 1}
                 onClick={() =>
                   onUpdateSettings({
-                    ...settings,
                     customCategories: categories.filter((c) => c !== cat),
                   })
                 }
@@ -381,7 +380,7 @@ const GeneralTab: React.FC<Props> = ({
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
                 if (dragPayIndex !== null && dragPayIndex !== idx) {
-                  onUpdateSettings({ ...settings, customPaymentMethods: reorder(payments, dragPayIndex, idx) });
+                  onUpdateSettings({ customPaymentMethods: reorder(payments, dragPayIndex, idx) });
                 }
                 setDragPayIndex(null);
               }}
@@ -397,7 +396,6 @@ const GeneralTab: React.FC<Props> = ({
                 disabled={payments.length <= 1}
                 onClick={() =>
                   onUpdateSettings({
-                    ...settings,
                     customPaymentMethods: payments.filter((p) => p !== pm),
                   })
                 }

@@ -1,3 +1,4 @@
+import { convertToUSD } from '../../shared/currency.js';
 import { addBillingCycleYMD } from '../../shared/billingDate.js';
 import { formatDateInTimeZone } from './dates.js';
 
@@ -27,14 +28,6 @@ export const previousMonthPeriod = (timeZone, now = new Date()) => {
 
 const inPeriod = (ymd, period) => Boolean(ymd && ymd >= period.start && ymd <= period.end);
 
-const toUsd = (amount, currency, rates) => {
-  const value = Number(amount);
-  if (!Number.isFinite(value) || value < 0) return 0;
-  if (!currency || currency === 'USD') return value;
-  const rate = Number(rates?.[currency]);
-  return Number.isFinite(rate) && rate > 0 ? value / rate : 0;
-};
-
 const billedAmountInPeriod = (subscription, period, rates) => {
   if (!subscription?.startDate) return 0;
   const cancellationEnd = subscription.cancelledAt || period.end;
@@ -43,7 +36,9 @@ const billedAmountInPeriod = (subscription, period, rates) => {
   let total = 0;
   for (let iteration = 0; iteration < 5000 && billingDate <= effectiveEnd; iteration += 1) {
     if (billingDate >= period.start) {
-      total += toUsd(subscription.price, subscription.currency, rates);
+      const converted = convertToUSD(subscription.price, subscription.currency, rates);
+      if (converted === null) return null;
+      total += converted;
     }
     const next = addBillingCycleYMD(billingDate, subscription.frequency, subscription.startDate);
     if (!next || next <= billingDate) break;
@@ -58,9 +53,12 @@ export const buildMonthlySummary = (subscriptions, settings, period) => {
   let cancelledSubscriptions = 0;
   let activeSubscriptions = 0;
   let totalPaidUsd = 0;
+  let unconvertedSubscriptions = 0;
 
   for (const subscription of list) {
-    totalPaidUsd += billedAmountInPeriod(subscription, period, settings?.exchangeRates);
+    const paid = billedAmountInPeriod(subscription, period, settings?.exchangeRates);
+    if (paid === null) unconvertedSubscriptions += 1;
+    else totalPaidUsd += paid;
     const activeAtPeriodEnd = subscription.cancelledAt
       ? subscription.cancelledAt > period.end
       : subscription.status !== 'cancelled';
@@ -79,6 +77,7 @@ export const buildMonthlySummary = (subscriptions, settings, period) => {
     .join('、');
 
   return {
+    unconvertedSubscriptions,
     periodKey: period.key,
     month: period.label,
     totalPaidUsd: Math.round(totalPaidUsd * 100) / 100,

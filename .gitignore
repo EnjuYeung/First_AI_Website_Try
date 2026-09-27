@@ -28,3 +28,4 @@ server/.env
 .env
 server/data/
 .playwright-cli/
+Jan/

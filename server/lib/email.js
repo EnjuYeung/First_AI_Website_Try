@@ -29,6 +29,6 @@ export const createEmail = ({ smtp }) => {
     });
   };
 
-  return { sendEmailMessage, hasSmtpConfig };
+  return { sendEmailMessage };
 };
 

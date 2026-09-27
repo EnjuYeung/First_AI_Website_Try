@@ -1,13 +1,14 @@
+import { applyEditableSettings } from '../shared/settingsOwnership.js';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Subscription, AppSettings, NotificationRecord, ServerClock } from '../types';
+import { Subscription, AppSettings, RemoteSettings, EditableSettingsPatch, ServerSettingsUpdate, NotificationRecord, ServerClock } from '../types';
 import {
   createSubscription,
   DataRevisions,
   fetchAllData,
-  getDefaultSettings,
+  getDefaultRemoteSettings,
   removeSubscription,
   removeSubscriptions,
-  replaceSettings,
+  updateSettingsFields,
   RevisionConflictError,
   updateSubscription,
 } from '../services/storageService';
@@ -29,23 +30,27 @@ export const useAppData = (
   language: AppSettings['language'] = 'zh'
 ) => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
+  const [settings, setSettings] = useState<RemoteSettings>(getDefaultRemoteSettings());
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [serverClock, setServerClock] = useState<ServerClock>(() => {
     const now = Date.now();
     return { serverTimeMs: now, receivedAtMs: now };
   });
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+  const conflictEpochRef = useRef({ subscriptions: 0, settings: 0, notifications: 0 });
   const [lastMutationError, setLastMutationError] = useState<unknown>(null);
   const onUnauthorizedRef = useRef<(() => void) | undefined>(onUnauthorized);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const revisionsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
   const mutationVersionsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
+  const pendingMutationsRef = useRef<DataRevisions>({ subscriptions: 0, settings: 0, notifications: 0 });
   const subscriptionsRef = useRef<Subscription[]>(subscriptions);
-  const settingsRef = useRef<AppSettings>(settings);
-  const notificationsRef = useRef<NotificationRecord[]>(notifications);
+  const settingsRef = useRef<RemoteSettings>(settings);
   const serverClockRef = useRef(serverClock);
   const isLoadingRef = useRef(false);
+  const refreshRequestedRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
 
   const applySubscriptions = useCallback((value: Subscription[]) => {
@@ -58,12 +63,11 @@ export const useAppData = (
     subscriptionsRef.current = rolled;
     setSubscriptions(rolled);
   }, []);
-  const applySettings = useCallback((value: AppSettings) => {
+  const applySettings = useCallback((value: RemoteSettings) => {
     settingsRef.current = value;
     setSettings(value);
   }, []);
   const applyNotifications = useCallback((value: NotificationRecord[]) => {
-    notificationsRef.current = value;
     setNotifications(value);
   }, []);
 
@@ -75,25 +79,44 @@ export const useAppData = (
 
   const fetchRemoteData = useCallback(async (): Promise<DataRefreshResult> => {
     if (!isAuthenticated) return { ok: false, error: new Error('not_authenticated') };
-    if (isLoadingRef.current) return { ok: false, error: new Error('refresh_in_progress') };
+    if (isLoadingRef.current) {
+      refreshRequestedRef.current = true;
+      return { ok: false, error: new Error('refresh_in_progress') };
+    }
     isLoadingRef.current = true;
     setIsDataLoading(true);
     try {
+      const versions = { ...mutationVersionsRef.current };
+      const pendingAtStart = { ...pendingMutationsRef.current };
+      const canApply = (feature: keyof DataRevisions) =>
+        versions[feature] === mutationVersionsRef.current[feature] &&
+        pendingAtStart[feature] === 0 && pendingMutationsRef.current[feature] === 0;
       const data = await fetchAllData();
       const receivedAtMs = Date.now();
       const nextClock = { serverTimeMs: data.serverTime, receivedAtMs };
-      applySettings(data.settings);
+      if (canApply('settings')) {
+        applySettings(data.settings);
+        revisionsRef.current.settings = data.revisions.settings;
+      }
       serverClockRef.current = nextClock;
       setServerClock(nextClock);
-      applySubscriptions(data.subscriptions);
-      applyNotifications(data.notifications || []);
-      revisionsRef.current = data.revisions;
+      if (canApply('subscriptions')) {
+        applySubscriptions(data.subscriptions);
+        revisionsRef.current.subscriptions = data.revisions.subscriptions;
+      }
+      if (canApply('notifications')) {
+        applyNotifications(data.notifications || []);
+        revisionsRef.current.notifications = data.revisions.notifications;
+      }
+      setHasLoadedData(true);
+      setLoadError(null);
       lastLoadedAtRef.current = Date.now();
       return { ok: true };
     } catch (err) {
       if (err instanceof UnauthorizedError && err.sessionExpired) {
         onUnauthorizedRef.current?.();
       }
+      setLoadError(err);
       console.error('Failed to load data', err);
       return { ok: false, error: err };
     } finally {
@@ -114,8 +137,15 @@ export const useAppData = (
   }, [loadRemoteData]);
 
   useEffect(() => {
+    if (isDataLoading || !refreshRequestedRef.current) return;
+    refreshRequestedRef.current = false;
+    void loadRemoteData();
+  }, [isDataLoading, loadRemoteData]);
+
+  useEffect(() => {
     if (!isAuthenticated) {
       lastLoadedAtRef.current = 0;
+      setHasLoadedData(false);
       return;
     }
 
@@ -128,9 +158,28 @@ export const useAppData = (
       void loadRemoteData();
     };
 
+    const currentDay = () => {
+      const clock = serverClockRef.current;
+      return getTodayYMD(settingsRef.current.timezone,
+        new Date(clock.serverTimeMs + Math.max(0, Date.now() - clock.receivedAtMs)));
+    };
+    let previousDay = currentDay();
+    const dayTimer = window.setInterval(() => {
+      const day = currentDay();
+      if (day === previousDay) return;
+      previousDay = day;
+      const clock = serverClockRef.current;
+      const now = Date.now();
+      const nextClock = { serverTimeMs: clock.serverTimeMs + Math.max(0, now - clock.receivedAtMs), receivedAtMs: now };
+      serverClockRef.current = nextClock;
+      setServerClock(nextClock);
+      applySubscriptions(subscriptionsRef.current);
+      void loadRemoteData();
+    }, 30_000);
     window.addEventListener('focus', refreshIfStale);
     document.addEventListener('visibilitychange', refreshIfStale);
     return () => {
+      window.clearInterval(dayTimer);
       window.removeEventListener('focus', refreshIfStale);
       document.removeEventListener('visibilitychange', refreshIfStale);
     };
@@ -141,6 +190,8 @@ export const useAppData = (
     operation: (revision: number) => Promise<{ data: T; revision: number }>,
     apply: (data: T) => void
   ) => {
+    pendingMutationsRef.current[feature] += 1;
+    const conflictEpoch = conflictEpochRef.current[feature];
     const mutationVersion = mutationVersionsRef.current[feature] + 1;
     mutationVersionsRef.current = {
       ...mutationVersionsRef.current,
@@ -149,32 +200,17 @@ export const useAppData = (
 
     const save = async (): Promise<boolean> => {
       try {
-        let result: { data: T; revision: number };
-        try {
-          result = await operation(revisionsRef.current[feature]);
-        } catch (err) {
-          if (!(err instanceof RevisionConflictError)) throw err;
-
-          // Settings can also be changed by server-side tasks such as exchange
-          // rate refreshes. Refresh the revisions and retry the user's pending
-          // mutation once instead of discarding the optimistic local value.
-          if (err.currentRevision !== undefined) {
-            revisionsRef.current = {
-              ...revisionsRef.current,
-              [feature]: err.currentRevision,
-            };
-          } else {
-            const latest = await fetchAllData();
-            revisionsRef.current = latest.revisions;
-          }
-          result = await operation(revisionsRef.current[feature]);
+        if (conflictEpochRef.current[feature] !== conflictEpoch) {
+          throw new RevisionConflictError('revision_conflict', revisionsRef.current[feature]);
         }
+        const result = await operation(revisionsRef.current[feature]);
         revisionsRef.current = { ...revisionsRef.current, [feature]: result.revision };
         if (mutationVersionsRef.current[feature] === mutationVersion) {
           apply(result.data);
         }
         return true;
       } catch (err) {
+        if (err instanceof RevisionConflictError) conflictEpochRef.current[feature] += 1;
         setLastMutationError(err);
         if (err instanceof UnauthorizedError && err.sessionExpired) {
           onUnauthorizedRef.current?.();
@@ -184,7 +220,7 @@ export const useAppData = (
           // overwrite optimistic changes queued for another feature.
           try {
             const latest = await fetchAllData();
-            revisionsRef.current = latest.revisions;
+            revisionsRef.current[feature] = latest.revisions[feature];
             if (mutationVersionsRef.current[feature] === mutationVersion) {
               if (feature === 'subscriptions') apply(latest.subscriptions as T);
               else if (feature === 'settings') apply(latest.settings as T);
@@ -195,6 +231,8 @@ export const useAppData = (
           }
         }
         return false;
+      } finally {
+        pendingMutationsRef.current[feature] -= 1;
       }
     };
     const result = saveQueueRef.current.then(save, save);
@@ -202,13 +240,22 @@ export const useAppData = (
     return result;
   };
 
-  const applyRemoteSettings = (patch: Partial<AppSettings>) => {
-    applySettings({ ...settingsRef.current, ...patch });
+  const applyRemoteSettings = ({ state, revision }: ServerSettingsUpdate) => {
+    // An older dedicated response must not move the shared revision backwards.
+    if (revision !== undefined && revision < revisionsRef.current.settings) return;
+    mutationVersionsRef.current.settings += 1;
+    if (state) applySettings({ ...settingsRef.current, ...state });
+    // A state-only response cannot authorize queued editable snapshots at a newer
+    // revision. Reconcile after the queue instead of upgrading those writes.
+    if (revision !== undefined && pendingMutationsRef.current.settings === 0) {
+      revisionsRef.current.settings = revision;
+    }
+    void loadRemoteData();
   };
 
-  const updateSettings = (newSettings: AppSettings) => {
-    applySettings(newSettings);
-    return persistFeature('settings', (revision) => replaceSettings(newSettings, revision), applySettings);
+  const updateSettings = (patch: EditableSettingsPatch) => {
+    applySettings(applyEditableSettings(settingsRef.current, patch));
+    return persistFeature('settings', (revision) => updateSettingsFields(patch, revision), applySettings);
   };
 
   const saveSubscription = (sub: Subscription, isEditing: boolean) => {
@@ -268,6 +315,8 @@ export const useAppData = (
     notifications,
     serverClock,
     isDataLoading,
+    loadError,
+    hasLoadedData,
     lastMutationError,
     clearMutationError: () => setLastMutationError(null),
     loadRemoteData,

@@ -2,40 +2,16 @@ import fs from 'fs/promises';
 import path from 'path';
 import { createIconUpload } from '../iconUpload.js';
 import {
-  validateSettings,
   validateSubscriptions,
 } from '../../../shared/dataSchema.js';
 import { formatDateInTimeZone } from '../dates.js';
-import { normalizeRuleChannels } from '../../../shared/constants.js';
+import { applySettingsUpdate, clientSettings } from '../settingsPolicy.js';
 
 const uploadedIconFilename = (url) =>
   /^\/api\/uploads\/([a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
 
 const uploadedWallpaperFilename = (url) =>
   /^\/api\/uploads\/(wallpaper-[a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
-
-const removeLegacySettingsFields = (settings) => {
-  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
-  const notifications = settings.notifications;
-  if (!notifications || typeof notifications !== 'object' || Array.isArray(notifications)) {
-    return settings;
-  }
-  const { scheduledTask: _scheduledTask, ...currentNotifications } = notifications;
-  return { ...settings, notifications: currentNotifications };
-};
-
-const clientSettings = (settings, timeZone) => {
-  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
-  const security = settings.security || {};
-  return {
-    ...settings,
-    ...(timeZone ? { timezone: timeZone } : {}),
-    security: {
-      twoFactorEnabled: Boolean(security.twoFactorEnabled),
-      lastPasswordChange: security.lastPasswordChange,
-    },
-  };
-};
 
 const clientUserData = (data, timeZone) => ({
   ...data,
@@ -189,55 +165,12 @@ export const registerDataRoutes = ({
   });
 
   app.put('/api/settings', auth.authMiddleware, async (req, res) => {
-    const settings = removeLegacySettingsFields(req.body);
+    const settings = req.body;
     let replacedWallpaper = '';
     return updateFeature(req, res, 'settings', (currentSettings) => {
-      const {
-        language: _language,
-        theme: _theme,
-        colorTheme: _colorTheme,
-        timezone: _timezone,
-        security: _security,
-        ...serverSettings
-      } = settings || {};
-      const nextWallpaper = serverSettings.wallpaper || currentSettings.wallpaper;
-      if (currentSettings.wallpaper?.url !== nextWallpaper?.url) {
+      const nextSettings = applySettingsUpdate(currentSettings, settings, timeZone);
+      if (currentSettings.wallpaper?.url !== nextSettings.wallpaper?.url) {
         replacedWallpaper = uploadedWallpaperFilename(currentSettings.wallpaper?.url);
-      }
-      const nextSettings = {
-        ...currentSettings,
-        ...serverSettings,
-        // Language and theme are client-only preferences. Preserve legacy
-        // values only to keep the persisted settings schema compatible.
-        language: currentSettings.language,
-        theme: currentSettings.theme,
-        colorTheme: currentSettings.colorTheme,
-        // Timezone is deployment-wide and controlled exclusively by TIMEZONE.
-        timezone: timeZone,
-        // Exchange-rate credentials, rates, and scheduler state are server-managed.
-        // Replace them before validation so stale legacy metadata from a client
-        // cannot block an unrelated preference update.
-        exchangeRateApi: currentSettings.exchangeRateApi,
-        exchangeRates: currentSettings.exchangeRates,
-        lastRatesUpdate: currentSettings.lastRatesUpdate,
-        // 2FA secrets and status can only be changed by the dedicated,
-        // reauthenticated /api/2fa routes.
-        security: currentSettings.security,
-      };
-      if (nextSettings.notifications?.rules) {
-        nextSettings.notifications = {
-          ...nextSettings.notifications,
-          rules: {
-            ...nextSettings.notifications.rules,
-            channels: normalizeRuleChannels(nextSettings.notifications.rules.channels),
-          },
-        };
-      }
-      const error = validateSettings(nextSettings);
-      if (error) {
-        const validationError = new Error(error);
-        validationError.statusCode = 400;
-        throw validationError;
       }
       return nextSettings;
     }, async (savedSettings) => {
@@ -294,9 +227,17 @@ export const registerDataRoutes = ({
     if (!/^[a-f0-9-]+\.(png|jpg|webp)$/i.test(filename) || path.basename(filename) !== filename) {
       return res.status(400).json({ ok: false, message: 'invalid_icon_filename' });
     }
-    await fs.unlink(path.join(uploadsDir, filename)).catch((err) => {
-      if (err?.code !== 'ENOENT') throw err;
+    let inUse = false;
+    await storage.updateUserData(req.user.username, async (data) => {
+      inUse = data.subscriptions.some(sub => uploadedIconFilename(sub.iconUrl) === filename);
+      if (!inUse) {
+        await fs.unlink(path.join(uploadsDir, filename)).catch((err) => {
+          if (err?.code !== 'ENOENT') throw err;
+        });
+      }
+      return data;
     });
+    if (inUse) return res.status(409).json({ ok: false, message: 'icon_in_use' });
     res.json({ ok: true });
   });
 };

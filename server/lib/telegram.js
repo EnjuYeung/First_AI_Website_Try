@@ -8,7 +8,7 @@ const redact = (value, botToken) => {
   return safe;
 };
 
-const telegramRequest = async (
+export const telegramRequest = async (
   botToken,
   method,
   payload,
@@ -16,39 +16,43 @@ const telegramRequest = async (
 ) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let resp;
   try {
-    resp = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-  } catch {
-    if (controller.signal.aborted) throw new Error('telegram_timeout');
-    throw new Error(`${errorPrefix}_request_failed`);
+    let resp;
+    let json;
+    try {
+      resp = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      json = await resp.json();
+    } catch {
+      if (controller.signal.aborted) throw new Error('telegram_timeout');
+      throw new Error(`${errorPrefix}_request_failed`);
+    }
+    if (!resp.ok || json?.ok === false) {
+      const description = redact(json?.description, botToken);
+      throw new Error(description || `${errorPrefix}_${resp.status}`);
+    }
+    return json;
   } finally {
     clearTimeout(timeout);
   }
-
-  const json = await resp.json().catch(() => ({}));
-  if (!resp.ok || json?.ok === false) {
-    const description = redact(json?.description, botToken);
-    throw new Error(description || `${errorPrefix}_${resp.status}`);
-  }
-  return json;
 };
 
 export const sendTelegramMessage = async (
   { debug, timeoutMs } = {},
   botToken,
   chatId,
-  text
+  text,
+  replyMarkup
 ) => {
   const payload = {
     chat_id: chatId,
     text,
     disable_web_page_preview: true,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
   };
 
   try {
@@ -75,3 +79,17 @@ export const sendTelegramMessage = async (
     throw new Error(redact(err?.message, botToken) || 'telegram_error');
   }
 };
+
+export const buildRenewalKeyboard = (notificationId, billingDate) => ({
+  inline_keyboard: [[
+    { text: '✅ 已续订', callback_data: `renewed|${notificationId}|${billingDate}` },
+    { text: '🛑 已弃用', callback_data: `deprecated|${notificationId}|${billingDate}` },
+  ]],
+});
+
+export const buildTestRenewalKeyboard = () => ({
+  inline_keyboard: [[
+    { text: '✅ 测试续订', callback_data: 'test_renewal|renewed' },
+    { text: '🛑 测试弃用', callback_data: 'test_renewal|deprecated' },
+  ]],
+});

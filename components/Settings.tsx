@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, BellRing, CheckCircle, Coins, KeyRound, ShieldCheck, SlidersHorizontal } from 'lucide-react';
-import { AppSettings } from '../types';
+import { AppSettings, SettingsUpdate, ServerSettingsUpdate } from '../types';
 import { getT } from '../services/i18n';
 import { useExchangeRateSettings } from '../hooks/useExchangeRateSettings';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
@@ -14,8 +14,8 @@ import SecurityTab from './settings/tabs/SecurityTab';
 
 interface Props {
   settings: AppSettings;
-  onUpdateSettings: (settings: AppSettings) => boolean | Promise<boolean>;
-  onApplyRemoteSettings: (patch: Partial<AppSettings>) => void;
+  onUpdateSettings: (patch: SettingsUpdate) => boolean | Promise<boolean>;
+  onApplyRemoteSettings: (update: ServerSettingsUpdate) => void;
 }
 
 type SettingsTab = 'general' | 'api' | 'currency' | 'notifications' | 'security';
@@ -36,7 +36,7 @@ const Settings: React.FC<Props> = ({ settings, onUpdateSettings, onApplyRemoteSe
   const setAlert = (alert: SettingsAlert) => setAlertState(alert);
   const exchange = useExchangeRateSettings(onApplyRemoteSettings, t, setAlert);
   const notification = useNotificationSettings(settings, onUpdateSettings, t, setAlert);
-  const security = useSecuritySettings(settings, t, setAlert, setToastMessage);
+  const security = useSecuritySettings(settings, t, setAlert, setToastMessage, onApplyRemoteSettings);
 
   const tabs = [
     { id: 'general' as const, icon: SlidersHorizontal },

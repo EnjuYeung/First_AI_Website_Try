@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BellRing, CalendarClock, Code2, Loader2, Mail, Save, Send } from 'lucide-react';
-import { AppSettings, NotificationChannel } from '../../../types';
+import { AppSettings, SettingsUpdate, NotificationChannel } from '../../../types';
 
 type Props = {
   t: (key: any) => string;
   settings: AppSettings;
-  onUpdateSettings: (settings: AppSettings) => boolean | Promise<boolean>;
+  onUpdateSettings: (patch: SettingsUpdate) => boolean | Promise<boolean>;
   templateText: string;
   setTemplateText: React.Dispatch<React.SetStateAction<string>>;
   monthlySummaryTemplateText: string;
@@ -122,21 +122,44 @@ const NotificationsTab: React.FC<Props> = ({
   toggleReminderChannel,
   toggleMonthlySummaryChannel,
 }) => {
-  const telegram = settings.notifications.telegram;
-  const email = settings.notifications.email;
+  const [telegram, updateTelegram] = useState(settings.notifications.telegram);
+  const [email, updateEmail] = useState(settings.notifications.email);
+  const dirty = useRef({ telegram: false, email: false });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const rules = settings.notifications.rules;
-
-  const setTelegram = (patch: Partial<typeof telegram>) => onUpdateSettings({
-    ...settings,
-    notifications: { ...settings.notifications, telegram: { ...telegram, ...patch } },
-  });
-  const setEmail = (patch: Partial<typeof email>) => onUpdateSettings({
-    ...settings,
-    notifications: { ...settings.notifications, email: { ...email, ...patch } },
-  });
+  useEffect(() => {
+    if (!dirty.current.telegram) updateTelegram(settings.notifications.telegram);
+    if (!dirty.current.email) updateEmail(settings.notifications.email);
+  }, [settings.notifications.telegram, settings.notifications.email]);
+  const setTelegram = (patch: Partial<typeof telegram>) => {
+    dirty.current.telegram = true;
+    updateTelegram(value => ({ ...value, ...patch }));
+  };
+  const setEmail = (patch: Partial<typeof email>) => {
+    dirty.current.email = true;
+    updateEmail(value => ({ ...value, ...patch }));
+  };
+  const saveChannels = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      const saved = await onUpdateSettings({
+        notifications: { telegram, email },
+      });
+      if (!saved) throw new Error('save_failed');
+      dirty.current = { telegram: false, email: false };
+      return true;
+    } catch {
+      setSaveError(t('save_failed_detail'));
+      return false;
+    } finally { setSaving(false); }
+  };
+  const testConnection = async () => {
+    if (await saveChannels()) handleTestTelegram();
+  };
   const setRules = (patch: Partial<typeof rules>) => onUpdateSettings({
-    ...settings,
-    notifications: { ...settings.notifications, rules: { ...rules, ...patch } },
+    notifications: { rules: patch },
   });
 
   return (
@@ -146,7 +169,7 @@ const NotificationsTab: React.FC<Props> = ({
           <h3 className="text-lg font-bold text-[var(--ink)]">{t('channels')}</h3>
           <p className="mt-1 text-sm text-[var(--muted)]">{t('channels_shared_hint')}</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
           <div className="notification-connection-card">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5"><Send size={18} /><strong>{t('telegram_bot')}</strong></div>
@@ -157,7 +180,7 @@ const NotificationsTab: React.FC<Props> = ({
                 <input type="password" autoComplete="new-password" placeholder="Bot Token" value={telegram.botToken} onChange={(event) => setTelegram({ botToken: event.target.value })} />
                 <div className="flex gap-2">
                   <input className="min-w-0 flex-1" type="password" autoComplete="new-password" placeholder="Chat ID" value={telegram.chatId} onChange={(event) => setTelegram({ chatId: event.target.value })} />
-                  <button type="button" onClick={handleTestTelegram} disabled={isTestingTelegram || !telegram.botToken || !telegram.chatId} className="secondary-action rounded-xl px-3 disabled:opacity-50" aria-label={t('test_connection')}>
+                  <button type="button" onClick={testConnection} disabled={saving || isTestingTelegram || !telegram.botToken || !telegram.chatId} className="secondary-action rounded-xl px-3 disabled:opacity-50" aria-label={t('test_connection')}>
                     {isTestingTelegram ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   </button>
                 </div>
@@ -174,7 +197,11 @@ const NotificationsTab: React.FC<Props> = ({
               <input className="mt-4" type="email" placeholder={t('email_address')} value={email.emailAddress} onChange={(event) => setEmail({ emailAddress: event.target.value })} />
             )}
           </div>
-        </div>
+        </fieldset>
+        <button type="button" disabled={saving} onClick={saveChannels} className="secondary-action mt-4 rounded-xl px-4 py-2">
+          {t('save')} · {t('channels')}
+        </button>
+        {saveError && <p role="alert">{saveError}</p>}
       </section>
 
       <section>
