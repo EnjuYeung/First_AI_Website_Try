@@ -264,15 +264,16 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="subscription-form space-y-5 p-5 sm:p-7">
+        <form onSubmit={handleSubmit} className="subscription-form p-5 sm:p-7">
           {/* 服务名称 */}
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/40 shadow-sm">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">{t('service_name')}</label>
+            <label htmlFor="subscription-name" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">{t('service_name')}</label>
             <input
               required
               type="text"
               placeholder={t('service_placeholder')}
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-base"
+              id="subscription-name"
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
@@ -299,7 +300,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
               </div>
 
               <div className="flex-1 space-y-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="subscription-icon" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t('icon_url')}
                 </label>
                 <input
@@ -307,6 +308,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                   inputMode="url"
                   placeholder={t('icon_url_placeholder')}
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  id="subscription-icon"
                   value={String(formData.iconUrl || '')}
                   onChange={(e) => {
                     setIconLoadError(false);
@@ -320,11 +322,12 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                 )}
 
                 <div className="flex items-center gap-3 pt-1">
-                  <label className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100/70 dark:bg-slate-700/60 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors cursor-pointer">
+                  <label className="file-upload-control inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100/70 dark:bg-slate-700/60 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors cursor-pointer">
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
+                      className="sr-only"
+                      aria-label={t('upload_from_device')}
                       disabled={isIconUploading}
                       onChange={(e) => handleIconFile(e.target.files?.[0] || null)}
                     />
@@ -358,24 +361,26 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </div>
 
           {/* 价格/币种/周期/分类 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
+          <div className="form-wide p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('price')}</label>
+                <label htmlFor="subscription-price" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('price')}</label>
                 <input
                   required
                   type="number"
                   step="0.01"
                   min="0"
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  id="subscription-price"
                   value={formData.price}
                   onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('currency')}</label>
+                <label htmlFor="subscription-currency" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('currency')}</label>
                 <select
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  id="subscription-currency"
                   value={formData.currency}
                   onChange={e => setFormData({...formData, currency: e.target.value})}
                 >
@@ -385,9 +390,10 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('frequency')}</label>
+                <label htmlFor="subscription-frequency" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('frequency')}</label>
                 <select
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  id="subscription-frequency"
                   value={formData.frequency}
                   onChange={e => {
                     scheduleTouched.current = true;
@@ -400,12 +406,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <label htmlFor="subscription-category" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                   <CategoryGlyph category={String(formData.category || '')} containerSize={18} size={12} />
                   <span>{t('categories')}</span>
                 </label>
                 <select
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  id="subscription-category"
                   value={formData.category}
                   onChange={e => setFormData({...formData, category: e.target.value})}
                 >
@@ -421,12 +428,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 	              <div className="flex flex-col gap-1">
-	                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+	                <label htmlFor="subscription-payment" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
 	                  <PaymentGlyph method={String(formData.paymentMethod || 'Credit Card')} containerSize={18} size={12} />
 	                  <span>{lang === 'zh' ? '支付方式' : t('payment_methods')}</span>
 	                </label>
 	                <select
 	                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+	                    id="subscription-payment"
 	                    value={formData.paymentMethod}
 	                    onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
 	                >
@@ -436,13 +444,14 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 	                </select>
 	              </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('status')}</label>
+                <label htmlFor="subscription-status" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('status')}</label>
                 <select
                   className={`w-full px-4 py-2.5 border rounded-lg font-semibold text-center focus:ring-2 focus:ring-primary-500 outline-none transition-colors ${
                     formData.status === 'active' 
                     ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' 
                     : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900'
                   }`}
+                  id="subscription-status"
                   value={formData.status}
                   onChange={e => handleStatusChange(e.target.value as 'active' | 'cancelled')}
                 >
@@ -457,10 +466,11 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('start_date')}</label>
+                <label htmlFor="subscription-start-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('start_date')}</label>
                 <input
                   type="date"
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                  id="subscription-start-date"
                   value={formData.startDate}
                   onChange={e => {
                     scheduleTouched.current = true;
@@ -469,7 +479,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                 />
               </div>
               <div className="flex flex-col gap-1">
-                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                 <label htmlFor="subscription-next-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                    {t('next_billing_date')}
                    <RefreshCw size={12} className="text-gray-400" />
                  </label>
@@ -477,6 +487,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                   type="date"
                   readOnly
                   className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-600 rounded-lg text-gray-600 dark:text-gray-200 cursor-not-allowed outline-none font-mono text-sm tracking-wide"
+                  id="subscription-next-date"
                   value={formData.nextBillingDate}
                  />
               </div>
@@ -484,12 +495,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
           </div>
 
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('service_url')}</label>
+            <label htmlFor="subscription-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('service_url')}</label>
             <input
               type="url"
               inputMode="url"
               placeholder={t('service_url_placeholder')}
               className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              id="subscription-url"
               value={String(formData.url || '')}
               onChange={(e) => setFormData({ ...formData, url: e.target.value })}
             />
@@ -498,16 +510,17 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
           {/* Notes */}
           <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('notes')}</label>
+            <label htmlFor="subscription-notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('notes')}</label>
             <textarea
               className="w-full min-h-[100px] px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              id="subscription-notes"
               value={formData.notes}
               onChange={e => setFormData({...formData, notes: e.target.value})}
             />
           </div>
 
           {/* Notification Toggle */}
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-slate-700 dark:to-slate-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="form-wide flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
               <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                   <Bell size={18} />
                   <div>
@@ -518,6 +531,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
               <label className="relative inline-flex items-center cursor-pointer">
                 <input 
                     type="checkbox" 
+                    aria-label={t('enable_notifications')}
                     checked={formData.notificationsEnabled} 
                     onChange={e => setFormData({...formData, notificationsEnabled: e.target.checked})} 
                     className="sr-only peer" 

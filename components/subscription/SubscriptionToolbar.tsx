@@ -84,13 +84,14 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
     t
 }) => {
     return (
-        <div className="statement-card relative z-30 flex flex-col items-start justify-between gap-3 overflow-visible p-3 xl:flex-row xl:items-center">
+        <div className="subscription-toolbar statement-card relative z-30 flex flex-col items-start justify-between gap-3 overflow-visible p-3 xl:flex-row xl:items-center">
 
             {/* Search */}
             <div className="relative w-full xl:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} />
                 <input
                     type="text"
+                    aria-label={t('search_placeholder')}
                     placeholder={t('search_placeholder')}
                     className="w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm outline-none"
                     value={searchTerm}
@@ -116,7 +117,7 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
                 />
                 <FilterMultiSelect
                     label={t('payment')}
-                    options={paymentMethodsOptionList(paymentOptions)} // Wait, props mismatch? No, passing standard options
+                    options={paymentOptions}
                     selectedValues={selectedPayments}
                     onChange={onPaymentChange}
                     resetText={t('reset')}
@@ -164,6 +165,8 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
                         onClick={() => onViewModeChange('list')}
                         className={`rounded-md p-1.5 transition-all ${viewMode === 'list' ? 'bg-[var(--surface-raised)] text-[var(--rail-teal)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
                         title={t('view_list')}
+                        aria-label={t('view_list')}
+                        aria-pressed={viewMode === 'list'}
                     >
                         <List size={18} />
                     </button>
@@ -171,6 +174,8 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
                         onClick={() => onViewModeChange('grid')}
                         className={`rounded-md p-1.5 transition-all ${viewMode === 'grid' ? 'bg-[var(--surface-raised)] text-[var(--rail-teal)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
                         title={t('view_grid')}
+                        aria-label={t('view_grid')}
+                        aria-pressed={viewMode === 'grid'}
                     >
                         <LayoutGrid size={18} />
                     </button>
@@ -179,6 +184,3 @@ export const SubscriptionToolbar: React.FC<SubscriptionToolbarProps> = ({
         </div>
     );
 };
-
-// Helper to fix the TS error in the render above where I called function instead of passing prop
-const paymentMethodsOptionList = (opts: Option[]) => opts; 

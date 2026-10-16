@@ -163,8 +163,8 @@ const NotificationsTab: React.FC<Props> = ({
   });
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <section>
+    <div className="settings-bento-grid">
+      <section className="settings-card settings-card-wide">
         <div className="mb-4">
           <h3 className="text-lg font-bold text-[var(--ink)]">{t('channels')}</h3>
           <p className="mt-1 text-sm text-[var(--muted)]">{t('channels_shared_hint')}</p>
@@ -177,9 +177,11 @@ const NotificationsTab: React.FC<Props> = ({
             </div>
             {telegram.enabled && (
               <div className="mt-4 space-y-2.5">
-                <input type="password" autoComplete="new-password" placeholder="Bot Token" value={telegram.botToken} onChange={(event) => setTelegram({ botToken: event.target.value })} />
+                <label className="mb-1 block text-xs" htmlFor="telegram-bot-token">Bot Token</label>
+                <input id="telegram-bot-token" type="password" autoComplete="new-password" placeholder="Bot Token" value={telegram.botToken} onChange={(event) => setTelegram({ botToken: event.target.value })} />
+                <label className="mb-1 block text-xs" htmlFor="telegram-chat-id">Chat ID</label>
                 <div className="flex gap-2">
-                  <input className="min-w-0 flex-1" type="password" autoComplete="new-password" placeholder="Chat ID" value={telegram.chatId} onChange={(event) => setTelegram({ chatId: event.target.value })} />
+                  <input id="telegram-chat-id" className="min-w-0 flex-1" type="password" autoComplete="new-password" placeholder="Chat ID" value={telegram.chatId} onChange={(event) => setTelegram({ chatId: event.target.value })} />
                   <button type="button" onClick={testConnection} disabled={saving || isTestingTelegram || !telegram.botToken || !telegram.chatId} className="secondary-action rounded-xl px-3 disabled:opacity-50" aria-label={t('test_connection')}>
                     {isTestingTelegram ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   </button>
@@ -194,7 +196,7 @@ const NotificationsTab: React.FC<Props> = ({
               <Toggle checked={email.enabled} onChange={(enabled) => setEmail({ enabled })} label={t('email')} />
             </div>
             {email.enabled && (
-              <input className="mt-4" type="email" placeholder={t('email_address')} value={email.emailAddress} onChange={(event) => setEmail({ emailAddress: event.target.value })} />
+              <label className="mt-4 block text-xs">{t('email_address')}<input className="mt-2" type="email" placeholder={t('email_address')} value={email.emailAddress} onChange={(event) => setEmail({ emailAddress: event.target.value })} /></label>
             )}
           </div>
         </fieldset>
@@ -204,7 +206,7 @@ const NotificationsTab: React.FC<Props> = ({
         {saveError && <p role="alert">{saveError}</p>}
       </section>
 
-      <section>
+      <section className="settings-card settings-card-wide">
         <h3 className="mb-4 text-lg font-bold text-[var(--ink)]">{t('rules')}</h3>
         <div className="space-y-5">
           <article className="notification-rule-card" data-kind="renewal">
@@ -220,7 +222,7 @@ const NotificationsTab: React.FC<Props> = ({
               <div className="notification-rule-body">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
                   <span>{t('remind_me')}</span>
-                  <input className="w-16 rounded-lg border px-2 py-1 text-center" type="number" min="0" max="365" value={rules.reminderDays} onChange={(event) => setRules({ reminderDays: Number(event.target.value) })} />
+                  <input aria-label={`${t('remind_me')} · ${t('days_before')}`} className="w-16 rounded-lg border px-2 py-1 text-center" type="number" min="0" max="365" value={rules.reminderDays} onChange={(event) => setRules({ reminderDays: Number(event.target.value) })} />
                   <span>{t('days_before')}</span>
                 </div>
                 <ChannelPicker settings={settings} selected={rules.channels.renewalReminder} onToggle={toggleReminderChannel} t={t} />

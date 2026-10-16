@@ -58,7 +58,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
         </div>
 
         <div className="relative z-10 max-w-2xl py-12">
-          <div className="mb-4 font-mono text-xs uppercase tracking-[0.16em] text-[#84cbc4]">
+          <div className="login-story-kicker mb-4 font-mono text-xs uppercase tracking-[0.16em]">
             {lang === 'zh' ? '周期支出 · 清晰可见' : 'Recurring costs · clearly scheduled'}
           </div>
           <h1 className="font-display text-5xl font-semibold leading-[0.98] tracking-[-0.06em] xl:text-7xl">
@@ -94,7 +94,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, lang, toggleLanguage }) => {
           <span>{lang === 'en' ? 'English' : '中文'}</span>
         </button>
 
-        <div className="w-full max-w-[430px]">
+        <div className="login-form-panel w-full max-w-[430px]">
           <div className="mb-10 lg:hidden">
             <div className="flex items-center gap-2.5">
               <span className="brand-mark"><Repeat2 size={19} /></span>

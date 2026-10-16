@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Globe, Image, Link2, Palette, Plus, Trash2, Upload, X as XIcon } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Globe, Image, Link2, Monitor, Moon, Palette, Plus, Sun, Trash2, Upload, X as XIcon } from 'lucide-react';
 import { AppSettings, SettingsUpdate } from '../../../types';
 import { CategoryGlyph, PaymentGlyph } from '../../ui/glyphs';
 import { canonicalCategoryKey, canonicalPaymentMethodKey, displayCategoryLabel, displayPaymentMethodLabel } from '../../../services/displayLabels';
@@ -131,12 +131,13 @@ const GeneralTab: React.FC<Props> = ({
     : undefined;
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <section>
+    <div className="settings-bento-grid">
+      <section className="settings-card settings-language">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('language')}</h3>
         <div className="flex space-x-4">
           <button
             onClick={() => onUpdateSettings({ language: 'zh' })}
+            aria-pressed={settings.language === 'zh'}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
               settings.language === 'zh'
                 ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white'
@@ -148,6 +149,7 @@ const GeneralTab: React.FC<Props> = ({
           </button>
           <button
             onClick={() => onUpdateSettings({ language: 'en' })}
+            aria-pressed={settings.language === 'en'}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
               settings.language === 'en'
                 ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-white'
@@ -160,14 +162,26 @@ const GeneralTab: React.FC<Props> = ({
         </div>
       </section>
 
-      <section>
+      <section className="settings-card">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-bold text-[var(--ink)]">{t('color_theme')}</h3>
+            <h3 className="text-lg font-bold text-[var(--ink)]">{t('appearance')}</h3>
             <p className="mt-1 text-sm text-[var(--muted)]">{t('color_theme_hint')}</p>
           </div>
           <Palette className="mt-1 shrink-0 text-[var(--rail-teal)]" size={20} />
         </div>
+        <div className="appearance-modes" role="group" aria-label={t('appearance')}>
+          {([
+            { id: 'light', Icon: Sun, label: currentLanguage === 'zh' ? '浅色' : 'Light' },
+            { id: 'dark', Icon: Moon, label: currentLanguage === 'zh' ? '深色' : 'Dark' },
+            { id: 'system', Icon: Monitor, label: currentLanguage === 'zh' ? '跟随系统' : 'System' },
+          ] as const).map(({ id, Icon, label }) => (
+            <button key={id} type="button" aria-pressed={settings.theme === id} onClick={() => onUpdateSettings({ theme: id })}>
+              <Icon size={15} aria-hidden="true" />{label}
+            </button>
+          ))}
+        </div>
+        <h4 className="mb-3 text-sm font-semibold text-[var(--ink-soft)]">{t('color_theme')}</h4>
         <div className="theme-choice-grid" role="group" aria-label={t('color_theme')}>
           {([
             { id: 'default', swatches: ['#267a76', '#d7a33d', '#d65f50'] },
@@ -203,7 +217,7 @@ const GeneralTab: React.FC<Props> = ({
         </div>
       </section>
 
-      <section className="wallpaper-settings">
+      <section className="settings-card wallpaper-settings">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-bold text-[var(--ink)]">{t('wallpaper')}</h3>
@@ -238,6 +252,7 @@ const GeneralTab: React.FC<Props> = ({
             <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={16} />
             <input
               type="url"
+              aria-label={t('wallpaper') + ' URL'}
               value={wallpaperDraft.url}
               onChange={(event) => setWallpaperDraft({ ...wallpaperDraft, url: event.target.value })}
               onKeyDown={(event) => { if (event.key === 'Enter') void applyWallpaperUrl(); }}
@@ -314,11 +329,12 @@ const GeneralTab: React.FC<Props> = ({
         )}
       </section>
 
-      <section>
+      <section className="settings-card">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('categories')}</h3>
         <div className="flex gap-2 mb-3">
           <input
             type="text"
+            aria-label={t('add_category')}
             placeholder={t('add_category')}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
             value={newCategory}
@@ -326,7 +342,8 @@ const GeneralTab: React.FC<Props> = ({
           />
           <button
             onClick={handleAddCategory}
-            className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            aria-label={t('add_category')}
+            className="primary-action rounded-lg p-2"
           >
             <Plus size={20} />
           </button>
@@ -335,6 +352,8 @@ const GeneralTab: React.FC<Props> = ({
           {categories.map((cat, idx) => (
             <span
               key={cat}
+              role="group"
+              aria-label={displayCategoryLabel(cat, currentLanguage)}
               draggable
               onDragStart={() => setDragCatIndex(idx)}
               onDragOver={(e) => e.preventDefault()}
@@ -345,21 +364,24 @@ const GeneralTab: React.FC<Props> = ({
                 setDragCatIndex(null);
               }}
               onDragEnd={() => setDragCatIndex(null)}
-              className={`px-3 py-1 bg-gray-100/70 dark:bg-slate-700/60 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
+              className={`preference-item text-sm flex items-center gap-2 cursor-move select-none ${
                 dragCatIndex === idx ? 'ring-2 ring-primary-400' : ''
               }`}
               title={t('drag_to_reorder')}
             >
               <CategoryGlyph category={cat} containerSize={18} size={12} />
-              {displayCategoryLabel(cat, currentLanguage)}
+              <span className="min-w-0 flex-1">{displayCategoryLabel(cat, currentLanguage)}</span>
+              <button type="button" className="preference-control" disabled={idx === 0} aria-label={`${currentLanguage === 'zh' ? '上移' : 'Move up'} ${displayCategoryLabel(cat, currentLanguage)}`} onClick={() => onUpdateSettings({ customCategories: reorder(categories, idx, idx - 1) })}><ChevronUp size={14} aria-hidden="true" /></button>
+              <button type="button" className="preference-control" disabled={idx === categories.length - 1} aria-label={`${currentLanguage === 'zh' ? '下移' : 'Move down'} ${displayCategoryLabel(cat, currentLanguage)}`} onClick={() => onUpdateSettings({ customCategories: reorder(categories, idx, idx + 1) })}><ChevronDown size={14} aria-hidden="true" /></button>
               <button
+                aria-label={`${t('remove')} ${displayCategoryLabel(cat, currentLanguage)}`}
                 disabled={categories.length <= 1}
                 onClick={() =>
                   onUpdateSettings({
                     customCategories: categories.filter((c) => c !== cat),
                   })
                 }
-                className="text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-gray-400"
+                className="preference-control preference-remove"
               >
                 <XIcon size={12} />
               </button>
@@ -368,11 +390,12 @@ const GeneralTab: React.FC<Props> = ({
         </div>
       </section>
 
-      <section>
+      <section className="settings-card">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('payment_methods')}</h3>
         <div className="flex gap-2 mb-3">
           <input
             type="text"
+            aria-label={t('add_payment_method')}
             placeholder={t('add_payment_method')}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
             value={newPayment}
@@ -380,7 +403,8 @@ const GeneralTab: React.FC<Props> = ({
           />
           <button
             onClick={handleAddPayment}
-            className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            aria-label={t('add_payment_method')}
+            className="primary-action rounded-lg p-2"
           >
             <Plus size={20} />
           </button>
@@ -389,6 +413,8 @@ const GeneralTab: React.FC<Props> = ({
           {payments.map((pm, idx) => (
             <span
               key={pm}
+              role="group"
+              aria-label={displayPaymentMethodLabel(pm, currentLanguage)}
               draggable
               onDragStart={() => setDragPayIndex(idx)}
               onDragOver={(e) => e.preventDefault()}
@@ -399,21 +425,24 @@ const GeneralTab: React.FC<Props> = ({
                 setDragPayIndex(null);
               }}
               onDragEnd={() => setDragPayIndex(null)}
-              className={`px-3 py-1 bg-gray-100/70 dark:bg-slate-700/60 dark:text-gray-200 rounded-full text-sm flex items-center gap-2 cursor-move select-none ${
+              className={`preference-item text-sm flex items-center gap-2 cursor-move select-none ${
                 dragPayIndex === idx ? 'ring-2 ring-primary-400' : ''
               }`}
               title={t('drag_to_reorder')}
             >
               <PaymentGlyph method={pm} containerSize={18} size={12} />
-              {displayPaymentMethodLabel(pm, currentLanguage)}
+              <span className="min-w-0 flex-1">{displayPaymentMethodLabel(pm, currentLanguage)}</span>
+              <button type="button" className="preference-control" disabled={idx === 0} aria-label={`${currentLanguage === 'zh' ? '上移' : 'Move up'} ${displayPaymentMethodLabel(pm, currentLanguage)}`} onClick={() => onUpdateSettings({ customPaymentMethods: reorder(payments, idx, idx - 1) })}><ChevronUp size={14} aria-hidden="true" /></button>
+              <button type="button" className="preference-control" disabled={idx === payments.length - 1} aria-label={`${currentLanguage === 'zh' ? '下移' : 'Move down'} ${displayPaymentMethodLabel(pm, currentLanguage)}`} onClick={() => onUpdateSettings({ customPaymentMethods: reorder(payments, idx, idx + 1) })}><ChevronDown size={14} aria-hidden="true" /></button>
               <button
+                aria-label={`${t('remove')} ${displayPaymentMethodLabel(pm, currentLanguage)}`}
                 disabled={payments.length <= 1}
                 onClick={() =>
                   onUpdateSettings({
                     customPaymentMethods: payments.filter((p) => p !== pm),
                   })
                 }
-                className="text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-gray-400"
+                className="preference-control preference-remove"
               >
                 <XIcon size={12} />
               </button>

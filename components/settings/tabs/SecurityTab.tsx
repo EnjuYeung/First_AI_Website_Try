@@ -39,13 +39,15 @@ const SecurityTab: React.FC<Props> = ({
   verifyTwoFactor,
 }) => {
   return (
-    <div className="space-y-8 max-w-2xl">
-      <section>
+    <div className="settings-bento-grid settings-security">
+      <section className="settings-card">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('change_password')}</h3>
         <div className="space-y-4">
           <input
             type="password"
             placeholder={t('current_password')}
+            aria-label={t('current_password')}
+            autoComplete="current-password"
             className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white"
             value={passwords.current}
             onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
@@ -53,6 +55,8 @@ const SecurityTab: React.FC<Props> = ({
           <input
             type="password"
             placeholder={t('new_password')}
+            aria-label={t('new_password')}
+            autoComplete="new-password"
             className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white"
             value={passwords.new}
             onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
@@ -60,25 +64,28 @@ const SecurityTab: React.FC<Props> = ({
           <input
             type="password"
             placeholder={t('confirm_new_password')}
+            aria-label={t('confirm_new_password')}
+            autoComplete="new-password"
             className="w-full px-4 py-2 border rounded-lg dark:bg-slate-700 dark:border-gray-600 dark:text-white"
             value={passwords.confirm}
             onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
           />
           <button
             onClick={handleUpdatePassword}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            className="primary-action px-6 py-2 rounded-lg"
           >
             {t('update_password')}
           </button>
         </div>
       </section>
 
-      <section>
+      <section className="settings-card">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('two_factor')}</h3>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
+              aria-label={t('two_factor')}
               checked={isTwoFactorActive || isTwoFactorPending || showQr}
               onChange={(e) => handleToggleTwoFactor(e.target.checked)}
               className="sr-only peer"
@@ -95,6 +102,8 @@ const SecurityTab: React.FC<Props> = ({
             type="text"
             inputMode="numeric"
             placeholder={t('two_factor_disable_hint')}
+            aria-label={t('two_factor_disable_hint')}
+            autoComplete="one-time-code"
             className="w-full mb-3 px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white"
             value={twoFaCode}
             onChange={(e) => setTwoFaCode(e.target.value)}
@@ -116,6 +125,9 @@ const SecurityTab: React.FC<Props> = ({
               <input
                 type="text"
                 placeholder={t('two_factor_code')}
+                aria-label={t('two_factor_code')}
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 className="flex-1 px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-gray-600 dark:text-white"
                 value={twoFaCode}
                 onChange={(e) => setTwoFaCode(e.target.value)}
@@ -123,7 +135,7 @@ const SecurityTab: React.FC<Props> = ({
               <button
                 onClick={verifyTwoFactor}
                 disabled={is2faVerifying}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-60"
+                className="primary-action px-4 py-2 rounded-lg disabled:opacity-60"
               >
                 {is2faVerifying ? t('verifying') : t('verify')}
               </button>

@@ -72,7 +72,7 @@ export const FilterMultiSelect: React.FC<FilterMultiSelectProps> = ({
                                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[var(--ink-soft)] hover:bg-[var(--surface-soft)]"
                             >
                                 {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
-                                <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${selectedValues.includes(opt.value) ? 'border-[var(--rail-teal)] bg-[var(--rail-teal)] text-white' : 'border-[var(--line-strong)]'}`}>
+                                <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${selectedValues.includes(opt.value) ? 'border-[var(--rail-teal)] bg-[var(--rail-teal)] text-[var(--on-accent)]' : 'border-[var(--line-strong)]'}`}>
                                     {selectedValues.includes(opt.value) && <Check size={10} strokeWidth={3} />}
                                 </div>
                                 <span className="truncate">{opt.label}</span>

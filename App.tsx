@@ -19,6 +19,7 @@ import { useTheme } from './hooks/useTheme';
 // Layout Components
 import { AppHeader } from './components/layout/AppHeader';
 import { MobileNav } from './components/layout/MobileNav';
+import { ModalDialog } from './components/ui/ModalDialog';
 
 const App: React.FC = () => {
   const { isAuthenticated, isLoadingAuth, login, logout } = useAuth();
@@ -195,6 +196,7 @@ const App: React.FC = () => {
         </div>
       )}
 
+      <a href="#main-content" className="skip-link">{language === 'zh' ? '跳转到主要内容' : 'Skip to main content'}</a>
       <AppHeader
         navTabs={navTabs}
         activeTab={activeTab}
@@ -210,7 +212,7 @@ const App: React.FC = () => {
       />
 
       {/* Main Content */}
-      <main className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 pb-28 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:px-8 lg:pt-10">
+      <main id="main-content" tabIndex={-1} data-page={activeTab} className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 pb-28 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:px-8 lg:pt-10">
         <Suspense fallback={<div className="py-16 text-center text-gray-500">{language === 'zh' ? '加载中…' : 'Loading…'}</div>}>
         <div className="animate-fade-in">
           {activeTab === 'dashboard' && (
@@ -266,66 +268,26 @@ const App: React.FC = () => {
 
       {/* Global Modals */}
       {visibleAlert && (
-        <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="dialog-panel w-full max-w-lg overflow-hidden rounded-[18px] p-6 text-center animate-pop-in">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              visibleAlert.type === 'success'
-                ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
-                : 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400'
-            }`}>
-              {visibleAlert.type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              {t(
-                visibleAlert.type === 'success'
-                  ? 'refresh_success'
-                  : visibleAlert.kind === 'save'
-                    ? 'save_failed'
-                    : 'refresh_failed'
-              )}
-            </h3>
-            {visibleAlert.type === 'error' && (
-              <pre className="max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-left text-xs leading-5 text-red-200 whitespace-pre-wrap break-words">
-                {visibleAlert.log}
-              </pre>
-            )}
-            <button
-              onClick={() => {
-                setRefreshAlert(null);
-                clearMutationError();
-              }}
-              className="w-full mt-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl transition-colors"
-            >
-              {t('close')}
-            </button>
-          </div>
-        </div>
+        <ModalDialog wide role="alertdialog"
+          title={t(visibleAlert.type === 'success' ? 'refresh_success' : visibleAlert.kind === 'save' ? 'save_failed' : 'refresh_failed')}
+          onClose={() => { setRefreshAlert(null); clearMutationError(); }}
+          icon={<div className={`rounded-xl p-3 ${visibleAlert.type === 'success' ? 'bg-[var(--rail-teal-soft)] text-[var(--rail-teal-ink)]' : 'bg-[var(--alert-coral-soft)] text-[var(--alert-coral)]'}`}>
+            {visibleAlert.type === 'success' ? <CheckCircle size={30} /> : <AlertTriangle size={30} />}
+          </div>}
+          actions={<button onClick={() => { setRefreshAlert(null); clearMutationError(); }} className="primary-action w-full rounded-xl py-2.5 font-medium">{t('close')}</button>}>
+          {visibleAlert.type === 'error' && <pre className="max-h-64 overflow-auto rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-4 text-left text-xs leading-5 text-[var(--alert-coral)] whitespace-pre-wrap break-words">{visibleAlert.log}</pre>}
+        </ModalDialog>
       )}
 
       {isLogoutModalOpen && (
-        <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="dialog-panel w-full max-w-sm overflow-hidden rounded-[18px] p-6 text-center animate-pop-in">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
-              <LogOut size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('logout')}</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">{t('confirm_logout')}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setIsLogoutModalOpen(false)}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-white font-medium rounded-xl transition-colors"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                onClick={handleLogoutConfirm}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors shadow-lg shadow-red-500/30"
-              >
-                {t('logout')}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ModalDialog title={t('logout')} onClose={() => setIsLogoutModalOpen(false)}
+          icon={<div className="rounded-xl bg-[var(--alert-coral-soft)] p-3 text-[var(--alert-coral)]"><LogOut size={30} /></div>}
+          actions={<div className="flex gap-3">
+            <button onClick={() => setIsLogoutModalOpen(false)} className="secondary-action flex-1 rounded-xl py-2.5 font-medium">{t('cancel')}</button>
+            <button onClick={handleLogoutConfirm} className="flex-1 rounded-xl bg-red-600 py-2.5 font-medium text-white hover:bg-red-700">{t('logout')}</button>
+          </div>}>
+          <p>{t('confirm_logout')}</p>
+        </ModalDialog>
       )}
     </div>
   );

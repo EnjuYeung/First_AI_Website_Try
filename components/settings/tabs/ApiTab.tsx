@@ -23,17 +23,18 @@ const ApiTab: React.FC<Props> = ({
   handleSaveExchangeApiKey,
 }) => {
   return (
-    <div className="space-y-6 max-w-2xl">
-      <section>
+    <div className="settings-bento-grid">
+      <section className="settings-card settings-card-wide">
         <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">ExchangeRate-API</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           URL: https://v6.exchangerate-api.com/v6/YOUR-API-KEY/latest/USD
         </p>
       </section>
 
-      <section className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl space-y-3">
-        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('api_key')}</label>
+      <section className="settings-card settings-card-wide space-y-4">
+        <label htmlFor="exchange-api-key" className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('api_key')}</label>
         <input
+          id="exchange-api-key"
           type="password"
           placeholder="YOUR-API-KEY"
           value={exchangeApiKey}
@@ -45,7 +46,7 @@ const ApiTab: React.FC<Props> = ({
           <button
             onClick={() => handleSaveExchangeApiKey(false)}
             disabled={isSavingExchangeApi || !exchangeApiKey.trim()}
-            className="px-4 py-2 bg-gray-100 dark:bg-slate-600 dark:text-white rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
+            className="secondary-action px-4 py-2 rounded-lg text-sm disabled:opacity-50 flex items-center gap-2"
           >
             <Save size={16} />
             <span>{t('save')}</span>
@@ -53,7 +54,7 @@ const ApiTab: React.FC<Props> = ({
           <button
             onClick={() => handleSaveExchangeApiKey(true)}
             disabled={isSavingExchangeApi || !exchangeApiKey.trim()}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
+            className="primary-action px-4 py-2 rounded-lg text-sm disabled:opacity-50 flex items-center gap-2"
           >
             {isSavingExchangeApi ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
             <span>{t('save_and_test')}</span>

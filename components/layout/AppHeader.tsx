@@ -81,6 +81,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <button
               type="button"
               onClick={onAddSubscription}
+              aria-label={t('add_new')}
               className="primary-action ml-1 flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition sm:px-4"
             >
               <Plus size={17} />

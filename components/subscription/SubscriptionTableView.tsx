@@ -49,7 +49,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
         if (status === 'cancelled') {
             return <span className="rounded-md bg-[var(--alert-coral-soft)] px-2 py-1 text-xs font-medium text-[var(--alert-coral)]">{t('cancelled')}</span>
         }
-        return <span className="rounded-md bg-[var(--rail-teal-soft)] px-2 py-1 text-xs font-medium text-[var(--rail-teal)]">{t('active')}</span>
+        return <span className="rounded-md bg-[var(--rail-teal-soft)] px-2 py-1 text-xs font-medium text-[var(--rail-teal-ink)]">{t('active')}</span>
     };
 
     const renderSortHeader = (key: string, label: string) => (
@@ -156,7 +156,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                     />
                                 </td>
                                 <td className="px-5 py-4 whitespace-nowrap">
-                                    <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${sub.frequency === Frequency.MONTHLY ? 'bg-[var(--rail-teal-soft)] text-[var(--rail-teal)]' :
+                                    <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ${sub.frequency === Frequency.MONTHLY ? 'bg-[var(--rail-teal-soft)] text-[var(--rail-teal-ink)]' :
                                             sub.frequency === Frequency.YEARLY ? 'bg-[var(--due-amber-soft)] text-[var(--due-amber)]' :
                                                 'bg-[var(--surface-soft)] text-[var(--ink-soft)]'
                                         }`}>

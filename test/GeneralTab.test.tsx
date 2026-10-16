@@ -8,7 +8,7 @@ vi.mock('../services/storageService', async original => ({
 import GeneralTab from '../components/settings/tabs/GeneralTab';
 import { getDefaultSettings, uploadWallpaperFile } from '../services/storageService';
 import { getT } from '../services/i18n';
-import { applyEditableSettings } from '../shared/settingsOwnership.js';
+import { applyEditableSettings, pickClientPreferences } from '../shared/settingsOwnership.js';
 import { SettingsUpdate } from '../types';
 
 beforeEach(() => vi.clearAllMocks());
@@ -29,7 +29,7 @@ describe('General settings', () => {
     );
 
     expect(screen.queryByText('Timezone')).toBeNull();
-    expect(screen.queryByText('Appearance')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Appearance' })).toBeTruthy();
     expect(screen.getByText('Color theme')).toBeTruthy();
     expect(screen.getByText('Wallpaper')).toBeTruthy();
 
@@ -53,6 +53,49 @@ describe('General settings', () => {
     expect(onUpdateSettings).toHaveBeenCalledWith(expect.objectContaining({
       wallpaper: expect.objectContaining({ panelOpacity: 68 }),
     }));
+  });
+
+  it('switches appearance modes without changing the palette or wallpaper', async () => {
+    const save = vi.fn();
+    const Page = () => {
+      const [settings, setSettings] = useState(getDefaultSettings);
+      return <GeneralTab settings={settings} currentLanguage="en" t={getT('en')}
+        onUpdateSettings={async patch => {
+          save(patch);
+          setSettings(current => ({ ...current, ...pickClientPreferences(patch) }));
+          return true;
+        }} />;
+    };
+    render(<Page />);
+
+    for (const [name, theme] of [['Dark', 'dark'], ['Light', 'light'], ['System', 'system']]) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      await waitFor(() => expect(save).toHaveBeenLastCalledWith({ theme }));
+      await waitFor(() => expect(screen.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('true'));
+    }
+  });
+
+  it('reorders categories and payment methods with buttons and prevents moving past the boundaries', async () => {
+    const save = vi.fn();
+    const settings = { ...getDefaultSettings(), customCategories: ['Cloud', 'Software'], customPaymentMethods: ['PayPal', 'Credit Card'] };
+    const Page = () => {
+      const [current, setSettings] = useState(settings);
+      return <GeneralTab settings={current} currentLanguage="en" t={getT('en')}
+        onUpdateSettings={async patch => {
+          save(patch);
+          setSettings(current => applyEditableSettings(current, patch));
+          return true;
+        }} />;
+    };
+    render(<Page />);
+
+    expect((screen.getByRole('button', { name: 'Move up Cloud' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Move down Credit Card' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Move down Cloud' }));
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith({ customCategories: ['Software', 'Cloud'] }));
+    expect((screen.getByRole('button', { name: 'Move down Cloud' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Move up Credit Card' }));
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith({ customPaymentMethods: ['Credit Card', 'PayPal'] }));
   });
 
   it('saves only the changed control and preserves an unapplied URL draft', async () => {

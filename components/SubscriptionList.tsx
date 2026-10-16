@@ -215,7 +215,7 @@ const SubscriptionList: React.FC<Props> = ({
 
   if (subscriptions.length === 0 && !searchTerm && selectedCategories.length === 0) {
     return (
-      <div className="animate-fade-in space-y-6">
+      <div className="workspace-page subscriptions-page animate-fade-in space-y-6">
         <header>
           <div className="eyebrow mb-3">{t('subscriptions_library')}</div>
           <h1 className="page-title">{t('subscriptions')}</h1>
@@ -237,7 +237,7 @@ const SubscriptionList: React.FC<Props> = ({
     selectedStatuses.length > 0;
 
   return (
-    <div className="animate-fade-in space-y-5">
+    <div className="workspace-page subscriptions-page animate-fade-in space-y-5">
       <header className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="eyebrow mb-3">{t('subscriptions_library')}</div>
