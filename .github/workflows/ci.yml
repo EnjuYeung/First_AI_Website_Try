@@ -62,7 +62,7 @@ jobs:
       - run: docker build -t subm-ci .
       - name: Start container with isolated synthetic configuration
         run: |
-          docker run -d --name subm-ci -p 127.0.0.1:33001:3001 \
+          docker run -d --init --name subm-ci -p 127.0.0.1:33001:3001 \
             -e ADMIN_USER=ci-admin \
             -e ADMIN_PASS='Synthetic-CI-Password-1!' \
             -e JWT_SECRET=synthetic-ci-jwt-secret-0123456789abcdef \
@@ -75,6 +75,11 @@ jobs:
           docker logs subm-ci
           exit 1
       - run: node scripts/smoke-container.mjs
+      - name: Verify application stops on SIGTERM
+        run: |
+          docker stop --timeout 5 subm-ci
+          subm_exit_code=$(docker inspect -f '{{.State.ExitCode}}' subm-ci)
+          if [ "$subm_exit_code" != 0 ] && [ "$subm_exit_code" != 143 ]; then exit 1; fi
       - name: Verify gateway request limits, timeout and error headers
         run: node scripts/check-proxy.mjs
       - name: Remove test container

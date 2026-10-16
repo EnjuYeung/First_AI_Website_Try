@@ -1,6 +1,7 @@
 services:
   app:
     restart: always
+    init: true
     build:
       context: .
       dockerfile: Dockerfile

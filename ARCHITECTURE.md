@@ -6,6 +6,7 @@
 
 生产部署为一个应用容器：外层 OpenResty → `127.0.0.1:33001` → Node/Express `3001`。
 Node 同时提供 `/app/dist` 前端产物、API 和既有后台任务；本地开发继续使用 Vite。
+Compose 使用 Docker init 转发进程信号并回收子进程，应用直接运行一个 Node 进程。
 统一镜像采用多阶段构建，前端开发依赖留在构建阶段，运行阶段只安装后台生产依赖。
 
 `server/lib/httpPolicy.js` 为所有应用响应提供安全头；`server/lib/frontend.js` 负责静态文件、

@@ -30,5 +30,8 @@ await get('/api/smoke-missing', 404, 'private, no-store');
 assert.deepEqual(await (await get('/api/health', 200, 'private, no-store')).json(), { status: 'ok' });
 await get('/api/me', 401, 'private, no-store');
 const redirect = await get('/api?smoke=1', 301, null, { redirect: 'manual' });
-assert.equal(redirect.headers.get('location'), '/api/?smoke=1');
+assert.equal(
+  new URL(redirect.headers.get('location'), baseUrl).href,
+  new URL('/api/?smoke=1', baseUrl).href,
+);
 console.log('Container HTTP smoke checks passed');

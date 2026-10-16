@@ -74,7 +74,7 @@
 - 根 `Dockerfile` 采用 Node 24 Alpine 多阶段构建：前端严格安装与构建、后台生产依赖、最终 Node 运行镜像。
 - 保留前端 npm 11.6.1 的锁文件兼容策略，继续使用前后端各自的 lockfile。
 - 最终镜像包含 `/app/dist`、`/app/server` 和 `/app/shared`，不包含前端开发依赖、测试数据或生产秘密。
-- 工作目录保持 `/app/server`，直接运行 `node server.js`；后台任务与 API 仍由同一个实例运行。
+- 工作目录保持 `/app/server`，直接运行 `node server.js`；后台任务与 API 仍由同一个实例运行。Compose 使用 Docker init 转发信号和回收子进程，CI 验证 SIGTERM 停止行为。
 - Compose 统一为 `app` 服务、`subm` 容器、`first_ai_website_try:latest` 镜像，映射 `127.0.0.1:33001:3001`。
 - 继续读取现有根目录 `.env`，挂载 `Jan:/app/server/data`，保持 `restart: always`；当前运行用户与数据权限保持一致。
 - 沿用 JWT audience `subm-web`。它是令牌协议标识，容器改名不构成修改它的理由。
@@ -121,5 +121,7 @@
 - 实际 Nginx 隔离验证：8.5 MiB 请求成功；超过 9 MiB 的定长及分块请求均返回 413；上游停顿 30 秒返回 504；上游不可用返回 502。上述响应均包含一份有效的五项安全头。
 - 最终运行镜像未包含 `.env`、前端开发依赖、测试目录或 Nginx 进程。
 - CI 增加统一容器冒烟和独立网关验证；本地对应流程已通过。
+- 隔离信号实验确认：开启 Docker init 后，SIGTERM 正常退出（143，约 0.1 秒），避免 Node 作为 PID 1 时等待强制终止。
+- 公网网关可将相对重定向补成绝对 HTTPS 地址，冒烟按最终目标 URL 校验，保留域名、协议、路径和查询参数检查。
 
 生产切换遵循上述“切换、验收与回退”流程。
