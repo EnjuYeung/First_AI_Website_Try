@@ -10,10 +10,16 @@ RUN npm install --global npm@11.6.1 \
 COPY . .
 RUN npm run build
 
-# Serve with nginx and proxy /api to backend
-FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# One production process serves the frontend, API and background tasks.
+FROM node:24-alpine
+ENV NODE_ENV=production
+WORKDIR /app/server
+COPY server/package*.json ./
+RUN npm ci --omit=dev
+COPY server/server.js server/healthcheck.js ./
+COPY server/lib/ ./lib/
+COPY shared/ /app/shared/
+COPY --from=build /app/dist /app/dist/
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "healthcheck.js"]
+CMD ["node", "server.js"]

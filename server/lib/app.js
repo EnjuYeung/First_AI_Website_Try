@@ -1,23 +1,25 @@
 import express from 'express';
 import cors from 'cors';
 
-import { UPLOADS_DIR } from './paths.js';
+import { FRONTEND_DIR, UPLOADS_DIR } from './paths.js';
 import { registerRoutes } from './routes.js';
+import { applyHttpPolicy } from './httpPolicy.js';
+import { registerFrontend } from './frontend.js';
 
-export const createApp = ({ config, auth, storage, exchangeRate }) => {
+export const createApp = ({ config, auth, storage, exchangeRate, frontendDir = FRONTEND_DIR }) => {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy ?? false);
 
-  app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (req.path.startsWith('/api/') && !req.path.startsWith('/api/uploads/')) {
-      res.setHeader('Cache-Control', 'private, no-store');
-    }
-    next();
+  app.use(applyHttpPolicy);
+
+  app.all(/^\/api$/, (req, res) => {
+    const query = req.originalUrl.indexOf('?');
+    res.redirect(301, `/api/${query >= 0 ? req.originalUrl.slice(query) : ''}`);
   });
 
   app.use(
+    '/api',
     cors({
       origin: (origin, cb) => {
         if (!origin) return cb(null, true);
@@ -55,6 +57,11 @@ export const createApp = ({ config, auth, storage, exchangeRate }) => {
     storage,
     exchangeRate,
     uploadsDir: UPLOADS_DIR,
+  });
+
+  registerFrontend(app, {
+    directory: frontendDir,
+    required: process.env.NODE_ENV === 'production',
   });
 
   app.use((err, _req, res, next) => {

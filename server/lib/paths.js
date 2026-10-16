@@ -5,6 +5,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const SERVER_DIR = path.dirname(__dirname);
+export const FRONTEND_DIR = path.resolve(SERVER_DIR, '..', 'dist');
 export const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(SERVER_DIR, 'data');

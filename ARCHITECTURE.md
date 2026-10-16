@@ -2,6 +2,24 @@
 
 本次重组沿用 React、Express 和 JSON 文件存储，不改变现有数据目录布局、schemaVersion 或公开 API 路径。
 
+## 应用部署
+
+生产部署为一个应用容器：外层 OpenResty → `127.0.0.1:33001` → Node/Express `3001`。
+Node 同时提供 `/app/dist` 前端产物、API 和既有后台任务；本地开发继续使用 Vite。
+统一镜像采用多阶段构建，前端开发依赖留在构建阶段，运行阶段只安装后台生产依赖。
+
+`server/lib/httpPolicy.js` 为所有应用响应提供安全头；`server/lib/frontend.js` 负责静态文件、
+缓存与 SPA 回退。API 和缺失资源不会进入 SPA；入口重新验证，散列资源长期缓存。
+生产启动要求前端产物存在，健康检查同时验证前端与 API。
+
+`deploy/openresty.conf` 保留原网关的总请求 9 MiB 上限、API 连接 5 秒及上游读取间隔
+30 秒超时，并为网关错误提供安全头。外层隐藏应用同名安全头后返回一份策略。
+域名、证书、环境文件和 `Jan:/app/server/data` 挂载继续沿用现有配置。
+
+同一数据目录及 Bot 必须只有一个后台实例运行。升级或回退均先停止当前后台，再启动
+目标版本；新版本验收通过后才删除旧镜像。容器名称不影响 JWT audience `subm-web`。
+讨论经过与迁移验收见 [单容器部署方案](./docs/plans/single-container.md)。
+
 ## 存储与业务状态
 
 ```mermaid

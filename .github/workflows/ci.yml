@@ -51,3 +51,32 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm audit --audit-level=high
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: docker build -t subm-ci .
+      - name: Start container with isolated synthetic configuration
+        run: |
+          docker run -d --name subm-ci -p 127.0.0.1:33001:3001 \
+            -e ADMIN_USER=ci-admin \
+            -e ADMIN_PASS='Synthetic-CI-Password-1!' \
+            -e JWT_SECRET=synthetic-ci-jwt-secret-0123456789abcdef \
+            -e DATA_ENCRYPTION_KEY=synthetic-ci-data-key-0123456789abcdef \
+            subm-ci
+          for attempt in {1..30}; do
+            if docker exec subm-ci node healthcheck.js; then exit 0; fi
+            sleep 1
+          done
+          docker logs subm-ci
+          exit 1
+      - run: node scripts/smoke-container.mjs
+      - name: Verify gateway request limits, timeout and error headers
+        run: node scripts/check-proxy.mjs
+      - name: Remove test container
+        if: always()
+        run: docker rm -f subm-ci || true

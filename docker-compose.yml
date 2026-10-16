@@ -1,25 +1,13 @@
 services:
-  web:
+  app:
     restart: always
     build:
       context: .
       dockerfile: Dockerfile
-    image: first_ai_website_try-web:latest
-    container_name: subm-web
+    image: first_ai_website_try:latest
+    container_name: subm
     ports:
-      - "127.0.0.1:33001:80"
-    depends_on:
-      - backend
-    networks:
-      - appnet
-
-  backend:
-    restart: always
-    build:
-      context: .
-      dockerfile: server/Dockerfile
-    image: first_ai_website_try-backend:latest
-    container_name: subm-backend
+      - "127.0.0.1:33001:3001"
     env_file:
       - /opt/1panel/apps/First_AI_Website_Try/.env
     volumes:
