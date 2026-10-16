@@ -16,6 +16,32 @@ const runIsolated = async (script) => {
 };
 const moduleUrl = relative => JSON.stringify(new URL(relative, import.meta.url).href);
 
+test('migration retries legacy cleanup when interruption happened after the final feature write', () => runIsolated(`
+  import assert from 'node:assert/strict';
+  import fs from 'node:fs/promises';
+  import { createFeatureDocuments } from ${moduleUrl('../lib/storage/featureDocuments.js')};
+  import { createUserMigration } from ${moduleUrl('../lib/storage/migrations.js')};
+  import { userDataPath, userFeaturePath } from ${moduleUrl('../lib/paths.js')};
+  import { defaultUserData } from ${moduleUrl('../lib/defaults.js')};
+  import { ensureDataDir } from ${moduleUrl('../lib/storage/jsonFiles.js')};
+  await ensureDataDir();
+  await fs.writeFile(userDataPath('admin'), JSON.stringify(defaultUserData()));
+  const documents = createFeatureDocuments();
+  const interrupted = { ...documents, write: async (...args) => {
+    const saved = await documents.write(...args);
+    if (args[1] === 'settings') throw new Error('interrupted after final write');
+    return saved;
+  } };
+  await assert.rejects(createUserMigration(interrupted, data => data)('admin'), /interrupted/);
+  await fs.access(userDataPath('admin'));
+  await createUserMigration(documents, data => data)('admin');
+  await assert.rejects(fs.access(userDataPath('admin')), { code: 'ENOENT' });
+  for (const feature of ['subscriptions', 'notifications', 'settings']) {
+    const document = JSON.parse(await fs.readFile(userFeaturePath('admin', feature), 'utf8'));
+    assert.equal(document.revision, 1);
+  }
+`));
+
 test('interrupted migration resumes using persisted subscriptions and only removes legacy data after success', () => runIsolated(`
   import assert from 'node:assert/strict';
   import fs from 'node:fs/promises';

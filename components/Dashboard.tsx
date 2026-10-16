@@ -124,10 +124,10 @@ const useDashboardStats = (
           if (isOverduePersistedDay) {
             stats.monthlyPending += usdCost ?? 0;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'pending' });
-          } else if (currentDate <= today) {
+          } else if (currentDate <= today || isSupersededFutureCycle) {
             stats.monthlyPaid += usdCost ?? 0;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'paid' });
-          } else if (!isCancelled && !isSupersededFutureCycle) {
+          } else if (!isCancelled) {
             stats.monthlyPending += usdCost ?? 0;
             stats.monthlyEvents.push({ sub, date, cost: usdCost, state: 'pending' });
           }
@@ -135,8 +135,8 @@ const useDashboardStats = (
 
         if (currentDate >= yearStart && currentDate <= yearEnd) {
           if (isOverduePersistedDay) stats.yearlyPending += usdCost ?? 0;
-          else if (currentDate <= today) stats.yearlyPaid += usdCost ?? 0;
-          else if (!isCancelled && !isSupersededFutureCycle) stats.yearlyPending += usdCost ?? 0;
+          else if (currentDate <= today || isSupersededFutureCycle) stats.yearlyPaid += usdCost ?? 0;
+          else if (!isCancelled) stats.yearlyPending += usdCost ?? 0;
         }
 
         if (

@@ -52,6 +52,66 @@ test('password changes revoke existing JWTs', async () => {
   assert.equal(after.body.message, 'Invalid token');
 });
 
+test('failed password persistence keeps the committed password and tokens usable and does not poison later changes', async () => {
+  let credentials = { username: 'admin', passwordHash: bcrypt.hashSync('Old-password-1!', 4), tokenVersion: 0 };
+  let fail = true;
+  const storage = {
+    loadCredentials: async () => structuredClone(credentials),
+    saveCredentials: async next => {
+      if (fail) throw new Error('synthetic ENOSPC');
+      credentials = structuredClone(next);
+    },
+  };
+  const auth = await createAuth({ jwtSecret: 'test-secret', storage });
+  const oldToken = auth.signToken({ username: 'admin' });
+  await assert.rejects(auth.changeAdminPassword('New-password-2!'), /ENOSPC/);
+  assert.equal(await auth.verifyAdminPassword('Old-password-1!'), true);
+  assert.equal(await auth.verifyAdminPassword('New-password-2!'), false);
+  const stillAuthenticated = response();
+  auth.authMiddleware({ headers: { authorization: `Bearer ${oldToken}` } }, stillAuthenticated, () => { stillAuthenticated.body = 'passed'; });
+  assert.equal(stillAuthenticated.body, 'passed');
+  assert.equal(credentials.tokenVersion, 0);
+  fail = false;
+  await auth.changeAdminPassword('New-password-2!');
+  assert.equal(credentials.tokenVersion, 1);
+  assert.equal(await auth.verifyAdminPassword('New-password-2!'), true);
+  const revoked = response();
+  auth.authMiddleware({ headers: { authorization: `Bearer ${oldToken}` } }, revoked, () => assert.fail('old token must be revoked'));
+  assert.equal(revoked.statusCode, 401);
+});
+
+test('overlapping password changes publish only persisted credentials and use consecutive token versions', async () => {
+  let credentials = { username: 'admin', passwordHash: bcrypt.hashSync('Old-password-1!', 4), tokenVersion: 0 };
+  let releaseFirst;
+  let firstStarted;
+  const firstWriteStarted = new Promise(resolve => { firstStarted = resolve; });
+  const firstWriteGate = new Promise(resolve => { releaseFirst = resolve; });
+  const writes = [];
+  const storage = {
+    loadCredentials: async () => structuredClone(credentials),
+    saveCredentials: async next => {
+      writes.push(next);
+      if (writes.length === 1) {
+        firstStarted();
+        await firstWriteGate;
+      }
+      credentials = structuredClone(next);
+    },
+  };
+  const auth = await createAuth({ jwtSecret: 'test-secret', storage });
+  const first = auth.changeAdminPassword('First-password-1!');
+  await firstWriteStarted;
+  const second = auth.changeAdminPassword('Second-password-2!');
+  assert.equal(await auth.verifyAdminPassword('Old-password-1!'), true);
+  assert.equal(await auth.verifyAdminPassword('First-password-1!'), false);
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.deepEqual(writes.map(value => value.tokenVersion), [1, 2]);
+  assert.equal(credentials.tokenVersion, 2);
+  assert.equal(await auth.verifyAdminPassword('Second-password-2!'), true);
+  assert.equal(await bcrypt.compare('Second-password-2!', credentials.passwordHash), true);
+});
+
 test('malformed cookie encoding does not crash authentication', async () => {
   const credentials = {
     username: 'admin',

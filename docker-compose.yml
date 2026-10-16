@@ -1,5 +1,6 @@
 services:
   web:
+    restart: always
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,6 +14,7 @@ services:
       - appnet
 
   backend:
+    restart: always
     build:
       context: .
       dockerfile: server/Dockerfile

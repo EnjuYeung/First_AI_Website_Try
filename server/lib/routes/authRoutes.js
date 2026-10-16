@@ -34,31 +34,33 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
       return null;
     }
     const now = Date.now();
-    const state = attempts.get(key);
+    let state = attempts.get(key);
     if (!state || state.resetAt <= now) {
       if (state) attempts.delete(key);
-      return { key, count: 0, resetAt: now + windowMs };
+      if (attempts.size >= maxRateLimitEntries) {
+        for (const [entryKey, value] of attempts) {
+          if (value.resetAt <= now) attempts.delete(entryKey);
+        }
+        while (attempts.size >= maxRateLimitEntries) {
+          attempts.delete(attempts.keys().next().value);
+        }
+      }
+      state = { count: 0, resetAt: now + windowMs };
+      attempts.set(key, state);
     }
     if (state.count >= maxAttempts) {
       res.setHeader('Retry-After', String(Math.ceil((state.resetAt - now) / 1000)));
       res.status(429).json({ message: 'too_many_login_attempts' });
       return null;
     }
-    return { key, ...state };
+    // Reserve synchronously: pending password and TOTP checks use the same limit.
+    state.count += 1;
+    return { key, state };
   };
-  const failLogin = (state) => {
-    const now = Date.now();
-    if (!attempts.has(state.key) && attempts.size >= maxRateLimitEntries) {
-      for (const [key, value] of attempts) {
-        if (value.resetAt <= now) attempts.delete(key);
-      }
-      while (attempts.size >= maxRateLimitEntries) {
-        const oldestKey = attempts.keys().next().value;
-        if (oldestKey === undefined) break;
-        attempts.delete(oldestKey);
-      }
-    }
-    attempts.set(state.key, { count: state.count + 1, resetAt: state.resetAt });
+  const releaseLoginAttempt = ({ key, state }) => {
+    if (attempts.get(key) !== state) return;
+    state.count -= 1;
+    if (state.count === 0) attempts.delete(key);
   };
   const verifyCurrentTotp = (security, code) =>
     !security.twoFactorEnabled ||
@@ -77,29 +79,33 @@ export const registerAuthRoutes = ({ app, auth, storage }) => {
     const { username, password, code } = req.body || {};
     const rateState = checkRateLimit(req, res);
     if (!rateState) return;
-    if (username !== auth.getAdminUsername() || !(await auth.verifyAdminPassword(password))) {
-      failLogin(rateState);
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-    const data = await storage.loadUserData(username);
-    const security = data.settings?.security || {};
-    if (security.twoFactorEnabled && security.twoFactorSecret) {
-      if (!code) return res.status(403).json({ message: 'two_factor_required' });
-      const verified = speakeasy.totp.verify({
-        secret: security.twoFactorSecret,
-        encoding: 'base32',
-        token: code,
-        window: 1,
-      });
-      if (!verified) {
-        failLogin(rateState);
-        return res.status(401).json({ message: 'invalid_2fa' });
+    try {
+      if (username !== auth.getAdminUsername() || !(await auth.verifyAdminPassword(password))) {
+        return res.status(401).json({ message: 'Invalid credentials' });
       }
+      const data = await storage.loadUserData(username);
+      const security = data.settings?.security || {};
+      if (security.twoFactorEnabled && security.twoFactorSecret) {
+        if (!code) {
+          releaseLoginAttempt(rateState);
+          return res.status(403).json({ message: 'two_factor_required' });
+        }
+        const verified = speakeasy.totp.verify({
+          secret: security.twoFactorSecret,
+          encoding: 'base32',
+          token: code,
+          window: 1,
+        });
+        if (!verified) return res.status(401).json({ message: 'invalid_2fa' });
+      }
+      if (attempts.get(rateState.key) === rateState.state) attempts.delete(rateState.key);
+      const token = auth.signToken({ username });
+      auth.setAuthCookie(res, req, token);
+      res.json({ ok: true, username });
+    } catch (error) {
+      releaseLoginAttempt(rateState);
+      throw error;
     }
-    attempts.delete(rateState.key);
-    const token = auth.signToken({ username });
-    auth.setAuthCookie(res, req, token);
-    res.json({ ok: true, username });
   });
 
   app.post('/api/logout', (req, res) => {

@@ -10,8 +10,15 @@ import { applySettingsUpdate, clientSettings } from '../settingsPolicy.js';
 const uploadedIconFilename = (url) =>
   /^\/api\/uploads\/([a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
 
-const uploadedWallpaperFilename = (url) =>
-  /^\/api\/uploads\/(wallpaper-[a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(String(url || ''))?.[1] || '';
+const uploadedWallpaperFilename = (url) => {
+  try {
+    const parsed = new URL(String(url || ''), 'http://uploads.invalid');
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    // Recognize local-file references in absolute URLs, query strings and encoded paths.
+    const pathname = path.posix.normalize(decodeURIComponent(parsed.pathname));
+    return /^\/api\/uploads\/(wallpaper-[a-f0-9-]+\.(?:png|jpg|webp))$/i.exec(pathname)?.[1] || '';
+  } catch { return ''; }
+};
 
 const clientUserData = (data, timeZone) => ({
   ...data,
@@ -34,6 +41,19 @@ export const registerDataRoutes = ({
     maxIconBytes: maxWallpaperBytes,
     filenamePrefix: 'wallpaper-',
   });
+  const removeUnusedWallpaper = async (username, filename) => {
+    let inUse = false;
+    await storage.updateUserData(username, async (data) => {
+      inUse = uploadedWallpaperFilename(data.settings.wallpaper?.url) === filename;
+      if (!inUse) {
+        await fs.unlink(path.join(uploadsDir, filename)).catch((err) => {
+          if (err?.code !== 'ENOENT') throw err;
+        });
+      }
+      return data;
+    });
+    return !inUse;
+  };
   const expectedRevision = (req) => {
     const raw = String(req.get('if-match') || '').replace(/^W\//, '').replaceAll('"', '');
     const revision = Number(raw);
@@ -173,11 +193,8 @@ export const registerDataRoutes = ({
         replacedWallpaper = uploadedWallpaperFilename(currentSettings.wallpaper?.url);
       }
       return nextSettings;
-    }, async (savedSettings) => {
-      if (!replacedWallpaper || uploadedWallpaperFilename(savedSettings.wallpaper?.url) === replacedWallpaper) return;
-      await fs.unlink(path.join(uploadsDir, replacedWallpaper)).catch((err) => {
-        if (err?.code !== 'ENOENT') throw err;
-      });
+    }, async () => {
+      if (replacedWallpaper) await removeUnusedWallpaper(req.user.username, replacedWallpaper);
     });
   });
 
@@ -217,9 +234,8 @@ export const registerDataRoutes = ({
     if (!/^wallpaper-[a-f0-9-]+\.(png|jpg|webp)$/i.test(filename) || path.basename(filename) !== filename) {
       return res.status(400).json({ ok: false, message: 'invalid_wallpaper_filename' });
     }
-    await fs.unlink(path.join(uploadsDir, filename)).catch((err) => {
-      if (err?.code !== 'ENOENT') throw err;
-    });
+    const removed = await removeUnusedWallpaper(req.user.username, filename);
+    if (!removed) return res.status(409).json({ ok: false, message: 'wallpaper_in_use' });
     res.json({ ok: true });
   });
   app.delete('/api/icons/:filename', auth.authMiddleware, async (req, res) => {

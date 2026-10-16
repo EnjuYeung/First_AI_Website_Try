@@ -1,6 +1,6 @@
 import { applyEditableSettings } from '../shared/settingsOwnership.js';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Subscription, AppSettings, RemoteSettings, EditableSettingsPatch, ServerSettingsUpdate, NotificationRecord, ServerClock } from '../types';
+import { Subscription, SubscriptionEdit, AppSettings, RemoteSettings, EditableSettingsPatch, ServerSettingsUpdate, NotificationRecord, ServerClock } from '../types';
 import {
   createSubscription,
   DataRevisions,
@@ -258,7 +258,16 @@ export const useAppData = (
     return persistFeature('settings', (revision) => updateSettingsFields(patch, revision), applySettings);
   };
 
-  const saveSubscription = (sub: Subscription, isEditing: boolean) => {
+  const beginSubscriptionEdit = (subscription: Subscription): SubscriptionEdit => ({
+    subscription: structuredClone(subscription),
+    revision: revisionsRef.current.subscriptions,
+  });
+
+  const saveSubscription = (sub: Subscription, edit?: SubscriptionEdit | null) => {
+    if (edit && (edit.subscription.id !== sub.id || edit.revision !== revisionsRef.current.subscriptions)) {
+      setLastMutationError(new RevisionConflictError('revision_conflict', revisionsRef.current.subscriptions));
+      return Promise.resolve(false);
+    }
     const clock = serverClockRef.current;
     const now = new Date(clock.serverTimeMs + Math.max(0, Date.now() - clock.receivedAtMs));
     const toSave = rollForwardActiveSubscriptions(
@@ -266,7 +275,7 @@ export const useAppData = (
       getTodayYMD(settingsRef.current.timezone, now),
     )[0] || sub;
     let updated: Subscription[];
-    if (isEditing) {
+    if (edit) {
       updated = subscriptionsRef.current.map(s => s.id === toSave.id ? toSave : s);
     } else {
       updated = [...subscriptionsRef.current, toSave];
@@ -274,8 +283,8 @@ export const useAppData = (
     applySubscriptions(updated);
     return persistFeature(
       'subscriptions',
-      (revision) => isEditing
-        ? updateSubscription(toSave, revision)
+      (revision) => edit
+        ? updateSubscription(toSave, edit.revision)
         : createSubscription(toSave, revision),
       applySubscriptions
     );
@@ -322,6 +331,7 @@ export const useAppData = (
     loadRemoteData,
     applyRemoteSettings,
     updateSettings,
+    beginSubscriptionEdit,
     saveSubscription,
     deleteSubscription,
     batchDeleteSubscriptions,

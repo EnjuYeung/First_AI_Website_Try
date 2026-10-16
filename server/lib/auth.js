@@ -5,6 +5,7 @@ export const createAuth = async ({ jwtSecret, storage }) => {
   let credentials = await storage.loadCredentials();
   let adminHash = credentials.passwordHash;
   let tokenVersion = Number.isInteger(credentials.tokenVersion) ? credentials.tokenVersion : 0;
+  let passwordChangeQueue = Promise.resolve();
   const cookieName = 'auth_token';
   const tokenMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -77,12 +78,20 @@ export const createAuth = async ({ jwtSecret, storage }) => {
 
   const verifyAdminPassword = async (password) => bcrypt.compare(password, adminHash);
 
-  const changeAdminPassword = async (newPassword) => {
-    const newHash = bcrypt.hashSync(newPassword, 10);
-    tokenVersion += 1;
-    credentials = { ...credentials, passwordHash: newHash, tokenVersion };
-    adminHash = newHash;
-    await storage.saveCredentials(credentials);
+  const changeAdminPassword = (newPassword) => {
+    const change = passwordChangeQueue.then(async () => {
+      const next = {
+        ...credentials,
+        passwordHash: await bcrypt.hash(newPassword, 10),
+        tokenVersion: tokenVersion + 1,
+      };
+      await storage.saveCredentials(next);
+      credentials = next;
+      adminHash = next.passwordHash;
+      tokenVersion = next.tokenVersion;
+    });
+    passwordChangeQueue = change.catch(() => {});
+    return change;
   };
 
   return {

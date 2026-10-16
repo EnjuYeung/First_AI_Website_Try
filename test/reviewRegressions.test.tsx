@@ -12,7 +12,7 @@ import SubscriptionForm from '../components/SubscriptionForm';
 import Dashboard from '../components/Dashboard';
 import NotificationsTab from '../components/settings/tabs/NotificationsTab';
 import { getT } from '../services/i18n';
-import { Frequency } from '../types';
+import { Frequency, Subscription } from '../types';
 import { createDefaultSettings } from '../shared/defaultSettings.js';
 import { applyEditableSettings } from '../shared/settingsOwnership.js';
 import { validateSettings } from '../shared/dataSchema.js';
@@ -33,6 +33,48 @@ beforeEach(() => { vi.resetAllMocks(); vi.mocked(storage.fetchAllData).mockResol
 afterEach(() => { vi.useRealTimers(); });
 
 describe('review regressions', () => {
+  it.each(['cancelled', 'renewed'])('does not authorize an old edit with a refreshed revision after remote %s', async action => {
+    let committed: Subscription = { ...sub };
+    let revision = 1;
+    vi.mocked(storage.fetchAllData).mockImplementation(async () => ({ ...snapshot(revision), subscriptions: [committed] }));
+    vi.mocked(storage.updateSubscription).mockImplementation(async (value, expected) => {
+      if (expected !== revision) throw new storage.RevisionConflictError('revision_conflict', revision);
+      committed = value;
+      return { data: [committed], revision: ++revision };
+    });
+    const { result } = renderHook(() => useAppData(true));
+    await waitFor(() => expect(result.current.hasLoadedData).toBe(true));
+    const edit = { subscription: { ...result.current.subscriptions[0] }, revision };
+    const draft = { ...edit.subscription, notes: 'keep this draft' };
+    committed = action === 'cancelled'
+      ? { ...sub, status: 'cancelled', nextBillingDate: '' }
+      : { ...sub, nextBillingDate: '2027-01-30' };
+    revision = 2;
+    await act(async () => { await result.current.loadRemoteData(); });
+    await act(async () => { expect(await result.current.saveSubscription(draft, edit)).toBe(false); });
+    expect(storage.updateSubscription).not.toHaveBeenCalled();
+    expect(result.current.subscriptions[0].status).toBe(committed.status);
+    expect(result.current.subscriptions[0].nextBillingDate).toBe(committed.nextBillingDate);
+    expect(draft.notes).toBe('keep this draft');
+  });
+
+  it('saves a current edit with its opening revision and allows a fresh edit after a conflict', async () => {
+    const { result } = renderHook(() => useAppData(true));
+    await waitFor(() => expect(result.current.hasLoadedData).toBe(true));
+    const firstEdit = result.current.beginSubscriptionEdit(result.current.subscriptions[0]);
+    const firstSave = { ...firstEdit.subscription, notes: 'first note' };
+    vi.mocked(storage.updateSubscription).mockResolvedValue({ data: [firstSave], revision: 2 });
+    await act(async () => { expect(await result.current.saveSubscription(firstSave, firstEdit)).toBe(true); });
+    expect(storage.updateSubscription).toHaveBeenLastCalledWith(firstSave, 1);
+    await act(async () => { expect(await result.current.saveSubscription(firstSave, firstEdit)).toBe(false); });
+    const freshEdit = result.current.beginSubscriptionEdit(result.current.subscriptions[0]);
+    const secondSave = { ...freshEdit.subscription, notes: 'second note' };
+    vi.mocked(storage.updateSubscription).mockResolvedValue({ data: [secondSave], revision: 3 });
+    await act(async () => { expect(await result.current.saveSubscription(secondSave, freshEdit)).toBe(true); });
+    expect(storage.updateSubscription).toHaveBeenLastCalledWith(secondSave, 2);
+    expect(result.current.subscriptions[0].notes).toBe('second note');
+  });
+
   it('does not replay a stale subscription on conflict and reconciles remote cancellation', async () => {
     vi.mocked(storage.updateSubscription).mockRejectedValue(new storage.RevisionConflictError('revision_conflict', 2));
     const { result } = renderHook(() => useAppData(true));
@@ -40,7 +82,8 @@ describe('review regressions', () => {
     const latest = snapshot(2);
     latest.subscriptions = [{ ...sub, status: 'cancelled' as any, nextBillingDate: '' }];
     vi.mocked(storage.fetchAllData).mockResolvedValue(latest);
-    await act(async () => { expect(await result.current.saveSubscription({ ...sub, notes: 'draft' }, true)).toBe(false); });
+    const edit = result.current.beginSubscriptionEdit(sub);
+    await act(async () => { expect(await result.current.saveSubscription({ ...sub, notes: 'draft' }, edit)).toBe(false); });
     expect(storage.updateSubscription).toHaveBeenCalledTimes(1);
     expect(result.current.subscriptions[0].status).toBe('cancelled');
   });

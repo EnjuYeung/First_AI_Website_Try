@@ -30,10 +30,11 @@ export const createUserMigration = (documents, normalizeInitialData) => {
         for (const [index, feature] of FEATURES.entries()) {
           if (!existing[index]) await documents.write(username, feature, makeDocument(values[feature]));
         }
-        if (legacy) await fs.unlink(userDataPath(username)).catch(error => {
-          if (error.code !== 'ENOENT') throw error;
-        });
       }
+      // Also finish cleanup when a previous run committed every feature file.
+      await fs.unlink(userDataPath(username)).catch(error => {
+        if (error.code !== 'ENOENT') throw error;
+      });
       migrated.add(username);
     });
   };

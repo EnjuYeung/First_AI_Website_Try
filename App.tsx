@@ -1,7 +1,7 @@
 import { pickEditableSettings } from './shared/settingsOwnership.js';
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Home, CreditCard, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
-import { AppSettings, SettingsUpdate, Subscription } from './types';
+import { AppSettings, SettingsUpdate, Subscription, SubscriptionEdit } from './types';
 import { RevisionConflictError } from './services/storageService';
 import { getT } from './services/i18n';
 import LoginPage from './components/LoginPage';
@@ -25,7 +25,7 @@ const App: React.FC = () => {
   const { language, setLanguage, theme, setTheme, colorTheme, setColorTheme } = useClientPreferences();
   const {
     subscriptions, settings, notifications, serverClock, isDataLoading, hasLoadedData, loadError,
-    loadRemoteData, updateSettings, saveSubscription, deleteSubscription,
+    loadRemoteData, updateSettings, beginSubscriptionEdit, saveSubscription, deleteSubscription,
     batchDeleteSubscriptions, duplicateSubscription,
     lastMutationError, clearMutationError, applyRemoteSettings
   } = useAppData(isAuthenticated, logout, language);
@@ -44,7 +44,7 @@ const App: React.FC = () => {
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSub, setEditingSub] = useState<Subscription | null>(null);
+  const [editingDraft, setEditingDraft] = useState<SubscriptionEdit | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [refreshAlert, setRefreshAlert] = useState<
     { type: 'success' } | { type: 'error'; log: string } | null
@@ -60,18 +60,20 @@ const App: React.FC = () => {
 
   // Handlers
   const handleEditSubscription = (sub: Subscription) => {
-    setEditingSub(sub);
+    clearMutationError();
+    setEditingDraft(beginSubscriptionEdit(sub));
     setIsModalOpen(true);
   };
 
   const handleSaveWrapper = async (sub: Subscription) => {
-    const saved = await saveSubscription(sub, !!editingSub);
-    if (saved) setEditingSub(null);
+    const saved = await saveSubscription(sub, editingDraft);
+    if (saved) setEditingDraft(null);
     return saved;
   };
 
   const openAddModal = () => {
-    setEditingSub(null);
+    clearMutationError();
+    setEditingDraft(null);
     setIsModalOpen(true);
   };
 
@@ -126,7 +128,7 @@ const App: React.FC = () => {
         kind: 'save' as const,
         type: 'error' as const,
         log: lastMutationError instanceof RevisionConflictError
-          ? (language === 'zh' ? '数据已在其他位置更新，本次保存已停止。请刷新并核对草稿后重新保存。' : 'Data changed elsewhere; saving stopped. Refresh and review your draft before saving again.')
+          ? (language === 'zh' ? '数据已在其他位置更新，本次保存已停止。请保留需要的草稿内容，关闭编辑框后重新打开，核对最新数据再保存。' : 'Data changed elsewhere; saving stopped. Keep any draft text you need, then reopen the editor and review the latest data before saving.')
           : lastMutationError instanceof Error
           ? lastMutationError.message
           : String(lastMutationError),
@@ -250,7 +252,7 @@ const App: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveWrapper}
-        initialData={editingSub}
+        initialData={editingDraft?.subscription}
         settings={clientSettings}
         lang={language}
       />}

@@ -75,6 +75,12 @@ export interface ServerClock {
   receivedAtMs: number;
 }
 
+/** The subscription and feature revision observed when an edit form opens. */
+export interface SubscriptionEdit {
+  readonly subscription: Subscription;
+  readonly revision: number;
+}
+
 // --- Settings Types ---
 
 export interface CurrencyConfig {

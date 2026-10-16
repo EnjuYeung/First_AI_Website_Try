@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 
 import { registerDataRoutes } from '../lib/routes/dataRoutes.js';
 import * as defaults from '../lib/defaults.js';
+import { applySettingsUpdate } from '../lib/settingsPolicy.js';
 
 const createResponse = () => ({
   statusCode: 200,
@@ -342,5 +343,82 @@ test('deleting an icon still referenced by a subscription returns a conflict wit
   await handlers.get('DELETE /api/icons/:filename')({ params: { filename: 'abc.png' }, user: { username: 'admin' } }, response);
   assert.equal(response.statusCode, 409);
   assert.equal(response.body.message, 'icon_in_use');
+  assert.equal(unlink.mock.callCount(), 0);
+});
+
+test('cleanup after a lost wallpaper save response cannot delete the committed wallpaper', async (t) => {
+  const unlink = t.mock.method(fs, 'unlink', async () => {});
+  const handlers = createRouteHarness({
+    async updateUserData(_username, updater) {
+      return updater({ settings: { wallpaper: { url: '/api/uploads/wallpaper-aabb.png' } } });
+    },
+  });
+  const response = createResponse();
+  await handlers.get('DELETE /api/wallpapers/:filename')({ params: { filename: 'wallpaper-aabb.png' }, user: { username: 'admin' } }, response);
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.message, 'wallpaper_in_use');
+  assert.equal(unlink.mock.callCount(), 0);
+});
+
+test('wallpaper cleanup deletes unreferenced uploads and tolerates an already removed file', async (t) => {
+  const unlink = t.mock.method(fs, 'unlink', async () => {
+    const error = new Error('already removed');
+    error.code = 'ENOENT';
+    throw error;
+  });
+  const handlers = createRouteHarness({
+    async updateUserData(_username, updater) {
+      return updater({ settings: { wallpaper: { url: '' } } });
+    },
+  });
+  const response = createResponse();
+  await handlers.get('DELETE /api/wallpapers/:filename')({ params: { filename: 'wallpaper-aabb.png' }, user: { username: 'admin' } }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(unlink.mock.callCount(), 1);
+});
+
+for (const url of [
+  'https://subm.example.test/api/uploads/wallpaper-aabb.png',
+  'https://subm.example.test/api/uploads/wallpaper-aabb.png?version=1#preview',
+  'https://subm.example.test/api/uploads/%77allpaper-aabb.png',
+  'https://subm.example.test/api/uploads/unused%2f..%2fwallpaper-aabb.png',
+]) {
+  test(`wallpaper cleanup preserves the uploaded image referenced through ${url}`, async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'subm-wallpaper-alias-'));
+    const filename = 'wallpaper-aabb.png';
+    const settings = applySettingsUpdate(defaults.defaultSettings(), { wallpaper: { url } }, 'UTC');
+    try {
+      await fs.writeFile(path.join(directory, filename), 'synthetic image');
+      const handlers = createRouteHarness({
+        async updateUserData(_username, updater) { return updater({ settings }); },
+      }, path.basename(directory));
+      const response = createResponse();
+      await handlers.get('DELETE /api/wallpapers/:filename')({ params: { filename }, user: { username: 'admin' } }, response);
+      assert.equal(response.statusCode, 409);
+      await fs.access(path.join(directory, filename));
+    } finally { await fs.rm(directory, { recursive: true, force: true }); }
+  });
+}
+
+test('post-save wallpaper cleanup checks the latest settings inside the user queue', async (t) => {
+  const unlink = t.mock.method(fs, 'unlink', async () => {});
+  const original = defaults.defaultSettings();
+  original.wallpaper.url = '/api/uploads/wallpaper-aabb.png';
+  let current = original;
+  const handlers = createRouteHarness({
+    async updateUserFeature(_username, _feature, _revision, updater) {
+      const saved = await updater(structuredClone(current));
+      // A concurrent committed write restores the old image before cleanup runs.
+      current = { ...saved, wallpaper: { ...saved.wallpaper, url: original.wallpaper.url } };
+      return { data: saved, revision: 2 };
+    },
+    async updateUserData(_username, updater) { return updater({ settings: current }); },
+  });
+  const response = createResponse();
+  await handlers.get('PUT /api/settings')({
+    body: { wallpaper: { url: '/api/uploads/wallpaper-ccdd.png' } },
+    user: { username: 'admin' }, get: () => '"1"',
+  }, response);
+  assert.equal(response.statusCode, 200);
   assert.equal(unlink.mock.callCount(), 0);
 });

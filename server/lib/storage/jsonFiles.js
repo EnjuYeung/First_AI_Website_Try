@@ -12,9 +12,15 @@ export const atomicWriteJson = async (filePath, data) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
   await fs.chmod(path.dirname(filePath), 0o700);
   const tmpPath = `${filePath}.tmp-${crypto.randomUUID()}`;
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: 0o600 });
-  await fs.rename(tmpPath, filePath);
-  await fs.chmod(filePath, 0o600);
+  try {
+    await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: 0o600 });
+    // Complete permission checks before the rename commits the replacement.
+    await fs.chmod(tmpPath, 0o600);
+    await fs.rename(tmpPath, filePath);
+  } catch (error) {
+    await fs.unlink(tmpPath).catch(() => {});
+    throw error;
+  }
 };
 
 const pendingWrites = new Map();

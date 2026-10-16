@@ -51,12 +51,21 @@ const GeneralTab: React.FC<Props> = ({
   const [wallpaperDraft, setWallpaperDraft] = useState(settings.wallpaper);
   const [isUploadingWallpaper, setIsUploadingWallpaper] = useState(false);
   const [wallpaperError, setWallpaperError] = useState('');
+  const previousWallpaper = useRef(settings.wallpaper);
 
-  useEffect(() => setWallpaperDraft(settings.wallpaper), [settings.wallpaper]);
+  useEffect(() => {
+    const previous = previousWallpaper.current;
+    previousWallpaper.current = settings.wallpaper;
+    setWallpaperDraft(current => ({
+      url: current.url === previous.url ? settings.wallpaper.url : current.url,
+      blur: current.blur === previous.blur ? settings.wallpaper.blur : current.blur,
+      overlay: current.overlay === previous.overlay ? settings.wallpaper.overlay : current.overlay,
+      panelOpacity: current.panelOpacity === previous.panelOpacity ? settings.wallpaper.panelOpacity : current.panelOpacity,
+    }));
+  }, [settings.wallpaper]);
 
-  const saveWallpaper = async (wallpaper: AppSettings['wallpaper']) => {
+  const saveWallpaper = async (wallpaper: Partial<AppSettings['wallpaper']>) => {
     const saved = await onUpdateSettings({ wallpaper });
-    if (saved !== false) setWallpaperDraft(wallpaper);
     return saved !== false;
   };
 
@@ -75,7 +84,8 @@ const GeneralTab: React.FC<Props> = ({
       }
     }
     setWallpaperError('');
-    await saveWallpaper({ ...wallpaperDraft, url });
+    setWallpaperDraft(current => ({ ...current, url }));
+    await saveWallpaper({ url });
   };
 
   const handleWallpaperUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +106,8 @@ const GeneralTab: React.FC<Props> = ({
     let uploadedUrl = '';
     try {
       uploadedUrl = await uploadWallpaperFile(file);
-      const saved = await saveWallpaper({ ...wallpaperDraft, url: uploadedUrl });
+      setWallpaperDraft(current => ({ ...current, url: uploadedUrl }));
+      const saved = await saveWallpaper({ url: uploadedUrl });
       if (!saved) await deleteUploadedWallpaper(uploadedUrl).catch(() => undefined);
     } catch {
       if (uploadedUrl) await deleteUploadedWallpaper(uploadedUrl).catch(() => undefined);
@@ -107,12 +118,12 @@ const GeneralTab: React.FC<Props> = ({
   };
 
   const commitWallpaperControls = () => {
-    if (
-      wallpaperDraft.blur === settings.wallpaper.blur &&
-      wallpaperDraft.overlay === settings.wallpaper.overlay &&
-      wallpaperDraft.panelOpacity === settings.wallpaper.panelOpacity
-    ) return;
-    void saveWallpaper(wallpaperDraft);
+    const patch = Object.fromEntries(
+      (['blur', 'overlay', 'panelOpacity'] as const)
+        .filter(key => wallpaperDraft[key] !== settings.wallpaper[key])
+        .map(key => [key, wallpaperDraft[key]])
+    );
+    if (Object.keys(patch).length) void saveWallpaper(patch);
   };
 
   const wallpaperImage = wallpaperDraft.url
@@ -292,7 +303,10 @@ const GeneralTab: React.FC<Props> = ({
         {wallpaperDraft.url && (
           <button
             type="button"
-            onClick={() => void saveWallpaper({ ...wallpaperDraft, url: '' })}
+            onClick={() => {
+              setWallpaperDraft(current => ({ ...current, url: '' }));
+              void saveWallpaper({ url: '' });
+            }}
             className="mt-4 flex items-center gap-2 text-sm font-medium text-[var(--alert-coral)]"
           >
             <Trash2 size={15} />{t('remove_wallpaper')}
