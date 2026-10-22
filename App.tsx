@@ -1,6 +1,6 @@
 import { pickEditableSettings } from './shared/settingsOwnership.js';
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Home, CreditCard, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Home, CreditCard, BarChart3, Settings as SettingsIcon, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
 import { AppSettings, SettingsUpdate, Subscription, SubscriptionEdit } from './types';
 import { RevisionConflictError } from './services/storageService';
 import { getT } from './services/i18n';
@@ -10,6 +10,8 @@ const Dashboard = lazy(() => import('./components/Dashboard'));
 const SubscriptionList = lazy(() => import('./components/SubscriptionList'));
 const SubscriptionForm = lazy(() => import('./components/SubscriptionForm'));
 const Settings = lazy(() => import('./components/Settings'));
+const SpendingStats = lazy(() => import('./components/SpendingStats'));
+const SubscriptionDetails = lazy(() => import('./components/subscription/SubscriptionDetails').then(module => ({ default: module.SubscriptionDetails })));
 
 import { useAuth } from './hooks/useAuth';
 import { useAppData } from './hooks/useAppData';
@@ -35,16 +37,18 @@ const App: React.FC = () => {
 
   useTheme(theme, colorTheme);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'settings'>(() => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'spending' | 'settings'>(() => {
     if (typeof window === 'undefined') return 'dashboard';
     const stored = window.localStorage.getItem('subm.activeTab');
-    if (stored === 'dashboard' || stored === 'list' || stored === 'settings') {
+    if (stored === 'dashboard' || stored === 'list' || stored === 'spending' || stored === 'settings') {
       return stored;
     }
     return 'dashboard';
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detailSubscription = subscriptions.find(sub => sub.id === detailId);
   const [editingDraft, setEditingDraft] = useState<SubscriptionEdit | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [refreshAlert, setRefreshAlert] = useState<
@@ -61,6 +65,7 @@ const App: React.FC = () => {
 
   // Handlers
   const handleEditSubscription = (sub: Subscription) => {
+    setDetailId(null);
     clearMutationError();
     setEditingDraft(beginSubscriptionEdit(sub));
     setIsModalOpen(true);
@@ -143,6 +148,7 @@ const App: React.FC = () => {
   const navTabs = [
     { id: 'dashboard', icon: Home, label: t('dashboard') },
     { id: 'list', icon: CreditCard, label: t('subscriptions') },
+    { id: 'spending', icon: BarChart3, label: t('spending') },
     { id: 'settings', icon: SettingsIcon, label: t('settings') },
   ] as const;
 
@@ -212,7 +218,7 @@ const App: React.FC = () => {
       />
 
       {/* Main Content */}
-      <main id="main-content" tabIndex={-1} data-page={activeTab} className="mx-auto w-full max-w-[1440px] flex-1 overflow-x-hidden px-4 pb-28 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:px-8 lg:pt-10">
+      <main id="main-content" tabIndex={-1} data-page={activeTab} className="app-main mx-auto w-full max-w-[1440px] flex-1 px-4 pb-28 pt-7 sm:px-6 sm:pt-9 lg:px-8 lg:pt-10">
         <Suspense fallback={<div className="py-16 text-center text-gray-500">{language === 'zh' ? '加载中…' : 'Loading…'}</div>}>
         <div className="animate-fade-in">
           {activeTab === 'dashboard' && (
@@ -221,6 +227,8 @@ const App: React.FC = () => {
               lang={language}
               settings={clientSettings}
               serverClock={serverClock}
+              onView={(sub) => setDetailId(sub.id)}
+              onNavigate={setActiveTab}
             />
           )}
 
@@ -235,8 +243,12 @@ const App: React.FC = () => {
               lang={language}
               exchangeRates={clientSettings.exchangeRates}
               timezone={clientSettings.timezone}
+              onView={(sub) => setDetailId(sub.id)}
+              onAdd={openAddModal}
             />
           )}
+
+          {activeTab === 'spending' && <SpendingStats subscriptions={subscriptions} settings={clientSettings} lang={language} serverClock={serverClock} />}
 
           {activeTab === 'settings' && (
             <Settings
@@ -250,6 +262,7 @@ const App: React.FC = () => {
       </main>
 
       <Suspense fallback={null}>
+      {detailSubscription && <SubscriptionDetails subscription={detailSubscription} settings={clientSettings} onClose={() => setDetailId(null)} onEdit={handleEditSubscription} />}
       {isModalOpen && <SubscriptionForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

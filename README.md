@@ -2,9 +2,21 @@
 
 家庭使用的轻量订阅管理工具，支持订阅记录、支出分析、汇率换算和 Telegram/邮件提醒。
 
+## 界面与费用口径
+
+- 概览优先展示月度、年度费用估算与待处理账单；手机账单列表无需横向拖动。
+- 订阅支持搜索、筛选、排序、卡片/表格切换、批量操作与只读详情。
+- 新增/编辑的核心信息前置、选填项折叠，手机保存按钮固定在底部。
+- 支出统计展示本月分类金额与扣费分布，与概览共用原有账期汇总。
+- 支持浅色、深色、系统跟随与四套强调色；沿用本地字体和 Lucide。
+
+费用基于当前价格、汇率和日历账期估算，并非支付流水。自动续订状态没有对应数据，
+详情明确显示“未记录”；订阅提醒偏好仍需配合全局规则和通知渠道才能发送。
+设计规范见 [MASTER.md](design-system/subm/MASTER.md)。
+
 ## 要求
 
-- Node.js 22.13 或更高版本（容器与 CI 使用 Node.js 24 LTS）
+- 推荐 Node.js 24.22.1 或更新的 24.x 安全版本（容器与 CI 使用 Node.js 24 LTS）
 - npm 10 或更高版本
 - Docker Compose（仅容器部署需要）
 
@@ -43,6 +55,16 @@
 
 ```bash
 docker compose up -d --build
+```
+
+Dockerfile 的构建和运行阶段均固定使用 `node:24.22.1-alpine`，包含 2026-10-21
+发布的 Node.js 安全修复。更新运行时时需同步修改两处基础镜像版本，并强制获取
+基础镜像后重建、替换容器；仅重启现有容器不会更新 Node.js：
+
+```bash
+docker compose build --pull app
+docker compose up -d --no-build app
+docker compose exec -T app node --version
 ```
 
 应用入口为 `http://127.0.0.1:33001`。一个 `subm` 容器运行单个 Node 进程，同时提供

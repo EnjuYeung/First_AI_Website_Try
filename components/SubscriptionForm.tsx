@@ -1,11 +1,15 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, RefreshCw, Bell, Loader2 } from 'lucide-react';
+import { X, RefreshCw, Bell, Loader2, ChevronDown, Upload } from 'lucide-react';
+import { useDialogScrollLock } from '../hooks/useDialogScrollLock';
 import { Frequency, Subscription, AppSettings } from '../types';
 import { getT } from '../services/i18n';
 import { newId } from '../services/ids';
 import { CategoryGlyph, PaymentGlyph } from './ui/glyphs';
-import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../services/displayLabels';
+import {
+  displayCategoryLabel,
+  displayFrequencyLabel,
+  displayPaymentMethodLabel,
+} from '../services/displayLabels';
 import { deleteUploadedIcon, uploadIconFile } from '../services/storageService';
 import { getTodayYMD } from '../services/dateUtils';
 import { calculateNextBillingDateYMD } from '../shared/billingDate.js';
@@ -19,9 +23,17 @@ interface Props {
   lang: 'en' | 'zh';
 }
 
-const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, settings, lang }) => {
+const SubscriptionForm: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
+  settings,
+  lang,
+}) => {
   const t = getT(lang);
-  
+  useDialogScrollLock(isOpen);
+
   const [formData, setFormData] = useState<Partial<Subscription>>({
     name: '',
     price: 0,
@@ -36,7 +48,7 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     iconUrl: '',
     url: '',
     notes: '',
-    notificationsEnabled: true
+    notificationsEnabled: true,
   });
 
   const [iconLoadError, setIconLoadError] = useState(false);
@@ -51,10 +63,13 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   const dialogRef = useRef<HTMLDivElement>(null);
   const iconUrl = String(formData.iconUrl || '').trim();
 
-  useEffect(() => () => {
-    // A late upload belongs to the closed form, even when the lazy form unmounts.
-    formSession.current += 1;
-  }, []);
+  useEffect(
+    () => () => {
+      // A late upload belongs to the closed form, even when the lazy form unmounts.
+      formSession.current += 1;
+    },
+    []
+  );
 
   const handleIconFile = async (file: File | null) => {
     if (!file) return;
@@ -94,9 +109,12 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   };
 
   // Helper to calculate next billing date
-  const calculateNextDate = useCallback((startStr: string, freq: Frequency) => {
-    return calculateNextBillingDateYMD(startStr, freq, getTodayYMD(settings.timezone));
-  }, [settings.timezone]);
+  const calculateNextDate = useCallback(
+    (startStr: string, freq: Frequency) => {
+      return calculateNextBillingDateYMD(startStr, freq, getTodayYMD(settings.timezone));
+    },
+    [settings.timezone]
+  );
 
   // Initialize form when opening
   useEffect(() => {
@@ -118,36 +136,37 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     setIconLoadError(false);
     setIconUploadError(null);
 
-      if (initialData) {
-        setFormData({
-            ...initialData,
-            status: initialData.status || 'active',
-            cancelledAt: initialData.status === 'cancelled' ? initialData.cancelledAt : undefined,
-            iconUrl: initialData.iconUrl || '',
-            notificationsEnabled: initialData.notificationsEnabled !== undefined ? initialData.notificationsEnabled : true
-        });
-      } else {
-        // Default Initialization for New Subscription
-        const today = getTodayYMD(settings.timezone);
-        const defaultFreq = Frequency.MONTHLY;
-        const initialNextBill = calculateNextDate(today, defaultFreq);
+    if (initialData) {
+      setFormData({
+        ...initialData,
+        status: initialData.status || 'active',
+        cancelledAt: initialData.status === 'cancelled' ? initialData.cancelledAt : undefined,
+        iconUrl: initialData.iconUrl || '',
+        notificationsEnabled:
+          initialData.notificationsEnabled !== undefined ? initialData.notificationsEnabled : true,
+      });
+    } else {
+      // Default Initialization for New Subscription
+      const today = getTodayYMD(settings.timezone);
+      const defaultFreq = Frequency.MONTHLY;
+      const initialNextBill = calculateNextDate(today, defaultFreq);
 
-        setFormData({
-          name: '',
-          price: 0,
-          currency: 'USD',
-          frequency: defaultFreq,
-          category: settings.customCategories[0] || 'Other',
-          paymentMethod: settings.customPaymentMethods[0] || 'Credit Card',
-          status: 'active',
-          startDate: today,
-          nextBillingDate: initialNextBill, // Set calculated value immediately
-          iconUrl: '',
-          url: '',
-          notes: '',
-          notificationsEnabled: true
-        });
-      }
+      setFormData({
+        name: '',
+        price: 0,
+        currency: 'USD',
+        frequency: defaultFreq,
+        category: settings.customCategories[0] || 'Other',
+        paymentMethod: settings.customPaymentMethods[0] || 'Credit Card',
+        status: 'active',
+        startDate: today,
+        nextBillingDate: initialNextBill, // Set calculated value immediately
+        iconUrl: '',
+        url: '',
+        notes: '',
+        notificationsEnabled: true,
+      });
+    }
   }, [isOpen, initialData?.id, calculateNextDate]);
 
   // Auto-calculate Next Billing Date when Start Date or Frequency changes
@@ -158,21 +177,35 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
       !formData.startDate ||
       !formData.frequency ||
       (initialData && !scheduleTouched.current)
-    ) return;
-    
+    )
+      return;
+
     const calculated = calculateNextDate(formData.startDate, formData.frequency);
-    
+
     // Only update if the calculated date is different to avoid infinite loops
     if (calculated !== formData.nextBillingDate) {
-      setFormData(prev => ({ ...prev, nextBillingDate: calculated }));
+      setFormData((prev) => ({ ...prev, nextBillingDate: calculated }));
     }
-  }, [formData.startDate, formData.frequency, formData.status, isOpen, initialData, calculateNextDate, formData.nextBillingDate]);
+  }, [
+    formData.startDate,
+    formData.frequency,
+    formData.status,
+    isOpen,
+    initialData,
+    calculateNextDate,
+    formData.nextBillingDate,
+  ]);
 
   const handleStatusChange = (value: 'active' | 'cancelled') => {
     setFormData((prev) => {
       if (value === 'cancelled') {
         if (prev.status === 'cancelled') return { ...prev, status: value, nextBillingDate: '' };
-        return { ...prev, status: value, cancelledAt: getTodayYMD(settings.timezone), nextBillingDate: '' };
+        return {
+          ...prev,
+          status: value,
+          cancelledAt: getTodayYMD(settings.timezone),
+          nextBillingDate: '',
+        };
       }
       scheduleTouched.current = true;
       return { ...prev, status: value, cancelledAt: undefined };
@@ -192,9 +225,11 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
 
   useEffect(() => {
     if (!isOpen) return;
-    const dialog = dialogRef.current;
-    const firstInput = dialog?.querySelector<HTMLElement>('input:not([type="hidden"]), button, select, textarea');
-    firstInput?.focus();
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialogRef.current?.querySelector<HTMLInputElement>('#subscription-name')?.focus();
+    return () => {
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
   }, [isOpen]);
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -204,9 +239,11 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
       return;
     }
     if (event.key !== 'Tab') return;
-    const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ) || [])];
+    const focusable = [
+      ...(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+      ) || []),
+    ].filter((control) => control.tagName === 'SUMMARY' || !control.closest('details:not([open])'));
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -229,11 +266,11 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
     let saved = false;
     try {
       saved = await onSave({
-          id: initialData?.id || newId(),
-          ...formData as Subscription,
-          price: Number(formData.price),
-          iconUrl: iconUrl.length > 0 ? iconUrl : undefined
-        });
+        id: initialData?.id || newId(),
+        ...(formData as Subscription),
+        price: Number(formData.price),
+        iconUrl: iconUrl.length > 0 ? iconUrl : undefined,
+      });
     } catch {
       saved = false;
     }
@@ -250,79 +287,227 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
   };
 
   return (
-    <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 animate-fade-in sm:p-4">
-      <div ref={dialogRef} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby="subscription-form-title" className="dialog-panel my-6 max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[20px] animate-pop-in">
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] p-5 sm:p-7">
+    <div className="dialog-backdrop editor-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+      <div
+        ref={dialogRef}
+        onKeyDown={handleDialogKeyDown}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="subscription-form-title"
+        className="dialog-panel subscription-editor-panel"
+      >
+        <header className="editor-heading">
           <div>
-            <div className="eyebrow mb-2">Subm / {t('subscriptions')}</div>
-            <h2 id="subscription-form-title" className="font-display text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-            {initialData ? t('edit_subscription') : t('add_subscription')}
+            <h2 id="subscription-form-title">
+              {initialData ? t('edit_subscription') : t('add_subscription')}
             </h2>
+            <p>{t('core_details')}</p>
           </div>
-          <button disabled={isSubmitting} aria-label={t('close')} onClick={closeAndDiscardUploads} className="icon-control rounded-xl p-2 transition-colors">
-            <X size={24} />
+          <button
+            type="button"
+            disabled={isSubmitting}
+            aria-label={t('close')}
+            onClick={closeAndDiscardUploads}
+            className="icon-control"
+          >
+            <X size={21} aria-hidden="true" />
           </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="subscription-form p-5 sm:p-7">
-          {/* 服务名称 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/40 shadow-sm">
-            <label htmlFor="subscription-name" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">{t('service_name')}</label>
+        </header>
+        <form
+          id="subscription-editor"
+          onSubmit={handleSubmit}
+          onInvalidCapture={(event) => {
+            event.target.closest('details')?.setAttribute('open', '');
+          }}
+          className="subscription-form redesigned-form"
+        >
+          <div className="editor-field editor-wide">
+            <label htmlFor="subscription-name">{t('service_name')}</label>
             <input
+              id="subscription-name"
               required
               type="text"
+              autoComplete="off"
               placeholder={t('service_placeholder')}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-base"
-              id="subscription-name"
               value={formData.name}
-              onChange={e => setFormData({...formData, name: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
-
-          {/* 图标设置（在线链接） */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-white/70 dark:bg-slate-900/40 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
-	                {iconUrl && !iconLoadError ? (
-                  <img
-                    src={iconUrl}
-                    alt={String(formData.name || 'icon')}
-                    className="w-full h-full object-contain"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={() => setIconLoadError(true)}
-                  />
-                ) : (
-                  <span className="text-xl font-bold text-primary-600">
-                    {String(formData.name || 'S').charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex-1 space-y-2">
-                <label htmlFor="subscription-icon" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {t('icon_url')}
-                </label>
+          <fieldset className="editor-section editor-wide">
+            <legend>{t('billing_details')}</legend>
+            <div className="editor-grid price-grid">
+              <div className="editor-field">
+                <label htmlFor="subscription-price">{t('price')}</label>
                 <input
-                  type="text"
-                  inputMode="url"
-                  placeholder={t('icon_url_placeholder')}
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  id="subscription-icon"
-                  value={String(formData.iconUrl || '')}
+                  id="subscription-price"
+                  required
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                />
+              </div>
+              <div className="editor-field">
+                <label htmlFor="subscription-currency">{t('currency')}</label>
+                <select
+                  id="subscription-currency"
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                >
+                  {settings.customCurrencies.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="editor-field">
+                <label htmlFor="subscription-frequency">{t('frequency')}</label>
+                <select
+                  id="subscription-frequency"
+                  value={formData.frequency}
                   onChange={(e) => {
-                    setIconLoadError(false);
-                    setIconUploadError(null);
-                    setFormData({ ...formData, iconUrl: e.target.value });
+                    scheduleTouched.current = true;
+                    setFormData({ ...formData, frequency: e.target.value as Frequency });
+                  }}
+                >
+                  {Object.values(Frequency).map((f) => (
+                    <option key={f} value={f}>
+                      {displayFrequencyLabel(f, lang)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="editor-grid mt-4">
+              <div className="editor-field">
+                <label htmlFor="subscription-start-date">{t('start_date')}</label>
+                <input
+                  id="subscription-start-date"
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => {
+                    scheduleTouched.current = true;
+                    setFormData({ ...formData, startDate: e.target.value });
                   }}
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400">{t('icon_url_tip')}</p>
-                {iconUploadError && (
-                  <p className="text-xs text-red-600 dark:text-red-400">{iconUploadError}</p>
-                )}
-
-                <div className="flex items-center gap-3 pt-1">
-                  <label className="file-upload-control inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100/70 dark:bg-slate-700/60 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors cursor-pointer">
+              </div>
+              <div className="editor-field">
+                <label htmlFor="subscription-next-date">
+                  {t('next_billing_date')}
+                  <RefreshCw size={13} aria-hidden="true" />
+                </label>
+                <input
+                  id="subscription-next-date"
+                  type="date"
+                  readOnly
+                  aria-describedby="billing-date-hint"
+                  value={formData.nextBillingDate}
+                />
+                <p id="billing-date-hint" className="field-hint">
+                  {t('automatic_date_hint')}
+                </p>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset className="editor-section editor-wide">
+            <legend>{t('organize_details')}</legend>
+            <div className="editor-grid">
+              <div className="editor-field">
+                <label htmlFor="subscription-category">
+                  <CategoryGlyph
+                    category={String(formData.category || '')}
+                    containerSize={18}
+                    size={12}
+                  />
+                  {t('categories')}
+                </label>
+                <select
+                  id="subscription-category"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                >
+                  {settings.customCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {displayCategoryLabel(cat, lang)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="editor-field">
+                <label htmlFor="subscription-payment">
+                  <PaymentGlyph
+                    method={String(formData.paymentMethod || 'Credit Card')}
+                    containerSize={18}
+                    size={12}
+                  />
+                  {t('payment')}
+                </label>
+                <select
+                  id="subscription-payment"
+                  value={formData.paymentMethod}
+                  onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                >
+                  {settings.customPaymentMethods.map((pm) => (
+                    <option key={pm} value={pm}>
+                      {displayPaymentMethodLabel(pm, lang)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </fieldset>
+          <div className="editor-field editor-wide">
+            <label htmlFor="subscription-status">{t('status')}</label>
+            <select
+              id="subscription-status"
+              value={formData.status}
+              onChange={(e) => handleStatusChange(e.target.value as 'active' | 'cancelled')}
+            >
+              <option value="active">{t('active')}</option>
+              <option value="cancelled">{t('cancelled')}</option>
+            </select>
+            <p className="field-hint">{t('record_status_hint')}</p>
+          </div>
+          <div className="editor-reminder editor-wide">
+            <Bell size={18} aria-hidden="true" />
+            <div>
+              <label htmlFor="subscription-reminder">{t('billing_reminder')}</label>
+              <p>{t('reminder_setup_note')}</p>
+            </div>
+            <input
+              id="subscription-reminder"
+              type="checkbox"
+              checked={formData.notificationsEnabled}
+              onChange={(e) => setFormData({ ...formData, notificationsEnabled: e.target.checked })}
+            />
+          </div>
+          <details className="editor-optional editor-wide">
+            <summary>
+              {t('optional_details')}
+              <span>{t('optional')}</span>
+              <ChevronDown size={17} aria-hidden="true" />
+            </summary>
+            <div className="optional-body">
+              <div className="editor-icon-row">
+                <span className="editor-icon-preview" aria-hidden="true">
+                  {iconUrl && !iconLoadError ? (
+                    <img
+                      src={iconUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={() => setIconLoadError(true)}
+                    />
+                  ) : (
+                    String(formData.name || 'S')
+                      .charAt(0)
+                      .toUpperCase()
+                  )}
+                </span>
+                <div>
+                  <label className="file-upload-control secondary-action">
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
@@ -332,225 +517,97 @@ const SubscriptionForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialDat
                       onChange={(e) => handleIconFile(e.target.files?.[0] || null)}
                     />
                     {isIconUploading ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>{t('uploading')}</span>
-                      </>
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
                     ) : (
-                      <span>{t('upload_from_device')}</span>
+                      <Upload size={16} aria-hidden="true" />
                     )}
+                    <span>{isIconUploading ? t('uploading') : t('upload_from_device')}</span>
                   </label>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{t('upload_icon_hint')}</span>
+                  <p className="field-hint">{t('upload_icon_hint')}</p>
                 </div>
+                {iconUrl && (
+                  <button
+                    type="button"
+                    className="text-action"
+                    onClick={() => {
+                      setIconLoadError(false);
+                      setFormData({ ...formData, iconUrl: '' });
+                    }}
+                  >
+                    {t('clear_icon')}
+                  </button>
+                )}
               </div>
-
-              {iconUrl && (
-                <button
-                  type="button"
-                  onClick={() => {
+              <div className="editor-field">
+                <label htmlFor="subscription-icon">{t('icon_url')}</label>
+                <input
+                  id="subscription-icon"
+                  type="text"
+                  inputMode="url"
+                  placeholder={t('icon_url_placeholder')}
+                  value={String(formData.iconUrl || '')}
+                  aria-describedby={iconUploadError ? 'icon-upload-error' : undefined}
+                  onChange={(e) => {
                     setIconLoadError(false);
-                    setFormData({ ...formData, iconUrl: '' });
+                    setIconUploadError(null);
+                    setFormData({ ...formData, iconUrl: e.target.value });
                   }}
-                  className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-200 bg-gray-100/70 dark:bg-slate-700/60 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors"
-                  title={t('clear_icon')}
-                >
-                  {t('clear_icon')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 价格/币种/周期/分类 */}
-          <div className="form-wide p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="subscription-price" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('price')}</label>
+                />
+                {iconUploadError && (
+                  <p id="icon-upload-error" role="alert" className="field-error">
+                    {iconUploadError}
+                  </p>
+                )}
+              </div>
+              <div className="editor-field">
+                <label htmlFor="subscription-url">{t('service_url')}</label>
                 <input
-                  required
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  id="subscription-price"
-                  value={formData.price}
-                  onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
+                  id="subscription-url"
+                  type="url"
+                  inputMode="url"
+                  placeholder={t('service_url_placeholder')}
+                  value={String(formData.url || '')}
+                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="subscription-currency" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('currency')}</label>
-                <select
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  id="subscription-currency"
-                  value={formData.currency}
-                  onChange={e => setFormData({...formData, currency: e.target.value})}
-                >
-                  {settings.customCurrencies.map(c => (
-                      <option key={c.code} value={c.code}>{c.code}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="subscription-frequency" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('frequency')}</label>
-                <select
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  id="subscription-frequency"
-                  value={formData.frequency}
-                  onChange={e => {
-                    scheduleTouched.current = true;
-                    setFormData({...formData, frequency: e.target.value as Frequency});
-                  }}
-                >
-                  {Object.values(Frequency).map(f => (
-                    <option key={f} value={f}>{displayFrequencyLabel(f as Frequency, lang)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="subscription-category" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                  <CategoryGlyph category={String(formData.category || '')} containerSize={18} size={12} />
-                  <span>{t('categories')}</span>
-                </label>
-                <select
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  id="subscription-category"
-                  value={formData.category}
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                >
-                  {settings.customCategories.map(cat => (
-                    <option key={cat} value={cat}>{displayCategoryLabel(cat, lang)}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 支付方式 / 状态 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-	              <div className="flex flex-col gap-1">
-	                <label htmlFor="subscription-payment" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-	                  <PaymentGlyph method={String(formData.paymentMethod || 'Credit Card')} containerSize={18} size={12} />
-	                  <span>{lang === 'zh' ? '支付方式' : t('payment_methods')}</span>
-	                </label>
-	                <select
-	                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-sm"
-	                    id="subscription-payment"
-	                    value={formData.paymentMethod}
-	                    onChange={e => setFormData({...formData, paymentMethod: e.target.value})}
-	                >
-	                    {settings.customPaymentMethods.map(pm => (
-	                    <option key={pm} value={pm}>{displayPaymentMethodLabel(pm, lang)}</option>
-	                    ))}
-	                </select>
-	              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="subscription-status" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('status')}</label>
-                <select
-                  className={`w-full px-4 py-2.5 border rounded-lg font-semibold text-center focus:ring-2 focus:ring-primary-500 outline-none transition-colors ${
-                    formData.status === 'active' 
-                    ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900' 
-                    : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900'
-                  }`}
-                  id="subscription-status"
-                  value={formData.status}
-                  onChange={e => handleStatusChange(e.target.value as 'active' | 'cancelled')}
-                >
-                  <option value="active">{t('active')}</option>
-                  <option value="cancelled">{t('cancelled')}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 起始日期 / 下个账单日 */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="subscription-start-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('start_date')}</label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
-                  id="subscription-start-date"
-                  value={formData.startDate}
-                  onChange={e => {
-                    scheduleTouched.current = true;
-                    setFormData({...formData, startDate: e.target.value});
-                  }}
+              <div className="editor-field">
+                <label htmlFor="subscription-notes">{t('notes')}</label>
+                <textarea
+                  id="subscription-notes"
+                  rows={3}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                 <label htmlFor="subscription-next-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                   {t('next_billing_date')}
-                   <RefreshCw size={12} className="text-gray-400" />
-                 </label>
-                 <input
-                  type="date"
-                  readOnly
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-slate-600 rounded-lg text-gray-600 dark:text-gray-200 cursor-not-allowed outline-none font-mono text-sm tracking-wide"
-                  id="subscription-next-date"
-                  value={formData.nextBillingDate}
-                 />
-              </div>
             </div>
-          </div>
-
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <label htmlFor="subscription-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('service_url')}</label>
-            <input
-              type="url"
-              inputMode="url"
-              placeholder={t('service_url_placeholder')}
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-              id="subscription-url"
-              value={String(formData.url || '')}
-              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-            />
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('service_url_tip')}</p>
-          </div>
-
-          {/* Notes */}
-          <div className="p-5 rounded-xl border border-gray-100 dark:border-gray-700 mac-surface-soft shadow-sm">
-            <label htmlFor="subscription-notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('notes')}</label>
-            <textarea
-              className="w-full min-h-[100px] px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-              id="subscription-notes"
-              value={formData.notes}
-              onChange={e => setFormData({...formData, notes: e.target.value})}
-            />
-          </div>
-
-          {/* Notification Toggle */}
-          <div className="form-wide flex items-center justify-between p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
-              <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                  <Bell size={18} />
-                  <div>
-                    <p className="text-sm font-semibold">{t('enable_notifications')}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('next_billing_date')} {t('notifications')}</p>
-                  </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                    type="checkbox" 
-                    aria-label={t('enable_notifications')}
-                    checked={formData.notificationsEnabled} 
-                    onChange={e => setFormData({...formData, notificationsEnabled: e.target.checked})} 
-                    className="sr-only peer" 
-                />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isIconUploading || isSubmitting}
-            className="primary-action mt-2 w-full rounded-xl py-4 font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSubmitting
-              ? t('saving')
-              : initialData ? t('save') : t('add_new')}
-          </button>
-          {submitError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{submitError}</p>}
+          </details>
         </form>
+        <footer className="editor-footer">
+          {submitError && (
+            <p role="alert" className="field-error">
+              {submitError}
+            </p>
+          )}
+          <div>
+            <button
+              type="button"
+              className="secondary-action"
+              disabled={isSubmitting}
+              onClick={closeAndDiscardUploads}
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="submit"
+              form="subscription-editor"
+              disabled={isIconUploading || isSubmitting}
+              className="primary-action"
+            >
+              {isSubmitting && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
+              {isSubmitting ? t('saving') : initialData ? t('save') : t('add_new')}
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

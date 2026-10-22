@@ -10,6 +10,8 @@ import { useSubscriptionFilters } from '../hooks/useSubscriptionFilters';
 import { SubscriptionToolbar } from './subscription/SubscriptionToolbar';
 import { SubscriptionTableView } from './subscription/SubscriptionTableView';
 import { SubscriptionGridView } from './subscription/SubscriptionGridView';
+import { ModalDialog } from './ui/ModalDialog';
+import { Plus, Search } from 'lucide-react';
 
 interface Props {
   subscriptions: Subscription[];
@@ -21,6 +23,8 @@ interface Props {
   lang: 'en' | 'zh';
   exchangeRates: ExchangeRates;
   timezone: string;
+  onView?: (sub: Subscription) => void;
+  onAdd?: () => void;
 }
 
 export const getVisibleSelectedIds = (
@@ -39,7 +43,9 @@ const SubscriptionList: React.FC<Props> = ({
   onBatchDelete,
   lang,
   exchangeRates,
-  timezone
+  timezone,
+  onView,
+  onAdd
 }) => {
   const t = getT(lang);
 
@@ -63,6 +69,7 @@ const SubscriptionList: React.FC<Props> = ({
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteRequest, setDeleteRequest] = useState<{ ids: string[]; batch: boolean } | null>(null);
   const visibleIds = useMemo(
     () => new Set(filteredSubscriptions.map((subscription) => subscription.id)),
     [filteredSubscriptions]
@@ -99,17 +106,13 @@ const SubscriptionList: React.FC<Props> = ({
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm(t('confirm_delete'))) return;
-    onDelete(id);
+    setDeleteRequest({ ids: [id], batch: false });
   };
 
   const executeBatchDelete = () => {
     const visibleSelection = getVisibleSelectedIds(filteredSubscriptions, selectedIds);
     if (visibleSelection.length === 0) return;
-    const message = t('confirm_batch_delete').replace('{count}', visibleSelection.length.toString());
-    if (!window.confirm(message)) return;
-    onBatchDelete(visibleSelection);
-    setSelectedIds(new Set());
+    setDeleteRequest({ ids: visibleSelection, batch: true });
   };
 
   // --- Options Construction ---
@@ -221,8 +224,10 @@ const SubscriptionList: React.FC<Props> = ({
           <h1 className="page-title">{t('subscriptions')}</h1>
           <p className="page-copy mt-3 text-sm">{t('manage_text')}</p>
         </header>
-        <div className="statement-card border-dashed p-12 text-center">
-          <p className="text-sm text-[var(--muted)]">{t('manage_text')}</p>
+        <div className="statement-card subscription-empty">
+          <span className="empty-icon"><Plus size={24} aria-hidden="true" /></span>
+          <h2>{t('empty_start')}</h2><p>{t('empty_start_copy')}</p>
+          {onAdd && <button type="button" className="primary-action" onClick={onAdd}><Plus size={17} aria-hidden="true" />{t('add_new')}</button>}
         </div>
       </div>
     );
@@ -245,7 +250,7 @@ const SubscriptionList: React.FC<Props> = ({
           <p className="page-copy mt-3 text-sm">{t('manage_text')}</p>
         </div>
         <div className="font-data text-sm text-[var(--muted)]">
-          {String(filteredSubscriptions.length).padStart(2, '0')} / {String(subscriptions.length).padStart(2, '0')}
+          {filteredSubscriptions.length} / {subscriptions.length} {t('list_count')}
         </div>
       </header>
       <SubscriptionToolbar
@@ -283,7 +288,7 @@ const SubscriptionList: React.FC<Props> = ({
         t={t}
       />
 
-      {viewMode === 'list' ? (
+      {filteredSubscriptions.length === 0 ? <div className="statement-card subscription-empty"><Search size={24} aria-hidden="true" /><h2>{t('no_subscriptions')}</h2><p>{t('no_matches_copy')}</p><button type="button" className="secondary-action" onClick={resetFilters}>{t('reset')}</button></div> : viewMode === 'list' ? (
         <SubscriptionTableView
           subscriptions={filteredSubscriptions}
           selectedIds={selectedIds}
@@ -292,6 +297,7 @@ const SubscriptionList: React.FC<Props> = ({
           sortConfig={{ key: sortConfig.key, direction: sortConfig.direction }}
           onSort={handleSort}
           onEdit={onEdit}
+          onView={onView}
           onDuplicate={onDuplicate}
           onDelete={handleDelete}
           renderDateBadge={renderDateBadge}
@@ -305,6 +311,7 @@ const SubscriptionList: React.FC<Props> = ({
           selectedIds={selectedIds}
           onSelectOne={handleSelectOne}
           onEdit={onEdit}
+          onView={onView}
           onDuplicate={onDuplicate}
           onDelete={handleDelete}
           renderDateBadge={renderDateBadge}
@@ -313,6 +320,17 @@ const SubscriptionList: React.FC<Props> = ({
           t={t}
         />
       )}
+      {deleteRequest && <ModalDialog role="alertdialog" title={deleteRequest.batch ? t('batch_delete') : t('remove')} onClose={() => setDeleteRequest(null)}
+        actions={<div className="flex gap-3"><button type="button" className="secondary-action flex-1 rounded-xl py-3" onClick={() => setDeleteRequest(null)}>{t('cancel')}</button><button type="button" className="danger-action flex-1" onClick={() => {
+          if (deleteRequest.batch) {
+            onBatchDelete(deleteRequest.ids);
+            setSelectedIds(new Set());
+          }
+          else onDelete(deleteRequest.ids[0]);
+          setDeleteRequest(null);
+        }}>{t('remove')}</button></div>}>
+        <p>{deleteRequest.batch ? t('confirm_batch_delete').replace('{count}', String(deleteRequest.ids.length)) : t('confirm_delete')}</p><p className="mt-3">{t('removal_note')}</p>
+      </ModalDialog>}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { useDialogScrollLock } from '../../hooks/useDialogScrollLock';
 
 interface Props {
   title: string;
@@ -8,11 +9,14 @@ interface Props {
   onClose: () => void;
   role?: 'dialog' | 'alertdialog';
   wide?: boolean;
+  presentation?: 'default' | 'details';
+  describeContent?: boolean;
 }
 
-export const ModalDialog: React.FC<Props> = ({ title, icon, children, actions, onClose, role = 'dialog', wide = false }) => {
+export const ModalDialog: React.FC<Props> = ({ title, icon, children, actions, onClose, role = 'dialog', wide = false, presentation = 'default', describeContent = true }) => {
   const id = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  useDialogScrollLock();
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
@@ -40,7 +44,7 @@ export const ModalDialog: React.FC<Props> = ({ title, icon, children, actions, o
 
   return (
     <div className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div ref={panelRef} role={role} aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={children ? `${id}-description` : undefined} tabIndex={-1} onKeyDown={handleKeyDown} className={`dialog-panel max-h-[92vh] w-full overflow-y-auto rounded-[20px] p-6 text-center animate-pop-in ${wide ? 'max-w-lg' : 'max-w-sm'}`}>
+      <div ref={panelRef} role={role} aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={children && describeContent ? `${id}-description` : undefined} tabIndex={-1} onKeyDown={handleKeyDown} className={`dialog-panel max-h-[92dvh] w-full overflow-y-auto rounded-[20px] p-6 text-center animate-pop-in ${presentation === 'details' ? 'detail-dialog' : ''} ${wide ? 'max-w-lg' : 'max-w-sm'}`}>
         {icon && <div className="mb-4 flex justify-center" aria-hidden="true">{icon}</div>}
         <h3 id={`${id}-title`} className="text-xl font-semibold text-[var(--ink)]">{title}</h3>
         {children && <div id={`${id}-description`} className="mt-3 text-sm leading-relaxed text-[var(--muted)]">{children}</div>}

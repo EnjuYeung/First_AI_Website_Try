@@ -1,5 +1,15 @@
 import React from 'react';
-import { Globe, LogOut, Monitor, Moon, Plus, RefreshCcw, Sun } from 'lucide-react';
+import {
+  Globe,
+  LogOut,
+  Monitor,
+  Moon,
+  MoreHorizontal,
+  Plus,
+  RefreshCcw,
+  Repeat2,
+  Sun,
+} from 'lucide-react';
 import { AppSettings } from '../../types';
 
 interface NavTab {
@@ -39,8 +49,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <header className="app-header sticky top-0 z-40">
-      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-end gap-4 px-4 sm:px-6 md:justify-between lg:px-8">
-        <nav className="hidden min-w-0 items-center gap-1 md:flex" aria-label="Primary navigation">
+      <div className="header-content mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <button
+          type="button"
+          className="app-brand"
+          aria-label={`Subm · ${t('dashboard')}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <Repeat2 size={21} aria-hidden="true" />
+          <span>Subm</span>
+        </button>
+        <nav className="hidden min-w-0 items-center gap-1 lg:flex" aria-label="Primary navigation">
           {navTabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
@@ -52,7 +71,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 data-active={active}
                 aria-current={active ? 'page' : undefined}
               >
-                <tab.icon size={16} />
+                <tab.icon size={16} aria-hidden="true" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -63,18 +82,36 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <button
             type="button"
             onClick={loadRemoteData}
-            className="icon-control rounded-xl p-2.5 transition-colors disabled:opacity-45"
+            className="icon-control hidden rounded-xl p-2.5 transition-colors disabled:opacity-45 lg:flex"
             title={t('refresh_rates')}
             aria-label={t('refresh_rates')}
             disabled={isDataLoading}
           >
             <RefreshCcw size={17} className={isDataLoading ? 'animate-spin' : ''} />
           </button>
-          <button type="button" onClick={toggleLanguage} className="icon-control rounded-xl p-2.5 transition-colors" title={t('language')} aria-label={t('language')}>
+          <button
+            type="button"
+            onClick={toggleLanguage}
+            className="icon-control hidden rounded-xl p-2.5 transition-colors lg:flex"
+            title={t('language')}
+            aria-label={t('language')}
+          >
             <Globe size={17} />
           </button>
-          <button type="button" onClick={toggleTheme} className="icon-control rounded-xl p-2.5 transition-colors" title={t('appearance')} aria-label={t('appearance')}>
-            {settings.theme === 'dark' ? <Moon size={17} /> : settings.theme === 'system' ? <Monitor size={17} /> : <Sun size={17} />}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="icon-control rounded-xl p-2.5 transition-colors"
+            title={t('appearance')}
+            aria-label={t('appearance')}
+          >
+            {settings.theme === 'dark' ? (
+              <Moon size={17} />
+            ) : settings.theme === 'system' ? (
+              <Monitor size={17} />
+            ) : (
+              <Sun size={17} />
+            )}
           </button>
 
           {canAdd && (
@@ -89,9 +126,64 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </button>
           )}
 
-          <button type="button" onClick={onLogoutClick} className="icon-control ml-0.5 rounded-xl p-2.5 transition-colors" title={t('logout')} aria-label={t('logout')}>
+          <button
+            type="button"
+            onClick={onLogoutClick}
+            className="icon-control ml-0.5 hidden rounded-xl p-2.5 transition-colors lg:flex"
+            title={t('logout')}
+            aria-label={t('logout')}
+          >
             <LogOut size={17} />
           </button>
+          <details
+            className="mobile-utility-menu lg:hidden"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.currentTarget.removeAttribute('open');
+                event.currentTarget.querySelector('summary')?.focus();
+              }
+            }}
+          >
+            <summary aria-label={t('actions')} className="icon-control">
+              <MoreHorizontal size={21} aria-hidden="true" />
+            </summary>
+            <div className="utility-popover">
+              <button
+                type="button"
+                aria-label={t('refresh_rates')}
+                disabled={isDataLoading}
+                onClick={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                  void loadRemoteData();
+                }}
+              >
+                <RefreshCcw size={17} aria-hidden="true" />
+                {t('refresh_rates')}
+              </button>
+              <button
+                type="button"
+                aria-label={t('language')}
+                onClick={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                  toggleLanguage();
+                }}
+              >
+                <Globe size={17} aria-hidden="true" />
+                {t('language')}
+              </button>
+              <button
+                type="button"
+                aria-label={t('logout')}
+                onClick={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                  onLogoutClick();
+                }}
+              >
+                <LogOut size={17} aria-hidden="true" />
+                {t('logout')}
+              </button>
+            </div>
+          </details>
         </div>
       </div>
     </header>

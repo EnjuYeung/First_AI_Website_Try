@@ -1,6 +1,7 @@
 import React from 'react';
 import { Subscription, Frequency } from '../../types';
-import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Edit2, Copy, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Edit2, Copy, Trash2 } from 'lucide-react';
+import { ServiceAvatar } from '../ui/ServiceAvatar';
 import { CategoryGlyph, PaymentGlyph } from '../ui/glyphs';
 import { displayCategoryLabel, displayFrequencyLabel, displayPaymentMethodLabel } from '../../services/displayLabels';
 import { SubscriptionCostStack } from './SubscriptionCostStack';
@@ -20,6 +21,7 @@ interface SubscriptionTableViewProps {
     onSort: (key: string) => void; // Using string to allow flexible keys
 
     onEdit: (sub: Subscription) => void;
+    onView?: (sub: Subscription) => void;
     onDuplicate: (sub: Subscription) => void;
     onDelete: (id: string) => void;
 
@@ -38,6 +40,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
     sortConfig,
     onSort,
     onEdit,
+    onView,
     onDuplicate,
     onDelete,
     renderDateBadge,
@@ -115,26 +118,11 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                 </td>
                                 <td className="px-5 py-4 whitespace-nowrap">
                                     <div className="flex items-center space-x-3">
-                                        {sub.iconUrl ? (
-                                            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
-                                                <img src={sub.iconUrl} alt={sub.name} className="w-full h-full object-contain" loading="lazy" referrerPolicy="no-referrer" />
-                                            </div>
-                                        ) : (
-                                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] border border-[var(--line)] bg-[var(--surface-soft)] text-lg font-bold text-[var(--rail-teal)]">
-                                                {sub.name.charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
+                                        <ServiceAvatar sub={sub} />
 
                                         <div>
-                                            <p className="font-semibold text-gray-900 dark:text-white">{sub.name}</p>
-                                            {sub.url && (
-                                                <div className="flex items-center space-x-1 text-xs text-primary-500 hover:underline">
-                                                    <a href={sub.url} target="_blank" rel="noreferrer" className="flex items-center">
-                                                        {t('view_details')}
-                                                        <ExternalLink size={10} className="ml-1" />
-                                                    </a>
-                                                </div>
-                                            )}
+                                            <button type="button" className="service-name-button" onClick={() => (onView || onEdit)(sub)} aria-label={`${t('view_details')} ${sub.name}`}>{sub.name}</button>
+                                            <p className="mt-1 text-xs text-[var(--muted)]">{t(sub.notificationsEnabled ? 'reminder_on' : 'reminder_off')} · {t('billing_reminder')}</p>
                                         </div>
                                     </div>
                                 </td>
@@ -153,6 +141,7 @@ export const SubscriptionTableView: React.FC<SubscriptionTableViewProps> = ({
                                         timezone={timezone}
                                         size="table"
                                         periodsLabel={t('lifetime_periods')}
+                                        estimateLabel={t('lifetime_estimate')}
                                     />
                                 </td>
                                 <td className="px-5 py-4 whitespace-nowrap">

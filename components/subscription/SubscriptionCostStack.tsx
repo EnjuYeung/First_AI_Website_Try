@@ -10,6 +10,7 @@ interface Props {
   size: 'table' | 'grid';
   frequencySuffix?: string;
   periodsLabel: string;
+  estimateLabel?: string;
 }
 
 export const SubscriptionCostStack: React.FC<Props> = ({
@@ -18,12 +19,12 @@ export const SubscriptionCostStack: React.FC<Props> = ({
   size,
   frequencySuffix,
   periodsLabel,
+  estimateLabel,
 }) => {
   const { periods, spent } = getSubscriptionLifetime(subscription, getTodayYMD(timezone));
-  const cancelled = subscription.status === 'cancelled';
 
   return (
-    <div className={`min-w-0 ${cancelled && size === 'grid' ? 'opacity-45' : ''}`}>
+    <div className="min-w-0">
       <div className="flex min-w-0 items-baseline gap-2">
         <span
           className={`cost-current data-value font-medium text-[var(--ink)] ${
@@ -36,9 +37,14 @@ export const SubscriptionCostStack: React.FC<Props> = ({
           <span className="text-xs text-[var(--muted)]">/ {frequencySuffix}</span>
         ) : null}
       </div>
-      <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px] leading-tight">
-        <span className="font-sans text-[var(--muted)]">{periodsLabel.replace('{count}', String(periods))}</span>
-        <span className="text-[var(--muted)]" aria-hidden="true">·</span>
+      <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs leading-relaxed">
+        <span className="font-sans text-[var(--muted)]">
+          {estimateLabel && `${estimateLabel} · `}
+          {periodsLabel.replace('{count}', String(periods))}
+        </span>
+        <span className="text-[var(--muted)]" aria-hidden="true">
+          ·
+        </span>
         <span className="cost-lifetime text-[var(--ink-soft)]">
           {formatCurrency(spent, subscription.currency)}
         </span>
